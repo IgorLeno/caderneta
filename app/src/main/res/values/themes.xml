@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Caderneta" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- Personalize as cores do seu tema aqui -->
+        <item name="colorPrimary">#FF5722</item>
+        <item name="colorPrimaryDark">#FF5722</item>
+        <item name="colorSecondary">#F44336</item>
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="ButtonStyle" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="backgroundTint">@color/button_background_unselected</item>
+        <item name="iconTint">@color/button_icon_unselected</item>
+        <item name="strokeColor">@color/button_stroke</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="ButtonStyle.Selected">
+        <item name="backgroundTint">@color/button_background_selected</item>
+        <item name="iconTint">@color/button_icon_selected</item>
+        <item name="strokeColor">@color/button_background_selected</item>
+    </style>
+</resources>

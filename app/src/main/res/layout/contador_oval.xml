@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_oval"
+    android:orientation="horizontal"
+    android:padding="4dp">
+
+    <ImageButton
+        android:id="@+id/btn_menos"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_minus" />
+
+    <TextView
+        android:id="@+id/tv_quantidade"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="8dp"
+        android:text="0"
+        android:textSize="16sp" />
+
+    <ImageButton
+        android:id="@+id/btn_mais"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_plus" />
+
+</LinearLayout>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary_color">#ff8247</color>
+    <color name="primary_variant">#ff9765</color>
+    <color name="secondary_color">#ffa265</color>
+    <color name="secondary_variant">#ffac83</color>
+    <color name="background_color">#FFF5F0</color>
+    <color name="surface_color">#FFFFFF</color>
+    <color name="on_primary">#000000</color>
+    <color name="on_secondary">#000000</color>
+    <color name="on_background">#000000</color>
+    <color name="on_surface">#000000</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="green">#4CAF50</color>
+    <color name="blue">#2196F3</color>
+    <color name="red">#F44336</color>
+
+    <!-- Mantendo cores de ação -->
+    <color name="edit_color">#2196F3</color>
+    <color name="delete_color">#F44336</color>
+    <color name="add_color">#4CAF50</color>
+
+    <!-- Cores para níveis de local -->
+    <color name="level_0">#ff9765</color>
+    <color name="level_1">#ffa87e</color>
+    <color name="level_2">#ffba97</color>
+    <color name="level_3">#ffcbb0</color>
+
+    <!-- Cores para os botoes -->
+    <color name="button_background_selected">#FF5722</color>
+    <color name="button_background_unselected">#FFFFFF</color>
+    <color name="button_icon_selected">#FFFFFF</color>
+    <color name="button_icon_unselected">#757575</color>
+    <color name="button_stroke">#E0E0E0</color>
+</resources>

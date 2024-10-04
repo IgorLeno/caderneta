@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/vendasFragment">
+
+    <fragment
+        android:id="@+id/vendasFragment"
+        android:name="com.example.caderneta.ui.vendas.VendasFragment"
+        android:label="Vendas"
+        tools:layout="@layout/fragment_vendas" />
+
+    <fragment
+        android:id="@+id/consultasFragment"
+        android:name="com.example.caderneta.ui.consultas.ConsultasFragment"
+        android:label="Consultas"
+        tools:layout="@layout/fragment_consultas" />
+
+    <fragment
+        android:id="@+id/balancoCaixaFragment"
+        android:name="com.example.caderneta.ui.balanco.BalancoCaixaFragment"
+        android:label="Balanço de Caixa"
+        tools:layout="@layout/fragment_balanco_caixa" />
+
+    <fragment
+        android:id="@+id/historicoVendasFragment"
+        android:name="com.example.caderneta.ui.historico.HistoricoVendasFragment"
+        android:label="Histórico de Vendas"
+        tools:layout="@layout/fragment_historico_vendas" />
+
+    <fragment
+        android:id="@+id/configuracoesFragment"
+        android:name="com.example.caderneta.ui.configuracoes.ConfiguracoesFragment"
+        android:label="Configurações"
+        tools:layout="@layout/fragment_configuracoes" />
+
+</navigation>

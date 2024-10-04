@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/et_quantidade_salgados"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Quantidade de salgados"
+        android:inputType="number" />
+
+    <EditText
+        android:id="@+id/et_quantidade_sucos"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Quantidade de sucos"
+        android:inputType="number" />
+
+    <EditText
+        android:id="@+id/et_valor_total"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Valor total"
+        android:inputType="numberDecimal" />
+
+</LinearLayout>
