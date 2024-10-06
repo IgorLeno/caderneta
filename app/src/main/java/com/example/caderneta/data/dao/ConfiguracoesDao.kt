@@ -5,7 +5,7 @@ import com.example.caderneta.data.entity.Configuracoes
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface ConfiguracaoDao {
+interface ConfiguracoesDao {
     @Query("SELECT * FROM configuracoes LIMIT 1")
     fun getConfiguracoes(): Flow<Configuracoes?>
 

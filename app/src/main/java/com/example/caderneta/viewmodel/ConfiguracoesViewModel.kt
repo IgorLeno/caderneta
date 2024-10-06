@@ -3,97 +3,71 @@ package com.example.caderneta.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.caderneta.data.entity.Produto
-import com.example.caderneta.data.entity.TipoProduto
-import com.example.caderneta.repository.ProdutoRepository
+import com.example.caderneta.data.entity.Configuracoes
+import com.example.caderneta.repository.ConfiguracoesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
-class ConfiguracoesViewModel(
-    private val produtoRepository: ProdutoRepository
-) : ViewModel() {
+class ConfiguracoesViewModel(private val repository: ConfiguracoesRepository) : ViewModel() {
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+    private val _configuracoes = MutableStateFlow<Configuracoes?>(null)
+    val configuracoes: StateFlow<Configuracoes?> = _configuracoes
+
+    private val _promocoesAtivadas = MutableStateFlow(false)
+    val promocoesAtivadas: StateFlow<Boolean> = _promocoesAtivadas
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    private val _produtos = MutableStateFlow<List<Produto>>(emptyList())
-    val produtos: StateFlow<List<Produto>> = _produtos
-
-    private val _precoAtualizado = MutableStateFlow<Produto?>(null)
-    val precoAtualizado: StateFlow<Produto?> = _precoAtualizado
-
     init {
-        carregarProdutos()
+        loadConfiguracoes()
     }
 
-    private fun carregarProdutos() {
+    private fun loadConfiguracoes() {
         viewModelScope.launch {
-            _isLoading.value = true
+            repository.getConfiguracoes()
+                .catch { e ->
+                    _error.value = "Erro ao carregar configurações: ${e.message}"
+                }
+                .collect { configuracoes ->
+                    _configuracoes.value = configuracoes
+                    _promocoesAtivadas.value = configuracoes.promocoesAtivadas
+                }
+        }
+    }
+
+    fun setPromocoesAtivadas(ativadas: Boolean) {
+        _promocoesAtivadas.value = ativadas
+    }
+
+    fun salvarConfiguracoes(novasConfiguracoes: Configuracoes) {
+        viewModelScope.launch {
             try {
-                produtoRepository.getAllProdutos().collect {
-                    _produtos.value = it
+                if (novasConfiguracoes.isValid()) {
+                    repository.salvarConfiguracoes(novasConfiguracoes)
+                    _configuracoes.value = novasConfiguracoes
+                    _error.value = null
+                } else {
+                    _error.value = "Configurações inválidas. Verifique os valores inseridos."
                 }
             } catch (e: Exception) {
-                _error.value = "Erro ao carregar produtos: ${e.message}"
-            } finally {
-                _isLoading.value = false
+                _error.value = "Erro ao salvar configurações: ${e.message}"
             }
         }
     }
 
-    fun atualizarPrecoProduto(produtoId: Long, novoPreco: Double) {
-        viewModelScope.launch {
-            try {
-                val produto = produtoRepository.getProdutoById(produtoId)
-                produto?.let {
-                    val produtoAtualizado = it.copy(preco = novoPreco)
-                    produtoRepository.updateProduto(produtoAtualizado)
-                    _precoAtualizado.value = produtoAtualizado
-                }
-            } catch (e: Exception) {
-                _error.value = "Erro ao atualizar preço: ${e.message}"
-            }
-        }
-    }
-
-    fun adicionarNovoProduto(nome: String, preco: Double, tipo: TipoProduto) {
-        viewModelScope.launch {
-            try {
-                val novoProduto = Produto(nome = nome, preco = preco, tipo = tipo)
-                produtoRepository.insertProduto(novoProduto)
-                carregarProdutos() // Recarrega a lista de produtos
-            } catch (e: Exception) {
-                _error.value = "Erro ao adicionar produto: ${e.message}"
-            }
-        }
-    }
-
-    fun removerProduto(produtoId: Long) {
-        viewModelScope.launch {
-            try {
-                val produto = produtoRepository.getProdutoById(produtoId)
-                produto?.let {
-                    produtoRepository.deleteProduto(it)
-                    carregarProdutos() // Recarrega a lista de produtos
-                }
-            } catch (e: Exception) {
-                _error.value = "Erro ao remover produto: ${e.message}"
-            }
-        }
+    fun clearError() {
+        _error.value = null
     }
 }
 
-class ConfiguracoesViewModelFactory(
-    private val produtoRepository: ProdutoRepository
-) : ViewModelProvider.Factory {
+class ConfiguracoesViewModelFactory(private val repository: ConfiguracoesRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ConfiguracoesViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ConfiguracoesViewModel(produtoRepository) as T
+            return ConfiguracoesViewModel(repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

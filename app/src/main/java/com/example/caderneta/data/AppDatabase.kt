@@ -11,7 +11,7 @@ import com.example.caderneta.util.DateConverter
 
 @Database(
     entities = [Cliente::class, Local::class, Produto::class, Venda::class, ItemVenda::class, Configuracoes::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(DateConverter::class)
@@ -21,7 +21,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun produtoDao(): ProdutoDao
     abstract fun vendaDao(): VendaDao
     abstract fun itemVendaDao(): ItemVendaDao
-    abstract fun configuracaoDao(): ConfiguracaoDao
+    abstract fun configuracoesDao(): ConfiguracoesDao
 
     companion object {
         @Volatile

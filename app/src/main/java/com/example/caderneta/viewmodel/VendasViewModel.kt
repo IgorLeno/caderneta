@@ -16,7 +16,7 @@ class VendasViewModel(
     private val produtoRepository: ProdutoRepository,
     private val vendaRepository: VendaRepository,
     private val itemVendaRepository: ItemVendaRepository,
-    private val configuracaoRepository: ConfiguracaoRepository
+    private val configuracoesRepository: ConfiguracoesRepository
 ) : ViewModel() {
 
     private val _clientes = MutableStateFlow<List<Cliente>>(emptyList())
@@ -76,19 +76,25 @@ class VendasViewModel(
         var valorTotal: Double = 0.0
     )
 
-
     private fun carregarDados() {
         viewModelScope.launch {
             try {
+                // Carrega locais
                 localRepository.getAllLocais().collect { locais ->
                     _locais.value = locais
                     Log.d("VendasViewModel", "Locais carregados: ${locais.size}, IDs: ${locais.map { it.id }}")
                 }
-                configuracaoRepository.getConfiguracoes().collect { configuracoes ->
+
+                // Carrega configurações
+                configuracoesRepository.getConfiguracoes().collect { configuracoes ->
                     _configuracoes.value = configuracoes
+                    Log.d("VendasViewModel", "Configurações carregadas: $configuracoes")
                 }
+
+                // Carrega produtos
                 produtoRepository.getAllProdutos().collect { produtos ->
                     _produtos.value = produtos
+                    Log.d("VendasViewModel", "Produtos carregados: ${produtos.size}")
                 }
             } catch (e: Exception) {
                 Log.e("VendasViewModel", "Erro ao carregar dados", e)
@@ -135,13 +141,13 @@ class VendasViewModel(
     private fun aplicarPromocao(state: ClienteState, aVista: Boolean) {
         val config = _configuracoes.value ?: return
         if (aVista) {
-            state.quantidadeSalgados = config.quantidadeSalgadosPromocao1
-            state.quantidadeSucos = config.quantidadeSucosPromocao1
-            state.valorTotal = config.valorPromocao1
+            state.quantidadeSalgados = config.promo1Salgados
+            state.quantidadeSucos = config.promo1Sucos
+            state.valorTotal = config.promo1Vista
         } else {
-            state.quantidadeSalgados = config.quantidadeSalgadosPromocao2
-            state.quantidadeSucos = config.quantidadeSucosPromocao2
-            state.valorTotal = config.valorPromocao2
+            state.quantidadeSalgados = config.promo2Salgados
+            state.quantidadeSucos = config.promo2Sucos
+            state.valorTotal = config.promo2Prazo
         }
     }
 
@@ -172,14 +178,14 @@ class VendasViewModel(
     }
 
     private fun calcularValorTotal(state: ClienteState) {
-        val config = configuracoes.value ?: return
+        val config = _configuracoes.value ?: return
         state.valorTotal = when (state.modoOperacao) {
             ModoOperacao.VENDA -> when (state.tipoTransacao) {
                 TipoTransacao.A_VISTA -> (state.quantidadeSalgados * config.precoSalgadoVista) + (state.quantidadeSucos * config.precoSucoVista)
                 TipoTransacao.A_PRAZO -> (state.quantidadeSalgados * config.precoSalgadoPrazo) + (state.quantidadeSucos * config.precoSucoPrazo)
                 null -> 0.0
             }
-            ModoOperacao.PROMOCAO -> if (state.tipoTransacao == TipoTransacao.A_VISTA) config.valorPromocao1 else config.valorPromocao2
+            ModoOperacao.PROMOCAO -> if (state.tipoTransacao == TipoTransacao.A_VISTA) config.promo1Vista else config.promo2Prazo
             ModoOperacao.PAGAMENTO, null -> 0.0
         }
     }
@@ -290,6 +296,7 @@ class VendasViewModel(
             }
         }
     }
+
 
     fun addLocal(nome: String, parentId: Long? = null) {
         viewModelScope.launch {
@@ -419,7 +426,7 @@ class VendasViewModelFactory(
     private val produtoRepository: ProdutoRepository,
     private val vendaRepository: VendaRepository,
     private val itemVendaRepository: ItemVendaRepository,
-    private val configuracaoRepository: ConfiguracaoRepository
+    private val configuracoesRepository: ConfiguracoesRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(VendasViewModel::class.java)) {
@@ -430,7 +437,7 @@ class VendasViewModelFactory(
                 produtoRepository,
                 vendaRepository,
                 itemVendaRepository,
-                configuracaoRepository
+                configuracoesRepository
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

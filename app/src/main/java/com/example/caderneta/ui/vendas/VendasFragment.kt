@@ -30,6 +30,7 @@ import com.example.caderneta.data.entity.ModoOperacao
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import com.example.caderneta.repository.ConfiguracoesRepository
 
 class VendasFragment : Fragment() {
 
@@ -43,7 +44,7 @@ class VendasFragment : Fragment() {
             (requireActivity().application as CadernetaApplication).produtoRepository,
             (requireActivity().application as CadernetaApplication).vendaRepository,
             (requireActivity().application as CadernetaApplication).itemVendaRepository,
-            (requireActivity().application as CadernetaApplication).configuracaoRepository
+            (requireActivity().application as CadernetaApplication).configuracoesRepository
         )
     }
 
