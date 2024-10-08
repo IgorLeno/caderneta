@@ -30,7 +30,6 @@ import com.example.caderneta.data.entity.ModoOperacao
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
-import com.example.caderneta.repository.ConfiguracoesRepository
 
 class VendasFragment : Fragment() {
 
@@ -79,6 +78,9 @@ class VendasFragment : Fragment() {
             },
             onUpdateQuantidadeSucos = { clienteId, quantidade ->
                 viewModel.updateQuantidadeSucos(clienteId, quantidade)
+            },
+            onUpdateValorTotal = { clienteId, valorTotal ->
+                viewModel.updateValorTotal(clienteId, valorTotal)
             },
             onConfirmarOperacao = { clienteId ->
                 val clienteState = viewModel.clienteStates.value[clienteId]
@@ -142,12 +144,10 @@ class VendasFragment : Fragment() {
             }
         }
 
-
         binding.navView.findViewById<TextInputLayout>(R.id.til_pesquisar_local).setEndIconOnClickListener {
             val query = binding.navView.findViewById<TextInputEditText>(R.id.et_pesquisar_local).text.toString()
             viewModel.searchLocais(query)
         }
-
     }
 
     private fun observeViewModel() {
@@ -177,7 +177,6 @@ class VendasFragment : Fragment() {
             }
         }
 
-
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.previaPagamento.collectLatest { previa ->
                 showPreviaPagamento(previa)
@@ -193,8 +192,12 @@ class VendasFragment : Fragment() {
             }
         }
 
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.valorTotal.collectLatest { (clienteId, valor) ->
+                clientesAdapter.updateValorTotal(clienteId, valor)
+            }
+        }
     }
-
 
     private fun showPreviaPagamento(previa: Double) {
         Snackbar.make(binding.root, "Valor restante após pagamento: R$ %.2f".format(previa), Snackbar.LENGTH_LONG).show()
@@ -239,6 +242,8 @@ class VendasFragment : Fragment() {
         _binding = null
     }
 }
+
+
 
 class EditLocalDialog(private val local: Local) : DialogFragment() {
     var onLocalEditado: ((Local) -> Unit)? = null

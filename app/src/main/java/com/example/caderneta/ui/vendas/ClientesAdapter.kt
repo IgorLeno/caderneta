@@ -26,13 +26,9 @@ class ClientesAdapter(
     private val onConfirmarOperacao: (Long) -> Unit,
     private val onCancelarOperacao: (Long) -> Unit,
     private val onPreviaPagamento: (Long, Double) -> Unit,
-    private val onUpdateContadoresVisibility: (Long, Boolean) -> Unit
+    private val onUpdateContadoresVisibility: (Long, Boolean) -> Unit,
+    private val onUpdateValorTotal: (Long, Double) -> Unit
 ) : ListAdapter<Cliente, ClientesAdapter.ClienteViewHolder>(ClienteDiffCallback()) {
-
-    private data class ClienteState(
-        var modoOperacao: ModoOperacao? = null,
-        var tipoTransacao: TipoTransacao? = null
-    )
 
     private val clienteStates = mutableMapOf<Long, VendasViewModel.ClienteState>()
 
@@ -46,15 +42,16 @@ class ClientesAdapter(
         holder.bind(cliente)
     }
 
-    fun updateModoOperacao(clienteId: Long, modoOperacao: ModoOperacao?) {
-        val clienteState = clienteStates.getOrPut(clienteId) { VendasViewModel.ClienteState() }
-        clienteState.modoOperacao = modoOperacao
-        clienteState.tipoTransacao = null
-        notifyItemChanged(currentList.indexOfFirst { it.id == clienteId })
-    }
-
-    fun Float.dpToPx(context: Context): Float {
-        return this * context.resources.displayMetrics.density
+    override fun onBindViewHolder(holder: ClienteViewHolder, position: Int, payloads: List<Any>) {
+        if (payloads.isNotEmpty()) {
+            val payload = payloads[0] as? Payload
+            when (payload) {
+                is Payload.ValorTotalChanged -> holder.updateValorTotal(payload.novoValor)
+                null -> super.onBindViewHolder(holder, position, payloads)
+            }
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
     }
 
     fun updateClienteStates(newStates: Map<Long, VendasViewModel.ClienteState>) {
@@ -63,7 +60,15 @@ class ClientesAdapter(
         notifyDataSetChanged()
     }
 
-    inner class ClienteViewHolder(private val binding: ItemClienteBinding) : RecyclerView.ViewHolder(binding.root) {
+    fun updateValorTotal(clienteId: Long, valor: Double) {
+        val position = currentList.indexOfFirst { it.id == clienteId }
+        if (position != -1) {
+            notifyItemChanged(position, Payload.ValorTotalChanged(valor))
+        }
+    }
+
+    inner class ClienteViewHolder(private val binding: ItemClienteBinding) :
+        RecyclerView.ViewHolder(binding.root) {
 
         fun bind(cliente: Cliente) {
             binding.tvNomeCliente.text = cliente.nome
@@ -77,14 +82,14 @@ class ClientesAdapter(
 
             setupMainButtons(cliente)
             setupVendaButtons(cliente)
-            setupContadores()
+            setupContadores(cliente)
             setupPagamentoLayout(cliente)
             updateButtonStates(cliente)
             setupButtonStateListeners()
         }
 
         private fun updateButtonStates(cliente: Cliente) {
-            val clienteState = clienteStates[cliente.id] ?: VendasViewModel.ClienteState()
+            val clienteState = clienteStates[cliente.id] ?: VendasViewModel.ClienteState(clienteId = cliente.id)
 
             binding.btnVenda.isSelected = clienteState.modoOperacao == ModoOperacao.VENDA
             binding.btnPromocao.isSelected = clienteState.modoOperacao == ModoOperacao.PROMOCAO
@@ -108,15 +113,19 @@ class ClientesAdapter(
             binding.layoutBotoesVenda.visibility = if (clienteState.modoOperacao == ModoOperacao.VENDA || clienteState.modoOperacao == ModoOperacao.PROMOCAO) View.VISIBLE else View.GONE
             binding.layoutVenda.visibility = if ((clienteState.modoOperacao == ModoOperacao.VENDA || clienteState.modoOperacao == ModoOperacao.PROMOCAO) && clienteState.tipoTransacao != null) View.VISIBLE else View.GONE
             binding.layoutPagamento.visibility = if (clienteState.modoOperacao == ModoOperacao.PAGAMENTO) View.VISIBLE else View.GONE
-        }
 
+            binding.btnConfirmarPagamento.visibility = if (clienteState.modoOperacao != null) View.VISIBLE else View.GONE
+            binding.btnCancelarPagamento.visibility = if (clienteState.modoOperacao != null) View.VISIBLE else View.GONE
+        }
 
         private fun setupButtonStateListeners() {
             val stateListAnimator = StateListAnimator().apply {
-                addState(intArrayOf(android.R.attr.state_selected),
-                    ObjectAnimator.ofFloat(itemView, "elevation", 8f.dpToPx(itemView.context))
+                addState(
+                    intArrayOf(android.R.attr.state_selected),
+                    ObjectAnimator.ofFloat(itemView, "elevation", dpToPx(itemView.context, 8f))
                 )
-                addState(intArrayOf(),
+                addState(
+                    intArrayOf(),
                     ObjectAnimator.ofFloat(itemView, "elevation", 0f)
                 )
             }
@@ -131,11 +140,21 @@ class ClientesAdapter(
         private fun updateButtonStyle(button: MaterialButton) {
             val context = button.context
             if (button.isSelected) {
-                button.setBackgroundColor(ContextCompat.getColor(context, R.color.button_background_selected))
+                button.setBackgroundColor(
+                    ContextCompat.getColor(
+                        context,
+                        R.color.button_background_selected
+                    )
+                )
                 button.setIconTintResource(R.color.button_icon_selected)
                 button.setStrokeColorResource(R.color.button_background_selected)
             } else {
-                button.setBackgroundColor(ContextCompat.getColor(context, R.color.button_background_unselected))
+                button.setBackgroundColor(
+                    ContextCompat.getColor(
+                        context,
+                        R.color.button_background_unselected
+                    )
+                )
                 button.setIconTintResource(R.color.button_icon_unselected)
                 button.setStrokeColorResource(R.color.button_stroke)
             }
@@ -151,8 +170,10 @@ class ClientesAdapter(
                     updateClienteState(cliente.id, ModoOperacao.VENDA, null)
                 }
                 clienteStates[cliente.id]?.modoOperacao?.let { it1 ->
-                    onModoOperacaoSelected(cliente,
-                        it1, null)
+                    onModoOperacaoSelected(
+                        cliente,
+                        it1, null
+                    )
                 }
                 updateButtonStates(cliente)
             }
@@ -166,8 +187,10 @@ class ClientesAdapter(
                     updateClienteState(cliente.id, ModoOperacao.PROMOCAO, null)
                 }
                 clienteStates[cliente.id]?.modoOperacao?.let { it1 ->
-                    onModoOperacaoSelected(cliente,
-                        it1, null)
+                    onModoOperacaoSelected(
+                        cliente,
+                        it1, null
+                    )
                 }
                 updateButtonStates(cliente)
             }
@@ -181,8 +204,10 @@ class ClientesAdapter(
                     updateClienteState(cliente.id, ModoOperacao.PAGAMENTO, null)
                 }
                 clienteStates[cliente.id]?.modoOperacao?.let { it1 ->
-                    onModoOperacaoSelected(cliente,
-                        it1, null)
+                    onModoOperacaoSelected(
+                        cliente,
+                        it1, null
+                    )
                 }
                 updateButtonStates(cliente)
             }
@@ -191,34 +216,45 @@ class ClientesAdapter(
         private fun setupVendaButtons(cliente: Cliente) {
             binding.btnAVista.setOnClickListener {
                 Log.d("ClientesAdapter", "A Vista button clicked for cliente ${cliente.id}")
-                val clienteState = clienteStates.getOrPut(cliente.id) { VendasViewModel.ClienteState() }
+                val clienteState =
+                    clienteStates.getOrPut(cliente.id) { VendasViewModel.ClienteState(clienteId = cliente.id) }
                 if (clienteState.tipoTransacao == TipoTransacao.A_VISTA) {
                     updateClienteState(cliente.id, clienteState.modoOperacao, null)
                 } else {
                     updateClienteState(cliente.id, clienteState.modoOperacao, TipoTransacao.A_VISTA)
                 }
-                onModoOperacaoSelected(cliente, clienteState.modoOperacao!!, clienteState.tipoTransacao)
+                onModoOperacaoSelected(
+                    cliente,
+                    clienteState.modoOperacao!!,
+                    clienteState.tipoTransacao
+                )
                 updateButtonStates(cliente)
+                updateContadoresVisibility(cliente.id, clienteState.tipoTransacao != null)
             }
 
             binding.btnAPrazo.setOnClickListener {
                 Log.d("ClientesAdapter", "A Prazo button clicked for cliente ${cliente.id}")
-                val clienteState = clienteStates.getOrPut(cliente.id) { VendasViewModel.ClienteState() }
+                val clienteState =
+                    clienteStates.getOrPut(cliente.id) { VendasViewModel.ClienteState(clienteId = cliente.id) }
                 if (clienteState.tipoTransacao == TipoTransacao.A_PRAZO) {
                     updateClienteState(cliente.id, clienteState.modoOperacao, null)
                 } else {
                     updateClienteState(cliente.id, clienteState.modoOperacao, TipoTransacao.A_PRAZO)
                 }
-                onModoOperacaoSelected(cliente, clienteState.modoOperacao!!, clienteState.tipoTransacao)
+                onModoOperacaoSelected(
+                    cliente,
+                    clienteState.modoOperacao!!,
+                    clienteState.tipoTransacao
+                )
                 updateButtonStates(cliente)
+                updateContadoresVisibility(cliente.id, clienteState.tipoTransacao != null)
             }
         }
 
-
-        private fun updateIconsForVendaType() {
-            val clienteId = getItem(bindingAdapterPosition).id
-            val clienteState = clienteStates.getOrPut(clienteId) { VendasViewModel.ClienteState() }
-            if (clienteState.modoOperacao == ModoOperacao.PROMOCAO) {
+        private fun updateIconsForVendaType(clienteId: Long) {
+            val clienteState = clienteStates[clienteId]
+            updateValorTotal(clienteState?.valorTotal ?: 0.0)
+            if (clienteState?.modoOperacao == ModoOperacao.PROMOCAO) {
                 binding.icItem1.setImageResource(R.drawable.ic_promo_one)
                 binding.icItem2.setImageResource(R.drawable.ic_promo_two)
             } else {
@@ -227,95 +263,78 @@ class ClientesAdapter(
             }
         }
 
-        private fun setupContadores() {
+        private fun setupContadores(cliente: Cliente) {
             binding.contadorItem1.btnMais.setOnClickListener {
-                val clienteId = getItem(bindingAdapterPosition).id
                 val novaQuantidade = binding.contadorItem1.tvQuantidade.text.toString().toInt() + 1
                 binding.contadorItem1.tvQuantidade.text = novaQuantidade.toString()
-                onUpdateQuantidadeSalgados(clienteId, novaQuantidade)
+                onUpdateQuantidadeSalgados(cliente.id, novaQuantidade)
+                Log.d("ClientesAdapter", "Quantidade de salgados atualizada: $novaQuantidade para cliente ${cliente.id}")
             }
             binding.contadorItem1.btnMenos.setOnClickListener {
-                val clienteId = getItem(bindingAdapterPosition).id
                 val quantidadeAtual = binding.contadorItem1.tvQuantidade.text.toString().toInt()
                 if (quantidadeAtual > 0) {
                     val novaQuantidade = quantidadeAtual - 1
                     binding.contadorItem1.tvQuantidade.text = novaQuantidade.toString()
-                    onUpdateQuantidadeSalgados(clienteId, novaQuantidade)
+                    onUpdateQuantidadeSalgados(cliente.id, novaQuantidade)
+                    Log.d("ClientesAdapter", "Quantidade de salgados atualizada: $novaQuantidade para cliente ${cliente.id}")
                 }
             }
             binding.contadorItem2.btnMais.setOnClickListener {
-                val clienteId = getItem(bindingAdapterPosition).id
                 val novaQuantidade = binding.contadorItem2.tvQuantidade.text.toString().toInt() + 1
                 binding.contadorItem2.tvQuantidade.text = novaQuantidade.toString()
-                onUpdateQuantidadeSucos(clienteId, novaQuantidade)
+                onUpdateQuantidadeSucos(cliente.id, novaQuantidade)
+                Log.d("ClientesAdapter", "Quantidade de sucos atualizada: $novaQuantidade para cliente ${cliente.id}")
             }
             binding.contadorItem2.btnMenos.setOnClickListener {
-                val clienteId = getItem(bindingAdapterPosition).id
                 val quantidadeAtual = binding.contadorItem2.tvQuantidade.text.toString().toInt()
                 if (quantidadeAtual > 0) {
                     val novaQuantidade = quantidadeAtual - 1
                     binding.contadorItem2.tvQuantidade.text = novaQuantidade.toString()
-                    onUpdateQuantidadeSucos(clienteId, novaQuantidade)
+                    onUpdateQuantidadeSucos(cliente.id, novaQuantidade)
+                    Log.d("ClientesAdapter", "Quantidade de sucos atualizada: $novaQuantidade para cliente ${cliente.id}")
                 }
             }
+
+            Log.d("ClientesAdapter", "Valor total atualizado: ${clienteStates[cliente.id]?.valorTotal}")
         }
-
-
         private fun setupPagamentoLayout(cliente: Cliente) {
             binding.btnTudo.setOnClickListener {
                 binding.etValorPagamento.setText(cliente.valorDevido.toString())
             }
             binding.btnPrevia.setOnClickListener {
-                val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull() ?: 0.0
+                val valorPagamento =
+                    binding.etValorPagamento.text.toString().toDoubleOrNull() ?: 0.0
                 onPreviaPagamento(cliente.id, valorPagamento)
             }
             binding.btnConfirmarPagamento.setOnClickListener {
                 onConfirmarOperacao(cliente.id)
-                resetSelection()
+                resetSelection(cliente.id)
             }
             binding.btnCancelarPagamento.setOnClickListener {
                 onCancelarOperacao(cliente.id)
-                resetSelection()
+                resetSelection(cliente.id)
             }
-        }
-
-        fun showVendaLayout(show: Boolean) {
-            binding.layoutBotoesVenda.visibility = if (show) View.VISIBLE else View.GONE
-            binding.layoutVenda.visibility = View.GONE // Inicialmente oculto
-        }
-
-        fun updateContadoresVisibility(visible: Boolean) {
-            binding.layoutVenda.visibility = if (visible) View.VISIBLE else View.GONE
-        }
-
-        fun showPagamentoLayout(show: Boolean) {
-            binding.layoutPagamento.visibility = if (show) View.VISIBLE else View.GONE
-            binding.layoutBotoesVenda.visibility = View.GONE
-            binding.layoutVenda.visibility = View.GONE
-        }
-
-        fun updateQuantidadeSalgados(quantidade: Int) {
-            binding.contadorItem1.tvQuantidade.text = quantidade.toString()
-        }
-
-        fun updateQuantidadeSucos(quantidade: Int) {
-            binding.contadorItem2.tvQuantidade.text = quantidade.toString()
         }
 
         fun updateValorTotal(valor: Double) {
             binding.tvValorTotal.text = String.format("R$ %.2f", valor)
+            binding.tvValorTotal.visibility = View.VISIBLE
+            Log.d("ClientesAdapter", "Valor total atualizado: $valor")
         }
 
-        fun updateModoOperacao(modoOperacao: ModoOperacao?) {
-            val clienteId = getItem(bindingAdapterPosition).id
-            updateClienteState(clienteId, modoOperacao, null)
-            updateIconsForVendaType()
-            updateButtonStates(getItem(bindingAdapterPosition))
+        private fun updateContadoresVisibility(clienteId: Long, visible: Boolean) {
+            binding.layoutVenda.visibility = if (visible) View.VISIBLE else View.GONE
+            onUpdateContadoresVisibility(clienteId, visible)
         }
 
-
-        private fun updateClienteState(clienteId: Long, modoOperacao: ModoOperacao?, tipoTransacao: TipoTransacao?) {
-            val clienteState = clienteStates.getOrPut(clienteId) { VendasViewModel.ClienteState() }
+        private fun updateClienteState(
+            clienteId: Long,
+            modoOperacao: ModoOperacao?,
+            tipoTransacao: TipoTransacao?
+        ) {
+            val clienteState = clienteStates.getOrPut(clienteId) {
+                VendasViewModel.ClienteState(clienteId = clienteId)
+            }
             clienteState.modoOperacao = modoOperacao
             clienteState.tipoTransacao = tipoTransacao
 
@@ -327,15 +346,13 @@ class ClientesAdapter(
                 clienteState.quantidadeSalgados = 0
                 clienteState.quantidadeSucos = 0
             }
+
+            updateLayoutVisibility(clienteState)
+            updateValorTotal(clienteState.valorTotal)
+            onUpdateValorTotal(clienteId, clienteState.valorTotal)
         }
 
-
-        fun updateValorPagamento(valor: Double) {
-            binding.etValorPagamento.setText(String.format("%.2f", valor))
-        }
-
-        private fun resetSelection() {
-            val clienteId = getItem(bindingAdapterPosition).id
+        private fun resetSelection(clienteId: Long) {
             clienteStates.remove(clienteId)
             updateButtonStates(getItem(bindingAdapterPosition))
         }
@@ -349,5 +366,15 @@ class ClientesAdapter(
         override fun areContentsTheSame(oldItem: Cliente, newItem: Cliente): Boolean {
             return oldItem == newItem
         }
+    }
+
+    companion object {
+        private fun dpToPx(context: Context, dp: Float): Float {
+            return dp * context.resources.displayMetrics.density
+        }
+    }
+
+    sealed class Payload {
+        data class ValorTotalChanged(val novoValor: Double) : Payload()
     }
 }

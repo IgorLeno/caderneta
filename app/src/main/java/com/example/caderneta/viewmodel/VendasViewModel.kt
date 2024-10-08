@@ -49,8 +49,8 @@ class VendasViewModel(
     private val _quantidadeSucos = MutableStateFlow(0)
     val quantidadeSucos: StateFlow<Int> = _quantidadeSucos
 
-    private val _valorTotal = MutableStateFlow(0.0)
-    val valorTotal: StateFlow<Double> = _valorTotal
+    private val _valorTotal = MutableStateFlow(Pair(0L, 0.0))
+    val valorTotal: StateFlow<Pair<Long, Double>> = _valorTotal.asStateFlow()
 
     private val _previaPagamento = MutableStateFlow(0.0)
     val previaPagamento: StateFlow<Double> = _previaPagamento
@@ -69,6 +69,7 @@ class VendasViewModel(
     }
 
     data class ClienteState(
+        val clienteId: Long,
         var modoOperacao: ModoOperacao? = null,
         var tipoTransacao: TipoTransacao? = null,
         var quantidadeSalgados: Int = 0,
@@ -79,19 +80,16 @@ class VendasViewModel(
     private fun carregarDados() {
         viewModelScope.launch {
             try {
-                // Carrega locais
                 localRepository.getAllLocais().collect { locais ->
                     _locais.value = locais
                     Log.d("VendasViewModel", "Locais carregados: ${locais.size}, IDs: ${locais.map { it.id }}")
                 }
 
-                // Carrega configurações
                 configuracoesRepository.getConfiguracoes().collect { configuracoes ->
                     _configuracoes.value = configuracoes
                     Log.d("VendasViewModel", "Configurações carregadas: $configuracoes")
                 }
 
-                // Carrega produtos
                 produtoRepository.getAllProdutos().collect { produtos ->
                     _produtos.value = produtos
                     Log.d("VendasViewModel", "Produtos carregados: ${produtos.size}")
@@ -114,8 +112,17 @@ class VendasViewModel(
         }
     }
 
+    fun updateValorTotal(clienteId: Long, valor: Double) {
+        _valorTotal.value = Pair(clienteId, valor)
+        _clienteStates.update { currentStates ->
+            currentStates.toMutableMap().apply {
+                this[clienteId]?.valorTotal = valor
+            }
+        }
+    }
+
     fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao, tipoTransacao: TipoTransacao? = null) {
-        val clienteState = _clienteStates.value.getOrDefault(cliente.id, ClienteState())
+        val clienteState = _clienteStates.value.getOrDefault(cliente.id, ClienteState(clienteId = cliente.id))
         val novoState = clienteState.copy(
             modoOperacao = modoOperacao,
             tipoTransacao = tipoTransacao,
@@ -187,6 +194,11 @@ class VendasViewModel(
             }
             ModoOperacao.PROMOCAO -> if (state.tipoTransacao == TipoTransacao.A_VISTA) config.promo1Vista else config.promo2Prazo
             ModoOperacao.PAGAMENTO, null -> 0.0
+        }
+
+        val clienteId = state.clienteId
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply {
+            put(clienteId, state.copy(valorTotal = state.valorTotal))
         }
     }
 
@@ -296,7 +308,6 @@ class VendasViewModel(
             }
         }
     }
-
 
     fun addLocal(nome: String, parentId: Long? = null) {
         viewModelScope.launch {
