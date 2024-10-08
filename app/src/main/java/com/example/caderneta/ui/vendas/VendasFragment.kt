@@ -157,6 +157,8 @@ class VendasFragment : Fragment() {
             }
         }
 
+
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.clienteStates.collectLatest { clienteStates ->
                 clientesAdapter.updateClienteStates(clienteStates)
@@ -195,6 +197,7 @@ class VendasFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.valorTotal.collectLatest { (clienteId, valor) ->
                 clientesAdapter.updateValorTotal(clienteId, valor)
+                Log.d("VendasFragment", "Valor total atualizado no Fragment: clienteId=$clienteId, valor=$valor")
             }
         }
     }

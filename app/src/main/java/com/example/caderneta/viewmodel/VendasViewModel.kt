@@ -172,6 +172,7 @@ class VendasViewModel(
             val novoState = clienteState.copy(quantidadeSalgados = quantidade)
             calcularValorTotal(novoState)
             _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, novoState) }
+            Log.d("VendasViewModel", "Quantidade de salgados atualizada: clienteId=$clienteId, quantidade=$quantidade, novoValorTotal=${novoState.valorTotal}")
         }
     }
 
@@ -181,11 +182,13 @@ class VendasViewModel(
             val novoState = clienteState.copy(quantidadeSucos = quantidade)
             calcularValorTotal(novoState)
             _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, novoState) }
+            Log.d("VendasViewModel", "Quantidade de sucos atualizada: clienteId=$clienteId, quantidade=$quantidade, novoValorTotal=${novoState.valorTotal}")
         }
     }
 
     private fun calcularValorTotal(state: ClienteState) {
         val config = _configuracoes.value ?: return
+        val valorAnterior = state.valorTotal
         state.valorTotal = when (state.modoOperacao) {
             ModoOperacao.VENDA -> when (state.tipoTransacao) {
                 TipoTransacao.A_VISTA -> (state.quantidadeSalgados * config.precoSalgadoVista) + (state.quantidadeSucos * config.precoSucoVista)
@@ -196,9 +199,13 @@ class VendasViewModel(
             ModoOperacao.PAGAMENTO, null -> 0.0
         }
 
-        val clienteId = state.clienteId
-        _clienteStates.value = _clienteStates.value.toMutableMap().apply {
-            put(clienteId, state.copy(valorTotal = state.valorTotal))
+        Log.d("VendasViewModel", "Valor total calculado: clienteId=${state.clienteId}, valorAnterior=$valorAnterior, novoValor=${state.valorTotal}")
+
+        _valorTotal.value = Pair(state.clienteId, state.valorTotal)
+        _clienteStates.update { currentStates ->
+            currentStates.toMutableMap().apply {
+                put(state.clienteId, state)
+            }
         }
     }
 

@@ -64,6 +64,7 @@ class ClientesAdapter(
         val position = currentList.indexOfFirst { it.id == clienteId }
         if (position != -1) {
             notifyItemChanged(position, Payload.ValorTotalChanged(valor))
+            Log.d("ClientesAdapter", "updateValorTotal chamado: clienteId=$clienteId, valor=$valor, position=$position")
         }
     }
 
@@ -268,7 +269,7 @@ class ClientesAdapter(
                 val novaQuantidade = binding.contadorItem1.tvQuantidade.text.toString().toInt() + 1
                 binding.contadorItem1.tvQuantidade.text = novaQuantidade.toString()
                 onUpdateQuantidadeSalgados(cliente.id, novaQuantidade)
-                Log.d("ClientesAdapter", "Quantidade de salgados atualizada: $novaQuantidade para cliente ${cliente.id}")
+                Log.d("ClientesAdapter", "Botão + de salgados clicado: clienteId=${cliente.id}, novaQuantidade=$novaQuantidade")
             }
             binding.contadorItem1.btnMenos.setOnClickListener {
                 val quantidadeAtual = binding.contadorItem1.tvQuantidade.text.toString().toInt()
@@ -276,9 +277,11 @@ class ClientesAdapter(
                     val novaQuantidade = quantidadeAtual - 1
                     binding.contadorItem1.tvQuantidade.text = novaQuantidade.toString()
                     onUpdateQuantidadeSalgados(cliente.id, novaQuantidade)
-                    Log.d("ClientesAdapter", "Quantidade de salgados atualizada: $novaQuantidade para cliente ${cliente.id}")
+                    Log.d("ClientesAdapter", "Botão - de salgados clicado: clienteId=${cliente.id}, novaQuantidade=$novaQuantidade")
                 }
             }
+
+
             binding.contadorItem2.btnMais.setOnClickListener {
                 val novaQuantidade = binding.contadorItem2.tvQuantidade.text.toString().toInt() + 1
                 binding.contadorItem2.tvQuantidade.text = novaQuantidade.toString()
@@ -319,7 +322,7 @@ class ClientesAdapter(
         fun updateValorTotal(valor: Double) {
             binding.tvValorTotal.text = String.format("R$ %.2f", valor)
             binding.tvValorTotal.visibility = View.VISIBLE
-            Log.d("ClientesAdapter", "Valor total atualizado: $valor")
+            Log.d("ClientesAdapter", "Valor total atualizado na UI: clienteId=${bindingAdapterPosition}, valor=$valor")
         }
 
         private fun updateContadoresVisibility(clienteId: Long, visible: Boolean) {
