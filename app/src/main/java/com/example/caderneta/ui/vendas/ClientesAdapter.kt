@@ -58,6 +58,7 @@ class ClientesAdapter(
         clienteStates.clear()
         clienteStates.putAll(newStates)
         notifyDataSetChanged()
+        Log.d("ClientesAdapter", "Estados dos clientes atualizados: ${clienteStates.map { "${it.key}: ${it.value}" }}")
     }
 
     fun updateValorTotal(clienteId: Long, valor: Double) {
