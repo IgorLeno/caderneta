@@ -270,6 +270,7 @@ class ClientesAdapter(
                 val novaQuantidade = binding.contadorItem1.tvQuantidade.text.toString().toInt() + 1
                 binding.contadorItem1.tvQuantidade.text = novaQuantidade.toString()
                 onUpdateQuantidadeSalgados(cliente.id, novaQuantidade)
+                updateValorTotalLocal(cliente.id)
                 Log.d("ClientesAdapter", "Botão + de salgados clicado: clienteId=${cliente.id}, novaQuantidade=$novaQuantidade")
             }
             binding.contadorItem1.btnMenos.setOnClickListener {
@@ -278,15 +279,16 @@ class ClientesAdapter(
                     val novaQuantidade = quantidadeAtual - 1
                     binding.contadorItem1.tvQuantidade.text = novaQuantidade.toString()
                     onUpdateQuantidadeSalgados(cliente.id, novaQuantidade)
+                    updateValorTotalLocal(cliente.id)
                     Log.d("ClientesAdapter", "Botão - de salgados clicado: clienteId=${cliente.id}, novaQuantidade=$novaQuantidade")
                 }
             }
-
 
             binding.contadorItem2.btnMais.setOnClickListener {
                 val novaQuantidade = binding.contadorItem2.tvQuantidade.text.toString().toInt() + 1
                 binding.contadorItem2.tvQuantidade.text = novaQuantidade.toString()
                 onUpdateQuantidadeSucos(cliente.id, novaQuantidade)
+                updateValorTotalLocal(cliente.id)
                 Log.d("ClientesAdapter", "Quantidade de sucos atualizada: $novaQuantidade para cliente ${cliente.id}")
             }
             binding.contadorItem2.btnMenos.setOnClickListener {
@@ -295,12 +297,20 @@ class ClientesAdapter(
                     val novaQuantidade = quantidadeAtual - 1
                     binding.contadorItem2.tvQuantidade.text = novaQuantidade.toString()
                     onUpdateQuantidadeSucos(cliente.id, novaQuantidade)
+                    updateValorTotalLocal(cliente.id)
                     Log.d("ClientesAdapter", "Quantidade de sucos atualizada: $novaQuantidade para cliente ${cliente.id}")
                 }
             }
-
-            Log.d("ClientesAdapter", "Valor total atualizado: ${clienteStates[cliente.id]?.valorTotal}")
         }
+
+        private fun updateValorTotalLocal(clienteId: Long) {
+            val clienteState = clienteStates[clienteId]
+            clienteState?.let {
+                updateValorTotal(it.valorTotal)
+            }
+        }
+
+
         private fun setupPagamentoLayout(cliente: Cliente) {
             binding.btnTudo.setOnClickListener {
                 binding.etValorPagamento.setText(cliente.valorDevido.toString())

@@ -80,19 +80,25 @@ class VendasViewModel(
     private fun carregarDados() {
         viewModelScope.launch {
             try {
-                localRepository.getAllLocais().collect { locais ->
-                    _locais.value = locais
-                    Log.d("VendasViewModel", "Locais carregados: ${locais.size}, IDs: ${locais.map { it.id }}")
+                launch {
+                    configuracoesRepository.getConfiguracoes().collect { configuracoes ->
+                        _configuracoes.value = configuracoes
+                        Log.d("VendasViewModel", "Configurações carregadas: $configuracoes")
+                    }
                 }
 
-                configuracoesRepository.getConfiguracoes().collect { configuracoes ->
-                    _configuracoes.value = configuracoes
-                    Log.d("VendasViewModel", "Configurações carregadas: $configuracoes")
+                launch {
+                    localRepository.getAllLocais().collect { locais ->
+                        _locais.value = locais
+                        Log.d("VendasViewModel", "Locais carregados: ${locais.size}")
+                    }
                 }
 
-                produtoRepository.getAllProdutos().collect { produtos ->
-                    _produtos.value = produtos
-                    Log.d("VendasViewModel", "Produtos carregados: ${produtos.size}")
+                launch {
+                    produtoRepository.getAllProdutos().collect { produtos ->
+                        _produtos.value = produtos
+                        Log.d("VendasViewModel", "Produtos carregados: ${produtos.size}")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("VendasViewModel", "Erro ao carregar dados", e)
@@ -112,14 +118,6 @@ class VendasViewModel(
         }
     }
 
-    fun updateValorTotal(clienteId: Long, valor: Double) {
-        _valorTotal.value = Pair(clienteId, valor)
-        _clienteStates.update { currentStates ->
-            currentStates.toMutableMap().apply {
-                this[clienteId]?.valorTotal = valor
-            }
-        }
-    }
 
     fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao, tipoTransacao: TipoTransacao? = null) {
         val clienteState = _clienteStates.value.getOrDefault(cliente.id, ClienteState(clienteId = cliente.id))
@@ -200,12 +198,24 @@ class VendasViewModel(
         }
 
         Log.d("VendasViewModel", "Valor total calculado: clienteId=${state.clienteId}, valorAnterior=$valorAnterior, novoValor=${state.valorTotal}")
+        Log.d("VendasViewModel", "Configurações: precoSalgadoVista=${config.precoSalgadoVista}, precoSucoVista=${config.precoSucoVista}")
 
-        _valorTotal.value = Pair(state.clienteId, state.valorTotal)
-        _clienteStates.update { currentStates ->
-            currentStates.toMutableMap().apply {
-                put(state.clienteId, state)
+        viewModelScope.launch {
+            _valorTotal.emit(Pair(state.clienteId, state.valorTotal))
+            _clienteStates.update { currentStates ->
+                currentStates.toMutableMap().apply {
+                    put(state.clienteId, state)
+                }
             }
+            // Adicionando esta linha para garantir que o valor total seja atualizado na UI
+            updateValorTotal(state.clienteId, state.valorTotal)
+        }
+    }
+
+    // Adicione esta função ao ViewModel
+    fun updateValorTotal(clienteId: Long, valor: Double) {
+        viewModelScope.launch {
+            _valorTotal.emit(Pair(clienteId, valor))
         }
     }
 

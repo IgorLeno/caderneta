@@ -157,6 +157,11 @@ class VendasFragment : Fragment() {
             }
         }
 
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.configuracoes.collectLatest { configuracoes ->
+                Log.d("VendasFragment", "Configurações atualizadas: $configuracoes")
+            }
+        }
 
 
         viewLifecycleOwner.lifecycleScope.launch {
