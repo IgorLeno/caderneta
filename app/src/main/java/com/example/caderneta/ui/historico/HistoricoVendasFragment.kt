@@ -1,9 +1,11 @@
 package com.example.caderneta.ui.historico
 
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -46,6 +48,7 @@ class HistoricoVendasFragment : Fragment() {
         return binding.root
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -71,8 +74,8 @@ class HistoricoVendasFragment : Fragment() {
     }
 
     private fun setupChipGroup() {
-        binding.chipGroupAgrupamento.setOnCheckedChangeListener { _, checkedId ->
-            when (checkedId) {
+        binding.chipGroupAgrupamento.setOnCheckedStateChangeListener { group, checkedIds ->
+            when (checkedIds.firstOrNull()) {
                 R.id.chip_pessoa -> viewModel.setAgrupamentoSelecionado(HistoricoVendasViewModel.Agrupamento.PESSOA)
                 R.id.chip_predio -> viewModel.setAgrupamentoSelecionado(HistoricoVendasViewModel.Agrupamento.PREDIO)
             }
@@ -104,6 +107,7 @@ class HistoricoVendasFragment : Fragment() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collectLatest { isLoading ->
@@ -128,6 +132,7 @@ class HistoricoVendasFragment : Fragment() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun atualizarGrafico() {
         val entries = when (viewModel.periodoSelecionado.value) {
             HistoricoVendasViewModel.Periodo.SEMANAL -> {
@@ -175,7 +180,7 @@ class HistoricoVendasFragment : Fragment() {
                     HistoricoVendasViewModel.Agrupamento.PESSOA -> viewModel.getClienteById(id)?.nome ?: "Cliente Desconhecido"
                     HistoricoVendasViewModel.Agrupamento.PREDIO -> viewModel.getLocalById(id)?.nome ?: "Local Desconhecido"
                 },
-                totalVendas = vendas.sumOf { it.total },
+                totalVendas = vendas.sumOf { it.valor },
                 quantidadeVendas = vendas.size
             )
         }

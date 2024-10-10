@@ -43,7 +43,9 @@ class VendasFragment : Fragment() {
             (requireActivity().application as CadernetaApplication).produtoRepository,
             (requireActivity().application as CadernetaApplication).vendaRepository,
             (requireActivity().application as CadernetaApplication).itemVendaRepository,
-            (requireActivity().application as CadernetaApplication).configuracoesRepository
+            (requireActivity().application as CadernetaApplication).configuracoesRepository,
+            (requireActivity().application as CadernetaApplication).operacaoRepository,
+            (requireActivity().application as CadernetaApplication).contaRepository
         )
     }
 
@@ -70,6 +72,8 @@ class VendasFragment : Fragment() {
 
     private fun setupRecyclerView() {
         clientesAdapter = ClientesAdapter(
+            contaRepository = (requireActivity().application as CadernetaApplication).contaRepository,
+            lifecycleScope = viewLifecycleOwner.lifecycleScope,
             onModoOperacaoSelected = { cliente, modoOperacao, tipoTransacao ->
                 viewModel.selecionarModoOperacao(cliente, modoOperacao, tipoTransacao)
             },

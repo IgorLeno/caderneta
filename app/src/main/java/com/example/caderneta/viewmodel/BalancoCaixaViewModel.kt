@@ -68,11 +68,11 @@ class BalancoCaixaViewModel(private val vendaRepository: VendaRepository) : View
     }
 
     private fun calcularTotalVendas(vendas: List<Venda>): Double {
-        return vendas.sumOf { it.total }
+        return vendas.sumOf { it.valor }
     }
 
     private fun calcularTotalRecebimentos(vendas: List<Venda>): Double {
-        return vendas.filter { it.pago }.sumOf { it.total }
+        return vendas.filter { it.transacao == "a_vista" }.sumOf { it.valor }
     }
 
     data class VendasState(

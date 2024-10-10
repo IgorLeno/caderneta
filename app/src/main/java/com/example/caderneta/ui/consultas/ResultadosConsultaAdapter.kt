@@ -75,9 +75,9 @@ class ResultadosConsultaAdapter(
         fun bind(cliente: ResultadoConsulta.Cliente) {
             binding.tvNomeCliente.text = cliente.cliente.nome
             binding.tvNomePredio.text = "Prédio: ${cliente.cliente.localId}" // Você pode buscar o nome do prédio aqui
-            binding.tvValorDevido.text = "Valor devido: R$ ${String.format("%.2f", cliente.cliente.valorDevido)}"
+            binding.tvValorDevido.text = "Valor devido: R$ ${String.format("%.2f", cliente.saldo)}"
             binding.tvValorDevido.setTextColor(
-                if (cliente.cliente.valorDevido > 0) Color.RED else Color.GREEN
+                if (cliente.saldo > 0) Color.RED else Color.GREEN
             )
 
             val vendas = vendasPorCliente[cliente.cliente.id] ?: emptyList()
@@ -124,7 +124,7 @@ class ResultadoConsultaDiffCallback : DiffUtil.ItemCallback<ResultadoConsulta>()
 
 sealed class ResultadoConsulta {
     data class Local(val local: com.example.caderneta.data.entity.Local) : ResultadoConsulta()
-    data class Cliente(val cliente: com.example.caderneta.data.entity.Cliente) : ResultadoConsulta()
+    data class Cliente(val cliente: com.example.caderneta.data.entity.Cliente, val saldo: Double) : ResultadoConsulta()
 }
 
 class ExtratoAdapter : ListAdapter<Venda, ExtratoAdapter.ExtratoViewHolder>(ExtratoDiffCallback()) {
@@ -146,9 +146,9 @@ class ExtratoAdapter : ListAdapter<Venda, ExtratoAdapter.ExtratoViewHolder>(Extr
         fun bind(venda: Venda) {
             binding.tvData.text = dateFormat.format(venda.data)
             binding.tvQuantidade.text = "${venda.quantidadeSalgados} salgados, ${venda.quantidadeSucos} sucos"
-            binding.tvValor.text = "R$ ${String.format("%.2f", venda.total)}"
+            binding.tvValor.text = "R$ ${String.format("%.2f", venda.valor)}"
             binding.tvValor.setTextColor(
-                if (venda.pago) Color.GREEN else Color.RED
+                if (venda.transacao == "a_vista") Color.GREEN else Color.RED
             )
         }
     }

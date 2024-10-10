@@ -11,10 +11,13 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.caderneta.CadernetaApplication
+import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.databinding.FragmentConsultasBinding
 import com.example.caderneta.viewmodel.ConsultasViewModel
 import com.example.caderneta.viewmodel.ConsultasViewModelFactory
 import com.google.android.material.tabs.TabLayout
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class ConsultasFragment : Fragment() {
@@ -22,17 +25,24 @@ class ConsultasFragment : Fragment() {
     private var _binding: FragmentConsultasBinding? = null
     private val binding get() = _binding!!
 
+
+
     private val viewModel: ConsultasViewModel by viewModels {
         ConsultasViewModelFactory(
             (requireActivity().application as CadernetaApplication).clienteRepository,
             (requireActivity().application as CadernetaApplication).vendaRepository,
-            (requireActivity().application as CadernetaApplication).localRepository
+            (requireActivity().application as CadernetaApplication).localRepository,
+            (requireActivity().application as CadernetaApplication).contaRepository
         )
     }
 
     private lateinit var resultadosAdapter: ResultadosConsultaAdapter
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
         _binding = FragmentConsultasBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -59,6 +69,7 @@ class ConsultasFragment : Fragment() {
             override fun onTabReselected(tab: TabLayout.Tab?) {}
         })
     }
+
 
     private fun setupRecyclerView() {
         resultadosAdapter = ResultadosConsultaAdapter(
@@ -100,20 +111,34 @@ class ConsultasFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.clientes.collect { clientes ->
-                resultadosAdapter.submitList(clientes.map { ResultadoConsulta.Cliente(it) })
+            viewModel.clientesComSaldo.collect { clientesComSaldo ->
+                resultadosAdapter.submitList(clientesComSaldo.map { (cliente, saldo) ->
+                    ResultadoConsulta.Cliente(cliente, saldo)
+                })
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.vendasPorCliente.collect { vendasPorCliente ->
-                resultadosAdapter.updateVendasPorCliente(vendasPorCliente)
+            viewModel.clientes.collect { clientes ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val clientesComSaldo = clientes.map { cliente ->
+                        val saldo = viewModel.getSaldoCliente(cliente.id)
+                        ResultadoConsulta.Cliente(cliente, saldo)
+                    }
+                    resultadosAdapter.submitList(clientesComSaldo)
+
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        viewModel.vendasPorCliente.collect { vendasPorCliente ->
+                            resultadosAdapter.updateVendasPorCliente(vendasPorCliente)
+                        }
+                    }
+                }
+
+                fun onDestroyView() {
+                    super.onDestroyView()
+                    _binding = null
+                }
             }
         }
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
     }
 }

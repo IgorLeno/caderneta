@@ -16,7 +16,9 @@ class VendasViewModel(
     private val produtoRepository: ProdutoRepository,
     private val vendaRepository: VendaRepository,
     private val itemVendaRepository: ItemVendaRepository,
-    private val configuracoesRepository: ConfiguracoesRepository
+    private val configuracoesRepository: ConfiguracoesRepository,
+    private val operacaoRepository: OperacaoRepository,
+    private val contaRepository: ContaRepository
 ) : ViewModel() {
 
     private val _clientes = MutableStateFlow<List<Cliente>>(emptyList())
@@ -223,28 +225,34 @@ class VendasViewModel(
         viewModelScope.launch {
             try {
                 val clienteState = _clienteStates.value[clienteId] ?: throw IllegalStateException("Estado do cliente não encontrado")
-                val cliente = _clientes.value.find { it.id == clienteId } ?: throw IllegalStateException("Cliente não encontrado")
                 val localId = _localSelecionado.value?.id ?: throw IllegalStateException("Local não selecionado")
 
+                // Registrar a operação
+                val operacao = Operacao(
+                    clienteId = clienteId,
+                    tipoOperacao = if (clienteState.modoOperacao == ModoOperacao.PROMOCAO) "Promo" else "Venda",
+                    valor = clienteState.valorTotal,
+                    data = Date()
+                )
+                val operacaoId = operacaoRepository.insertOperacao(operacao)
+
+                // Registrar a venda
                 val venda = Venda(
+                    operacaoId = operacaoId,
                     clienteId = clienteId,
                     localId = localId,
                     data = Date(),
-                    total = clienteState.valorTotal,
-                    pago = clienteState.tipoTransacao == TipoTransacao.A_VISTA,
+                    transacao = if (clienteState.tipoTransacao == TipoTransacao.A_VISTA) "a_vista" else "a_prazo",
                     quantidadeSalgados = clienteState.quantidadeSalgados,
-                    quantidadeSucos = clienteState.quantidadeSucos
+                    quantidadeSucos = clienteState.quantidadeSucos,
+                    valor = clienteState.valorTotal
                 )
-
                 val vendaId = vendaRepository.insertVenda(venda)
-                inserirItensVenda(vendaId, clienteState.quantidadeSalgados, clienteState.quantidadeSucos, clienteState.tipoTransacao ?: throw IllegalStateException("Tipo de transação não selecionado"))
 
-                val clienteAtualizado = cliente.copy(
-                    valorDevido = if (clienteState.tipoTransacao == TipoTransacao.A_VISTA) cliente.valorDevido else cliente.valorDevido + clienteState.valorTotal,
-                    quantidadeSalgados = cliente.quantidadeSalgados + clienteState.quantidadeSalgados,
-                    quantidadeSucos = cliente.quantidadeSucos + clienteState.quantidadeSucos
-                )
-                clienteRepository.updateCliente(clienteAtualizado)
+                // Atualizar a conta do cliente se for venda a prazo
+                if (clienteState.tipoTransacao == TipoTransacao.A_PRAZO) {
+                    contaRepository.atualizarSaldo(clienteId, clienteState.valorTotal)
+                }
 
                 cancelarOperacao(clienteId)
                 carregarDados()
@@ -263,16 +271,14 @@ class VendasViewModel(
         val salgado = produtos.value.find { it.tipo == TipoProduto.SALGADO }
         val suco = produtos.value.find { it.tipo == TipoProduto.SUCO }
 
-        val precoSalgado = when (_modoOperacaoAtual.value) {
-            ModoOperacao.PROMOCAO -> 0.0
-            ModoOperacao.VENDA -> if (tipoTransacao == TipoTransacao.A_VISTA) config.precoSalgadoVista else config.precoSalgadoPrazo
-            else -> 0.0
+        val precoSalgado = when (tipoTransacao) {
+            TipoTransacao.A_VISTA -> config.precoSalgadoVista
+            TipoTransacao.A_PRAZO -> config.precoSalgadoPrazo
         }
 
-        val precoSuco = when (_modoOperacaoAtual.value) {
-            ModoOperacao.PROMOCAO -> 0.0
-            ModoOperacao.VENDA -> if (tipoTransacao == TipoTransacao.A_VISTA) config.precoSucoVista else config.precoSucoPrazo
-            else -> 0.0
+        val precoSuco = when (tipoTransacao) {
+            TipoTransacao.A_VISTA -> config.precoSucoVista
+            TipoTransacao.A_PRAZO -> config.precoSucoPrazo
         }
 
         if (salgado != null && quantidadeSalgados > 0) {
@@ -303,21 +309,41 @@ class VendasViewModel(
     }
 
     fun calcularPreviaPagamento(clienteId: Long, valorPagamento: Double) {
-        val clienteState = _clienteStates.value[clienteId] ?: return
-        val cliente = _clientes.value.find { it.id == clienteId } ?: return
-        clienteState.valorTotal = (cliente.valorDevido - valorPagamento).coerceAtLeast(0.0)
-        _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, clienteState) }
+        viewModelScope.launch {
+            try {
+                val clienteState = _clienteStates.value[clienteId] ?: return@launch
+                val conta = contaRepository.getContaByCliente(clienteId).firstOrNull()
+                val saldoDevedor = conta?.saldo ?: 0.0
+
+                clienteState.valorTotal = (saldoDevedor - valorPagamento).coerceAtLeast(0.0)
+                _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, clienteState) }
+
+                // Atualizar a prévia do pagamento
+                _previaPagamento.value = clienteState.valorTotal
+            } catch (e: Exception) {
+                _error.value = "Erro ao calcular prévia de pagamento: ${e.message}"
+            }
+        }
     }
 
     fun confirmarPagamento(clienteId: Long) {
         viewModelScope.launch {
             try {
                 val clienteState = _clienteStates.value[clienteId] ?: throw IllegalStateException("Estado do cliente não encontrado")
-                val cliente = _clientes.value.find { it.id == clienteId } ?: throw IllegalStateException("Cliente não encontrado")
                 val valorPago = clienteState.valorTotal
-                val novoValorDevido = (cliente.valorDevido - valorPago).coerceAtLeast(0.0)
-                val clienteAtualizado = cliente.copy(valorDevido = novoValorDevido)
-                clienteRepository.updateCliente(clienteAtualizado)
+
+                // Registrar a operação de pagamento
+                val operacao = Operacao(
+                    clienteId = clienteId,
+                    tipoOperacao = "Pagamento",
+                    valor = valorPago,
+                    data = Date()
+                )
+                operacaoRepository.insertOperacao(operacao)
+
+                // Atualizar o saldo do cliente
+                contaRepository.atualizarSaldo(clienteId, -valorPago)
+
                 cancelarOperacao(clienteId)
                 carregarDados()
             } catch (e: Exception) {
@@ -454,7 +480,9 @@ class VendasViewModelFactory(
     private val produtoRepository: ProdutoRepository,
     private val vendaRepository: VendaRepository,
     private val itemVendaRepository: ItemVendaRepository,
-    private val configuracoesRepository: ConfiguracoesRepository
+    private val configuracoesRepository: ConfiguracoesRepository,
+    private val operacaoRepository: OperacaoRepository,
+    private val contaRepository: ContaRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(VendasViewModel::class.java)) {
@@ -465,7 +493,9 @@ class VendasViewModelFactory(
                 produtoRepository,
                 vendaRepository,
                 itemVendaRepository,
-                configuracoesRepository
+                configuracoesRepository,
+                operacaoRepository,
+                contaRepository
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

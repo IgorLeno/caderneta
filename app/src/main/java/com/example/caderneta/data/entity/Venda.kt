@@ -22,13 +22,15 @@ import java.util.Date
         )
     ]
 )
+
 data class Venda(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val operacaoId: Long,
     val clienteId: Long,
     val localId: Long,
     val data: Date,
-    val total: Double,
-    val pago: Boolean,
+    val transacao: String,
     val quantidadeSalgados: Int,
-    val quantidadeSucos: Int
+    val quantidadeSucos: Int,
+    val valor: Double
 )

@@ -10,8 +10,17 @@ import com.example.caderneta.data.entity.*
 import com.example.caderneta.util.DateConverter
 
 @Database(
-    entities = [Cliente::class, Local::class, Produto::class, Venda::class, ItemVenda::class, Configuracoes::class],
-    version = 3,
+    entities = [
+        Cliente::class,
+        Local::class,
+        Produto::class,
+        Venda::class,
+        ItemVenda::class,
+        Configuracoes::class,
+        Operacao::class,
+        Conta::class
+    ],
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(DateConverter::class)
@@ -22,6 +31,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun vendaDao(): VendaDao
     abstract fun itemVendaDao(): ItemVendaDao
     abstract fun configuracoesDao(): ConfiguracoesDao
+    abstract fun operacaoDao(): OperacaoDao
+    abstract fun contaDao(): ContaDao
 
     companion object {
         @Volatile

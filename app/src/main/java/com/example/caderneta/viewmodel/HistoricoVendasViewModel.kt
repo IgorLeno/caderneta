@@ -109,14 +109,14 @@ class HistoricoVendasViewModel(
 
     fun calcularTotalVendasPorSemana(): Map<Int, Double> {
         return _historicoVendas.value.groupBy { getWeekOfYear(it.data) }
-            .mapValues { (_, vendas) -> vendas.sumOf { it.total } }
+            .mapValues { (_, vendas) -> vendas.sumOf { it.valor } }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun calcularTotalVendasPorMes(): Map<Int, Double> {
         return _historicoVendas.value.groupBy {
             LocalDate.ofInstant(it.data.toInstant(), ZoneId.systemDefault()).monthValue
-        }.mapValues { (_, vendas) -> vendas.sumOf { it.total } }
+        }.mapValues { (_, vendas) -> vendas.sumOf { it.valor } }
     }
 
     private fun getWeekOfYear(date: Date): Int {

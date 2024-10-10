@@ -33,6 +33,7 @@ import androidx.room.PrimaryKey
         )
     ]
 )
+
 data class Cliente(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val nome: String,
@@ -40,8 +41,5 @@ data class Cliente(
     val localId: Long,
     val sublocal1Id: Long? = null,
     val sublocal2Id: Long? = null,
-    val sublocal3Id: Long? = null,
-    var valorDevido: Double = 0.0,
-    var quantidadeSalgados: Int = 0,
-    var quantidadeSucos: Int = 0
+    val sublocal3Id: Long? = null
 )

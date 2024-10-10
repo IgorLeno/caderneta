@@ -7,16 +7,19 @@ import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.repository.ClienteRepository
+import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ConsultasViewModel(
     private val clienteRepository: ClienteRepository,
     private val vendaRepository: VendaRepository,
-    private val localRepository: LocalRepository
+    private val localRepository: LocalRepository,
+    private val contaRepository: ContaRepository
 ) : ViewModel() {
 
     private val _locais = MutableStateFlow<List<Local>>(emptyList())
@@ -27,6 +30,9 @@ class ConsultasViewModel(
 
     private val _vendasPorCliente = MutableStateFlow<Map<Long, List<Venda>>>(emptyMap())
     val vendasPorCliente: StateFlow<Map<Long, List<Venda>>> = _vendasPorCliente
+
+    private val _clientesComSaldo = MutableStateFlow<List<Pair<Cliente, Double>>>(emptyList())
+    val clientesComSaldo: StateFlow<List<Pair<Cliente, Double>>> = _clientesComSaldo
 
     private val _modoBusca = MutableStateFlow(ModoBusca.POR_PREDIO)
     val modoBusca: StateFlow<ModoBusca> = _modoBusca
@@ -40,14 +46,29 @@ class ConsultasViewModel(
             when (_modoBusca.value) {
                 ModoBusca.POR_PREDIO -> {
                     _locais.value = localRepository.buscarLocais(query)
-                    _clientes.value = emptyList()
+                    _clientesComSaldo.value = emptyList()
                 }
                 ModoBusca.POR_NOME -> {
-                    _clientes.value = clienteRepository.buscarClientes(query)
+                    buscarClientesComSaldo(query)
                     _locais.value = emptyList()
                 }
             }
         }
+    }
+
+    fun buscarClientesComSaldo(query: String) {
+        viewModelScope.launch {
+            val clientes = clienteRepository.buscarClientes(query)
+            val clientesComSaldo = clientes.map { cliente ->
+                val saldo = getSaldoCliente(cliente.id)
+                Pair(cliente, saldo)
+            }
+            _clientesComSaldo.value = clientesComSaldo
+        }
+    }
+
+    suspend fun getSaldoCliente(clienteId: Long): Double {
+        return contaRepository.getContaByCliente(clienteId).first()?.saldo ?: 0.0
     }
 
     fun carregarClientesPorLocal(localId: Long) {
@@ -80,12 +101,13 @@ class ConsultasViewModel(
 class ConsultasViewModelFactory(
     private val clienteRepository: ClienteRepository,
     private val vendaRepository: VendaRepository,
-    private val localRepository: LocalRepository
+    private val localRepository: LocalRepository,
+    private val contaRepository: ContaRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ConsultasViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ConsultasViewModel(clienteRepository, vendaRepository, localRepository) as T
+            return ConsultasViewModel(clienteRepository, vendaRepository, localRepository, contaRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

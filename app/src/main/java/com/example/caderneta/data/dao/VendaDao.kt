@@ -34,10 +34,10 @@ interface VendaDao {
     @Query("SELECT * FROM vendas WHERE clienteId = :clienteId AND data BETWEEN :startDate AND :endDate")
     fun getVendasByClienteAndDateRange(clienteId: Long, startDate: Date, endDate: Date): Flow<List<Venda>>
 
-    @Query("SELECT SUM(total) FROM vendas WHERE data BETWEEN :startDate AND :endDate")
+    @Query("SELECT SUM(valor) FROM vendas WHERE data BETWEEN :startDate AND :endDate")
     fun getTotalVendasByDateRange(startDate: Date, endDate: Date): Flow<Double?>
 
-    @Query("SELECT SUM(total) FROM vendas WHERE clienteId = :clienteId AND data BETWEEN :startDate AND :endDate")
+    @Query("SELECT SUM(valor) FROM vendas WHERE clienteId = :clienteId AND data BETWEEN :startDate AND :endDate")
     fun getTotalVendasByClienteAndDateRange(clienteId: Long, startDate: Date, endDate: Date): Flow<Double?>
 
     @Query("SELECT SUM(quantidadeSalgados) FROM vendas WHERE data BETWEEN :startDate AND :endDate")

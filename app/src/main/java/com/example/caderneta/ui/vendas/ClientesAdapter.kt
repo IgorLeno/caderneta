@@ -16,10 +16,16 @@ import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.databinding.ItemClienteBinding
 import android.content.Context
 import android.util.Log
+import androidx.lifecycle.LifecycleCoroutineScope
+import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class ClientesAdapter(
+    private val contaRepository: ContaRepository,
+    private val lifecycleScope: LifecycleCoroutineScope,
     private val onModoOperacaoSelected: (Cliente, ModoOperacao, TipoTransacao?) -> Unit,
     private val onUpdateQuantidadeSalgados: (Long, Int) -> Unit,
     private val onUpdateQuantidadeSucos: (Long, Int) -> Unit,
@@ -74,13 +80,18 @@ class ClientesAdapter(
 
         fun bind(cliente: Cliente) {
             binding.tvNomeCliente.text = cliente.nome
-            binding.tvValorDevido.text = "R$ %.2f".format(cliente.valorDevido)
-            binding.tvValorDevido.setTextColor(
-                if (cliente.valorDevido > 0)
-                    ContextCompat.getColor(itemView.context, R.color.delete_color)
-                else
-                    ContextCompat.getColor(itemView.context, R.color.add_color)
-            )
+
+            lifecycleScope.launch {
+                val conta = contaRepository.getContaByCliente(cliente.id).first()
+                val saldo = conta?.saldo ?: 0.0
+                binding.tvValorDevido.text = "R$ %.2f".format(saldo)
+                binding.tvValorDevido.setTextColor(
+                    if (saldo > 0)
+                        ContextCompat.getColor(itemView.context, R.color.delete_color)
+                    else
+                        ContextCompat.getColor(itemView.context, R.color.add_color)
+                )
+            }
 
             setupMainButtons(cliente)
             setupVendaButtons(cliente)
@@ -313,7 +324,11 @@ class ClientesAdapter(
 
         private fun setupPagamentoLayout(cliente: Cliente) {
             binding.btnTudo.setOnClickListener {
-                binding.etValorPagamento.setText(cliente.valorDevido.toString())
+                lifecycleScope.launch {
+                    val conta = contaRepository.getContaByCliente(cliente.id).first()
+                    val saldo = conta?.saldo ?: 0.0
+                    binding.etValorPagamento.setText(saldo.toString())
+                }
             }
             binding.btnPrevia.setOnClickListener {
                 val valorPagamento =

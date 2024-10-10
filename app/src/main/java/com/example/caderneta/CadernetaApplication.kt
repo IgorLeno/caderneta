@@ -11,4 +11,7 @@ class CadernetaApplication : Application() {
     val produtoRepository by lazy { ProdutoRepository(database.produtoDao()) }
     val vendaRepository by lazy { VendaRepository(database.vendaDao()) }
     val itemVendaRepository by lazy { ItemVendaRepository(database.itemVendaDao()) }
-    val configuracoesRepository by lazy { ConfiguracoesRepository(database.configuracoesDao()) }}
+    val configuracoesRepository by lazy { ConfiguracoesRepository(database.configuracoesDao()) }
+    val operacaoRepository by lazy { OperacaoRepository(database.operacaoDao()) }
+    val contaRepository by lazy { ContaRepository(database.contaDao()) }
+}
