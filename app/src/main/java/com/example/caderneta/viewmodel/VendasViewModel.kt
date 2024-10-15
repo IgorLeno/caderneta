@@ -36,22 +36,10 @@ class VendasViewModel(
     private val _configuracoes = MutableStateFlow<Configuracoes?>(null)
     val configuracoes: StateFlow<Configuracoes?> = _configuracoes
 
-    private val _clienteSelecionado = MutableStateFlow<Cliente?>(null)
-    val clienteSelecionado: StateFlow<Cliente?> = _clienteSelecionado
+    private val _clienteStates = MutableStateFlow<Map<Long, ClienteState>>(emptyMap())
+    val clienteStates: StateFlow<Map<Long, ClienteState>> = _clienteStates.asStateFlow()
 
-    private val _modoOperacaoAtual = MutableStateFlow<ModoOperacao?>(null)
-    val modoOperacaoAtual: StateFlow<ModoOperacao?> = _modoOperacaoAtual
-
-    private val _tipoTransacaoSelecionado = MutableStateFlow<TipoTransacao?>(null)
-    val tipoTransacaoSelecionado: StateFlow<TipoTransacao?> = _tipoTransacaoSelecionado
-
-    private val _quantidadeSalgados = MutableStateFlow(0)
-    val quantidadeSalgados: StateFlow<Int> = _quantidadeSalgados
-
-    private val _quantidadeSucos = MutableStateFlow(0)
-    val quantidadeSucos: StateFlow<Int> = _quantidadeSucos
-
-    private val _valorTotal = MutableStateFlow(Pair(0L, 0.0))
+    private val _valorTotal = MutableStateFlow<Pair<Long, Double>>(0L to 0.0)
     val valorTotal: StateFlow<Pair<Long, Double>> = _valorTotal.asStateFlow()
 
     private val _previaPagamento = MutableStateFlow(0.0)
@@ -59,12 +47,6 @@ class VendasViewModel(
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
-
-    private val _contadoresVisibles = MutableStateFlow(false)
-    val contadoresVisibles: StateFlow<Boolean> = _contadoresVisibles
-
-    private val _clienteStates = MutableStateFlow<Map<Long, ClienteState>>(emptyMap())
-    val clienteStates: StateFlow<Map<Long, ClienteState>> = _clienteStates.asStateFlow()
 
     init {
         carregarDados()
@@ -120,114 +102,97 @@ class VendasViewModel(
         }
     }
 
+    fun getClienteState(clienteId: Long): ClienteState? {
+        return _clienteStates.value[clienteId]
+    }
 
-    fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao, tipoTransacao: TipoTransacao? = null) {
-        val clienteState = _clienteStates.value.getOrDefault(cliente.id, ClienteState(clienteId = cliente.id))
-        val novoState = clienteState.copy(
-            modoOperacao = modoOperacao,
-            tipoTransacao = tipoTransacao,
+
+    fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao?) {
+        val currentState = _clienteStates.value[cliente.id]
+        val newState = if (currentState == null || currentState.modoOperacao != modoOperacao) {
+            ClienteState(clienteId = cliente.id, modoOperacao = modoOperacao)
+        } else {
+            currentState.copy(
+                modoOperacao = null,
+                tipoTransacao = null,
+                quantidadeSalgados = 0,
+                quantidadeSucos = 0,
+                valorTotal = 0.0
+            )
+        }
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(cliente.id, newState) }
+        calcularValorTotal(newState)
+    }
+
+    fun selecionarTipoTransacao(cliente: Cliente, tipoTransacao: TipoTransacao?) {
+        val clienteState = _clienteStates.value[cliente.id] ?: return
+        val newTipoTransacao = if (clienteState.tipoTransacao == tipoTransacao) null else tipoTransacao
+        val newState = clienteState.copy(
+            tipoTransacao = newTipoTransacao,
             quantidadeSalgados = 0,
             quantidadeSucos = 0,
             valorTotal = 0.0
         )
-
-        when (modoOperacao) {
-            ModoOperacao.VENDA, ModoOperacao.PROMOCAO -> {
-                if (modoOperacao == ModoOperacao.PROMOCAO) {
-                    aplicarPromocao(novoState, tipoTransacao == TipoTransacao.A_VISTA)
-                }
-            }
-            ModoOperacao.PAGAMENTO -> {
-                _previaPagamento.value = 0.0
-            }
-        }
-        calcularValorTotal(novoState)
-        _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(cliente.id, novoState) }
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(cliente.id, newState) }
+        calcularValorTotal(newState)
     }
 
-    private fun aplicarPromocao(state: ClienteState, aVista: Boolean) {
-        val config = _configuracoes.value ?: return
-        if (aVista) {
-            state.quantidadeSalgados = config.promo1Salgados
-            state.quantidadeSucos = config.promo1Sucos
-            state.valorTotal = config.promo1Vista
-        } else {
-            state.quantidadeSalgados = config.promo2Salgados
-            state.quantidadeSucos = config.promo2Sucos
-            state.valorTotal = config.promo2Prazo
-        }
-    }
-
-    fun updateContadoresVisibility(clienteId: Long, visible: Boolean) {
-        val clienteState = _clienteStates.value[clienteId] ?: return
-        _clienteStates.value = _clienteStates.value.toMutableMap().apply {
-            put(clienteId, clienteState.copy(quantidadeSalgados = if (visible) clienteState.quantidadeSalgados else 0,
-                quantidadeSucos = if (visible) clienteState.quantidadeSucos else 0))
-        }
-    }
 
     fun updateQuantidadeSalgados(clienteId: Long, quantidade: Int) {
         val clienteState = _clienteStates.value[clienteId] ?: return
-        if (clienteState.modoOperacao != ModoOperacao.PROMOCAO) {
-            val novoState = clienteState.copy(quantidadeSalgados = quantidade)
-            calcularValorTotal(novoState)
-            _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, novoState) }
-            Log.d("VendasViewModel", "Quantidade de salgados atualizada: clienteId=$clienteId, quantidade=$quantidade, novoValorTotal=${novoState.valorTotal}")
-        }
+        val newState = clienteState.copy(quantidadeSalgados = quantidade)
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, newState) }
+        calcularValorTotal(newState)
     }
 
     fun updateQuantidadeSucos(clienteId: Long, quantidade: Int) {
         val clienteState = _clienteStates.value[clienteId] ?: return
-        if (clienteState.modoOperacao != ModoOperacao.PROMOCAO) {
-            val novoState = clienteState.copy(quantidadeSucos = quantidade)
-            calcularValorTotal(novoState)
-            _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, novoState) }
-            Log.d("VendasViewModel", "Quantidade de sucos atualizada: clienteId=$clienteId, quantidade=$quantidade, novoValorTotal=${novoState.valorTotal}")
-        }
+        val newState = clienteState.copy(quantidadeSucos = quantidade)
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, newState) }
+        calcularValorTotal(newState)
     }
 
     private fun calcularValorTotal(state: ClienteState) {
         val config = _configuracoes.value ?: return
-        val valorAnterior = state.valorTotal
         state.valorTotal = when (state.modoOperacao) {
             ModoOperacao.VENDA -> when (state.tipoTransacao) {
                 TipoTransacao.A_VISTA -> (state.quantidadeSalgados * config.precoSalgadoVista) + (state.quantidadeSucos * config.precoSucoVista)
                 TipoTransacao.A_PRAZO -> (state.quantidadeSalgados * config.precoSalgadoPrazo) + (state.quantidadeSucos * config.precoSucoPrazo)
                 null -> 0.0
             }
-            ModoOperacao.PROMOCAO -> if (state.tipoTransacao == TipoTransacao.A_VISTA) config.promo1Vista else config.promo2Prazo
-            ModoOperacao.PAGAMENTO, null -> 0.0
+            ModoOperacao.PROMOCAO -> when (state.tipoTransacao) {
+                TipoTransacao.A_VISTA -> config.promo1Vista
+                TipoTransacao.A_PRAZO -> config.promo2Prazo
+                null -> 0.0
+            }
+            else -> 0.0
         }
 
-        Log.d("VendasViewModel", "Valor total calculado: clienteId=${state.clienteId}, valorAnterior=$valorAnterior, novoValor=${state.valorTotal}")
-        Log.d("VendasViewModel", "Configurações: precoSalgadoVista=${config.precoSalgadoVista}, precoSucoVista=${config.precoSucoVista}")
-
         viewModelScope.launch {
-            _valorTotal.emit(Pair(state.clienteId, state.valorTotal))
+            _valorTotal.emit(state.clienteId to state.valorTotal)
             _clienteStates.update { currentStates ->
                 currentStates.toMutableMap().apply {
                     put(state.clienteId, state)
                 }
             }
-            // Adicionando esta linha para garantir que o valor total seja atualizado na UI
-            updateValorTotal(state.clienteId, state.valorTotal)
         }
     }
 
-    // Adicione esta função ao ViewModel
-    fun updateValorTotal(clienteId: Long, valor: Double) {
-        viewModelScope.launch {
-            _valorTotal.emit(Pair(clienteId, valor))
+    fun confirmarOperacao(clienteId: Long) {
+        val clienteState = _clienteStates.value[clienteId] ?: return
+        when (clienteState.modoOperacao) {
+            ModoOperacao.VENDA, ModoOperacao.PROMOCAO -> confirmarVenda(clienteId)
+            ModoOperacao.PAGAMENTO -> confirmarPagamento(clienteId)
+            else -> {}
         }
     }
 
-    fun confirmarVenda(clienteId: Long) {
+    private fun confirmarVenda(clienteId: Long) {
         viewModelScope.launch {
             try {
                 val clienteState = _clienteStates.value[clienteId] ?: throw IllegalStateException("Estado do cliente não encontrado")
                 val localId = _localSelecionado.value?.id ?: throw IllegalStateException("Local não selecionado")
 
-                // Registrar a operação
                 val operacao = Operacao(
                     clienteId = clienteId,
                     tipoOperacao = if (clienteState.modoOperacao == ModoOperacao.PROMOCAO) "Promo" else "Venda",
@@ -236,7 +201,6 @@ class VendasViewModel(
                 )
                 val operacaoId = operacaoRepository.insertOperacao(operacao)
 
-                // Registrar a venda
                 val venda = Venda(
                     operacaoId = operacaoId,
                     clienteId = clienteId,
@@ -249,7 +213,6 @@ class VendasViewModel(
                 )
                 val vendaId = vendaRepository.insertVenda(venda)
 
-                // Atualizar a conta do cliente se for venda a prazo
                 if (clienteState.tipoTransacao == TipoTransacao.A_PRAZO) {
                     contaRepository.atualizarSaldo(clienteId, clienteState.valorTotal)
                 }
@@ -262,77 +225,12 @@ class VendasViewModel(
         }
     }
 
-    fun cancelarOperacao(clienteId: Long) {
-        _clienteStates.value = _clienteStates.value.toMutableMap().apply { remove(clienteId) }
-    }
-
-    private suspend fun inserirItensVenda(vendaId: Long, quantidadeSalgados: Int, quantidadeSucos: Int, tipoTransacao: TipoTransacao) {
-        val config = _configuracoes.value ?: return
-        val salgado = produtos.value.find { it.tipo == TipoProduto.SALGADO }
-        val suco = produtos.value.find { it.tipo == TipoProduto.SUCO }
-
-        val precoSalgado = when (tipoTransacao) {
-            TipoTransacao.A_VISTA -> config.precoSalgadoVista
-            TipoTransacao.A_PRAZO -> config.precoSalgadoPrazo
-        }
-
-        val precoSuco = when (tipoTransacao) {
-            TipoTransacao.A_VISTA -> config.precoSucoVista
-            TipoTransacao.A_PRAZO -> config.precoSucoPrazo
-        }
-
-        if (salgado != null && quantidadeSalgados > 0) {
-            itemVendaRepository.insertItemVenda(
-                ItemVenda(
-                    vendaId = vendaId,
-                    produtoId = salgado.id,
-                    quantidade = quantidadeSalgados,
-                    precoUnitario = precoSalgado
-                )
-            )
-        }
-
-        if (suco != null && quantidadeSucos > 0) {
-            itemVendaRepository.insertItemVenda(
-                ItemVenda(
-                    vendaId = vendaId,
-                    produtoId = suco.id,
-                    quantidade = quantidadeSucos,
-                    precoUnitario = precoSuco
-                )
-            )
-        }
-    }
-
-    fun iniciarModoPagamento(cliente: Cliente) {
-        selecionarModoOperacao(cliente, ModoOperacao.PAGAMENTO)
-    }
-
-    fun calcularPreviaPagamento(clienteId: Long, valorPagamento: Double) {
-        viewModelScope.launch {
-            try {
-                val clienteState = _clienteStates.value[clienteId] ?: return@launch
-                val conta = contaRepository.getContaByCliente(clienteId).firstOrNull()
-                val saldoDevedor = conta?.saldo ?: 0.0
-
-                clienteState.valorTotal = (saldoDevedor - valorPagamento).coerceAtLeast(0.0)
-                _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, clienteState) }
-
-                // Atualizar a prévia do pagamento
-                _previaPagamento.value = clienteState.valorTotal
-            } catch (e: Exception) {
-                _error.value = "Erro ao calcular prévia de pagamento: ${e.message}"
-            }
-        }
-    }
-
-    fun confirmarPagamento(clienteId: Long) {
+    private fun confirmarPagamento(clienteId: Long) {
         viewModelScope.launch {
             try {
                 val clienteState = _clienteStates.value[clienteId] ?: throw IllegalStateException("Estado do cliente não encontrado")
                 val valorPago = clienteState.valorTotal
 
-                // Registrar a operação de pagamento
                 val operacao = Operacao(
                     clienteId = clienteId,
                     tipoOperacao = "Pagamento",
@@ -341,7 +239,6 @@ class VendasViewModel(
                 )
                 operacaoRepository.insertOperacao(operacao)
 
-                // Atualizar o saldo do cliente
                 contaRepository.atualizarSaldo(clienteId, -valorPago)
 
                 cancelarOperacao(clienteId)
@@ -349,6 +246,29 @@ class VendasViewModel(
             } catch (e: Exception) {
                 _error.value = "Erro ao confirmar pagamento: ${e.message}"
             }
+        }
+    }
+
+    fun cancelarOperacao(clienteId: Long) {
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply { remove(clienteId) }
+    }
+
+    fun calcularPreviaPagamento(clienteId: Long, valorPagamento: Double) {
+        viewModelScope.launch {
+            try {
+                val conta = contaRepository.getContaByCliente(clienteId).firstOrNull()
+                val saldoDevedor = conta?.saldo ?: 0.0
+                val valorRestante = (saldoDevedor - valorPagamento).coerceAtLeast(0.0)
+                _previaPagamento.value = valorRestante
+            } catch (e: Exception) {
+                _error.value = "Erro ao calcular prévia de pagamento: ${e.message}"
+            }
+        }
+    }
+
+    fun updateValorTotal(clienteId: Long, valor: Double) {
+        viewModelScope.launch {
+            _valorTotal.emit(clienteId to valor)
         }
     }
 

@@ -8,28 +8,27 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
-import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.caderneta.databinding.FragmentVendasBinding
-import com.example.caderneta.viewmodel.VendasViewModel
-import com.example.caderneta.viewmodel.VendasViewModelFactory
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import com.example.caderneta.CadernetaApplication
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.R
 import com.example.caderneta.data.entity.Local
-import com.example.caderneta.data.entity.ModoOperacao
+import com.example.caderneta.databinding.FragmentVendasBinding
+import com.example.caderneta.viewmodel.VendasViewModel
+import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class VendasFragment : Fragment() {
 
@@ -74,8 +73,12 @@ class VendasFragment : Fragment() {
         clientesAdapter = ClientesAdapter(
             contaRepository = (requireActivity().application as CadernetaApplication).contaRepository,
             lifecycleScope = viewLifecycleOwner.lifecycleScope,
-            onModoOperacaoSelected = { cliente, modoOperacao, tipoTransacao ->
-                viewModel.selecionarModoOperacao(cliente, modoOperacao, tipoTransacao)
+            getClienteState = { clienteId -> viewModel.getClienteState(clienteId) },
+            onModoOperacaoSelected = { cliente, modoOperacao ->
+                viewModel.selecionarModoOperacao(cliente, modoOperacao)
+            },
+            onTipoTransacaoSelected = { cliente, tipoTransacao ->
+                viewModel.selecionarTipoTransacao(cliente, tipoTransacao)
             },
             onUpdateQuantidadeSalgados = { clienteId, quantidade ->
                 viewModel.updateQuantidadeSalgados(clienteId, quantidade)
@@ -83,21 +86,17 @@ class VendasFragment : Fragment() {
             onUpdateQuantidadeSucos = { clienteId, quantidade ->
                 viewModel.updateQuantidadeSucos(clienteId, quantidade)
             },
+            onConfirmarOperacao = { clienteId ->
+                viewModel.confirmarOperacao(clienteId)
+            },
+            onCancelarOperacao = { clienteId ->
+                viewModel.cancelarOperacao(clienteId)
+            },
+            onPreviaPagamento = { clienteId, valor ->
+                viewModel.calcularPreviaPagamento(clienteId, valor)
+            },
             onUpdateValorTotal = { clienteId, valorTotal ->
                 viewModel.updateValorTotal(clienteId, valorTotal)
-            },
-            onConfirmarOperacao = { clienteId ->
-                val clienteState = viewModel.clienteStates.value[clienteId]
-                when (clienteState?.modoOperacao) {
-                    ModoOperacao.VENDA, ModoOperacao.PROMOCAO -> viewModel.confirmarVenda(clienteId)
-                    ModoOperacao.PAGAMENTO -> viewModel.confirmarPagamento(clienteId)
-                    null -> { /* Nenhuma ação necessária */ }
-                }
-            },
-            onCancelarOperacao = { clienteId -> viewModel.cancelarOperacao(clienteId) },
-            onPreviaPagamento = { clienteId, valor -> viewModel.calcularPreviaPagamento(clienteId, valor) },
-            onUpdateContadoresVisibility = { clienteId, visible ->
-                viewModel.updateContadoresVisibility(clienteId, visible)
             }
         )
 
@@ -164,13 +163,6 @@ class VendasFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.configuracoes.collectLatest { configuracoes ->
                 Log.d("VendasFragment", "Configurações atualizadas: $configuracoes")
-            }
-        }
-
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.clienteStates.collectLatest { clienteStates ->
-                clientesAdapter.updateClienteStates(clienteStates)
             }
         }
 
@@ -255,8 +247,6 @@ class VendasFragment : Fragment() {
     }
 }
 
-
-
 class EditLocalDialog(private val local: Local) : DialogFragment() {
     var onLocalEditado: ((Local) -> Unit)? = null
 
@@ -274,10 +264,9 @@ class EditLocalDialog(private val local: Local) : DialogFragment() {
             .create()
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        val view = super.onCreateView(inflater, container, savedInstanceState)
+    override fun onStart() {
+        super.onStart()
         dialog?.findViewById<EditText>(R.id.et_nome_local)?.setText(local.nome)
-        return view
     }
 }
 
