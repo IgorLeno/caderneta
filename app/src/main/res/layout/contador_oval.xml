@@ -13,12 +13,14 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/ic_minus" />
 
+
     <TextView
         android:id="@+id/tv_quantidade"
-        android:layout_width="wrap_content"
+        android:layout_width="19dp"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="8dp"
-        android:text="0"
+        android:layout_marginHorizontal="7dp"
+        android:text="10"
+        android:textAlignment="center"
         android:textSize="16sp" />
 
     <ImageButton

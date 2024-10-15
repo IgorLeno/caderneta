@@ -97,6 +97,7 @@ class ClientesAdapter(
             setupVendaButtons(cliente)
             setupContadores(cliente)
             setupPagamentoLayout(cliente)
+            setupConfirmationButtons(cliente)
             updateButtonStates(cliente)
             setupButtonStateListeners()
         }
@@ -127,8 +128,11 @@ class ClientesAdapter(
             binding.layoutVenda.visibility = if ((clienteState.modoOperacao == ModoOperacao.VENDA || clienteState.modoOperacao == ModoOperacao.PROMOCAO) && clienteState.tipoTransacao != null) View.VISIBLE else View.GONE
             binding.layoutPagamento.visibility = if (clienteState.modoOperacao == ModoOperacao.PAGAMENTO) View.VISIBLE else View.GONE
 
-            binding.btnConfirmarPagamento.visibility = if (clienteState.modoOperacao != null) View.VISIBLE else View.GONE
-            binding.btnCancelarPagamento.visibility = if (clienteState.modoOperacao != null) View.VISIBLE else View.GONE
+            val showConfirmationButtons = clienteState.modoOperacao != null &&
+                    (clienteState.modoOperacao == ModoOperacao.PAGAMENTO ||
+                            (clienteState.modoOperacao != ModoOperacao.PAGAMENTO && clienteState.tipoTransacao != null))
+
+            binding.layoutBotoesConfirmacao.visibility = if (showConfirmationButtons) View.VISIBLE else View.GONE
         }
 
         private fun setupButtonStateListeners() {
@@ -321,7 +325,6 @@ class ClientesAdapter(
             }
         }
 
-
         private fun setupPagamentoLayout(cliente: Cliente) {
             binding.btnTudo.setOnClickListener {
                 lifecycleScope.launch {
@@ -335,11 +338,14 @@ class ClientesAdapter(
                     binding.etValorPagamento.text.toString().toDoubleOrNull() ?: 0.0
                 onPreviaPagamento(cliente.id, valorPagamento)
             }
-            binding.btnConfirmarPagamento.setOnClickListener {
+        }
+
+        private fun setupConfirmationButtons(cliente: Cliente) {
+            binding.btnConfirmarOperacao.setOnClickListener {
                 onConfirmarOperacao(cliente.id)
                 resetSelection(cliente.id)
             }
-            binding.btnCancelarPagamento.setOnClickListener {
+            binding.btnCancelarOperacao.setOnClickListener {
                 onCancelarOperacao(cliente.id)
                 resetSelection(cliente.id)
             }
