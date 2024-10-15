@@ -15,6 +15,7 @@ import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.databinding.ItemClienteBinding
 import android.content.Context
+import android.content.res.ColorStateList
 import android.util.Log
 import androidx.lifecycle.LifecycleCoroutineScope
 import com.example.caderneta.repository.ContaRepository
@@ -109,8 +110,10 @@ class ClientesAdapter(
             binding.btnPromocao.isSelected = clienteState.modoOperacao == ModoOperacao.PROMOCAO
             binding.btnPagamento.isSelected = clienteState.modoOperacao == ModoOperacao.PAGAMENTO
 
-            binding.btnAVista.isSelected = clienteState.tipoTransacao == TipoTransacao.A_VISTA
-            binding.btnAPrazo.isSelected = clienteState.tipoTransacao == TipoTransacao.A_PRAZO
+            // Atualiza o estado dos botões À Vista e A Prazo com base no modo de operação
+            val isVendaOrPromocao = clienteState.modoOperacao == ModoOperacao.VENDA || clienteState.modoOperacao == ModoOperacao.PROMOCAO
+            binding.btnAVista.isSelected = isVendaOrPromocao && clienteState.tipoTransacao == TipoTransacao.A_VISTA
+            binding.btnAPrazo.isSelected = isVendaOrPromocao && clienteState.tipoTransacao == TipoTransacao.A_PRAZO
 
             updateButtonStyle(binding.btnVenda)
             updateButtonStyle(binding.btnPromocao)
@@ -164,7 +167,7 @@ class ClientesAdapter(
                     )
                 )
                 button.setIconTintResource(R.color.button_icon_selected)
-                button.setStrokeColorResource(R.color.button_background_selected)
+                button.strokeColor = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.button_background_selected))
             } else {
                 button.setBackgroundColor(
                     ContextCompat.getColor(
@@ -173,8 +176,10 @@ class ClientesAdapter(
                     )
                 )
                 button.setIconTintResource(R.color.button_icon_unselected)
-                button.setStrokeColorResource(R.color.button_stroke)
+                button.strokeColor = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.button_stroke))
             }
+            button.elevation = 0f
+            button.stateListAnimator = null
         }
 
         private fun setupMainButtons(cliente: Cliente) {
