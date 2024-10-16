@@ -10,8 +10,10 @@ import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -37,6 +39,9 @@ class ConsultasViewModel(
     private val _modoBusca = MutableStateFlow(ModoBusca.POR_PREDIO)
     val modoBusca: StateFlow<ModoBusca> = _modoBusca
 
+    private val _saldoAtualizado = MutableSharedFlow<Long>()
+    val saldoAtualizado = _saldoAtualizado.asSharedFlow()
+
     fun setModoBusca(modo: ModoBusca) {
         _modoBusca.value = modo
     }
@@ -56,7 +61,7 @@ class ConsultasViewModel(
         }
     }
 
-    fun buscarClientesComSaldo(query: String) {
+    private fun buscarClientesComSaldo(query: String) {
         viewModelScope.launch {
             val clientes = clienteRepository.buscarClientes(query)
             val clientesComSaldo = clientes.map { cliente ->
@@ -68,12 +73,18 @@ class ConsultasViewModel(
     }
 
     suspend fun getSaldoCliente(clienteId: Long): Double {
-        return contaRepository.getContaByCliente(clienteId).first()?.saldo ?: 0.0
+        return contaRepository.getContaByCliente(clienteId)?.saldo ?: 0.0
     }
 
     fun carregarClientesPorLocal(localId: Long) {
         viewModelScope.launch {
             _clientes.value = clienteRepository.getClientesByLocal(localId)
+        }
+    }
+
+    fun atualizarSaldoCliente(clienteId: Long) {
+        viewModelScope.launch {
+            _saldoAtualizado.emit(clienteId)
         }
     }
 

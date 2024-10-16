@@ -6,8 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ContaDao {
-    @Query("SELECT * FROM contas WHERE clienteId = :clienteId")
-    fun getContaByCliente(clienteId: Long): Flow<Conta?>
+
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConta(conta: Conta)
@@ -17,4 +16,8 @@ interface ContaDao {
 
     @Query("UPDATE contas SET saldo = saldo + :valor WHERE clienteId = :clienteId")
     suspend fun atualizarSaldo(clienteId: Long, valor: Double)
+
+    @Query("SELECT * FROM contas WHERE clienteId = :clienteId")
+    suspend fun getContaByCliente(clienteId: Long): Conta?
+
 }

@@ -97,6 +97,13 @@ class VendasFragment : Fragment() {
             },
             onUpdateValorTotal = { clienteId, valorTotal ->
                 viewModel.updateValorTotal(clienteId, valorTotal)
+            },
+            observeSaldoAtualizado = { observer ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    viewModel.saldoAtualizado.collect { clienteId ->
+                        observer(clienteId)
+                    }
+                }
             }
         )
 

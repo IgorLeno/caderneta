@@ -21,7 +21,6 @@ import com.example.caderneta.databinding.ItemClienteBinding
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.google.android.material.button.MaterialButton
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ClientesAdapter(
@@ -35,8 +34,20 @@ class ClientesAdapter(
     private val onConfirmarOperacao: (Long) -> Unit,
     private val onCancelarOperacao: (Long) -> Unit,
     private val onPreviaPagamento: (Long, Double) -> Unit,
-    private val onUpdateValorTotal: (Long, Double) -> Unit
+    private val onUpdateValorTotal: (Long, Double) -> Unit,
+    private val observeSaldoAtualizado: ((suspend (Long) -> Unit) -> Unit)
 ) : ListAdapter<Cliente, ClientesAdapter.ClienteViewHolder>(ClienteDiffCallback()) {
+
+    init {
+        lifecycleScope.launch {
+            observeSaldoAtualizado { clienteId ->
+                val position = currentList.indexOfFirst { it.id == clienteId }
+                if (position != -1) {
+                    notifyItemChanged(position, Payload.SaldoChanged)
+                }
+            }
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ClienteViewHolder {
         val binding = ItemClienteBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -50,10 +61,11 @@ class ClientesAdapter(
 
     override fun onBindViewHolder(holder: ClienteViewHolder, position: Int, payloads: List<Any>) {
         if (payloads.isNotEmpty()) {
-            val payload = payloads[0] as? Payload
+            val payload = payloads[0]
             when (payload) {
                 is Payload.ValorTotalChanged -> holder.updateValorTotal(payload.novoValor)
-                null -> super.onBindViewHolder(holder, position, payloads)
+                is Payload.SaldoChanged -> holder.updateSaldo()
+                else -> super.onBindViewHolder(holder, position, payloads)
             }
         } else {
             super.onBindViewHolder(holder, position, payloads)
@@ -74,8 +86,22 @@ class ClientesAdapter(
         fun bind(cliente: Cliente) {
             binding.tvNomeCliente.text = cliente.nome
 
+            updateSaldo()
+
+            setupMainButtons(cliente)
+            setupVendaButtons(cliente)
+            setupContadores(cliente)
+            setupPagamentoLayout(cliente)
+            setupConfirmationButtons(cliente)
+            updateButtonStates(cliente)
+            setupButtonStateListeners()
+        }
+
+
+        fun updateSaldo() {
             lifecycleScope.launch {
-                val conta = contaRepository.getContaByCliente(cliente.id).first()
+                val cliente = getItem(bindingAdapterPosition)
+                val conta = contaRepository.getContaByCliente(cliente.id)
                 val saldo = conta?.saldo ?: 0.0
                 binding.tvValorDevido.text = "R$ %.2f".format(saldo)
                 binding.tvValorDevido.setTextColor(
@@ -85,14 +111,6 @@ class ClientesAdapter(
                         ContextCompat.getColor(itemView.context, R.color.add_color)
                 )
             }
-
-            setupMainButtons(cliente)
-            setupVendaButtons(cliente)
-            setupContadores(cliente)
-            setupPagamentoLayout(cliente)
-            setupConfirmationButtons(cliente)
-            updateButtonStates(cliente)
-            setupButtonStateListeners()
         }
 
         private fun updateButtonStates(cliente: Cliente) {
@@ -125,7 +143,6 @@ class ClientesAdapter(
 
             Log.d("ClientesAdapter", "Button states updated for cliente ${cliente.id}: venda=${binding.btnVenda.isSelected}, promocao=${binding.btnPromocao.isSelected}, pagamento=${binding.btnPagamento.isSelected}, aVista=${binding.btnAVista.isSelected}, aPrazo=${binding.btnAPrazo.isSelected}")
         }
-
 
         private fun updateLayoutVisibility(clienteState: VendasViewModel.ClienteState) {
             binding.layoutBotoesVenda.visibility = if (clienteState.modoOperacao == ModoOperacao.VENDA || clienteState.modoOperacao == ModoOperacao.PROMOCAO) View.VISIBLE else View.GONE
@@ -277,7 +294,7 @@ class ClientesAdapter(
         private fun setupPagamentoLayout(cliente: Cliente) {
             binding.btnTudo.setOnClickListener {
                 lifecycleScope.launch {
-                    val conta = contaRepository.getContaByCliente(cliente.id).first()
+                    val conta = contaRepository.getContaByCliente(cliente.id)
                     val saldo = conta?.saldo ?: 0.0
                     binding.etValorPagamento.setText(saldo.toString())
                 }
@@ -287,7 +304,6 @@ class ClientesAdapter(
                 onPreviaPagamento(cliente.id, valorPagamento)
             }
         }
-
 
         private fun setupConfirmationButtons(cliente: Cliente) {
             binding.btnConfirmarOperacao.setOnClickListener {
@@ -325,5 +341,6 @@ class ClientesAdapter(
 
     sealed class Payload {
         data class ValorTotalChanged(val novoValor: Double) : Payload()
+        object SaldoChanged : Payload()
     }
 }

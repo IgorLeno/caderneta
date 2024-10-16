@@ -7,7 +7,11 @@ import kotlinx.coroutines.flow.Flow
 class ContaRepository(private val contaDao: ContaDao) {
 
 
-    fun getContaByCliente(clienteId: Long): Flow<Conta?> = contaDao.getContaByCliente(clienteId)
+
+    suspend fun getContaByCliente(clienteId: Long): Conta? {
+        return contaDao.getContaByCliente(clienteId)
+    }
+
 
     suspend fun insertConta(conta: Conta) = contaDao.insertConta(conta)
 

@@ -48,6 +48,15 @@ class VendasViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    private val _saldoAtualizado = MutableSharedFlow<Long>()
+    val saldoAtualizado = _saldoAtualizado.asSharedFlow()
+
+    private fun atualizarSaldoCliente(clienteId: Long) {
+        viewModelScope.launch {
+            _saldoAtualizado.emit(clienteId)
+        }
+    }
+
     init {
         carregarDados()
     }
@@ -106,7 +115,6 @@ class VendasViewModel(
         return _clienteStates.value[clienteId]
     }
 
-
     fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao?) {
         val currentState = _clienteStates.value[cliente.id]
         val newState = if (currentState == null || currentState.modoOperacao != modoOperacao) {
@@ -136,7 +144,6 @@ class VendasViewModel(
         _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(cliente.id, newState) }
         calcularValorTotal(newState)
     }
-
 
     fun updateQuantidadeSalgados(clienteId: Long, quantidade: Int) {
         val clienteState = _clienteStates.value[clienteId] ?: return
@@ -187,6 +194,7 @@ class VendasViewModel(
         }
     }
 
+    // Em VendasViewModel.kt
     private fun confirmarVenda(clienteId: Long) {
         viewModelScope.launch {
             try {
@@ -211,14 +219,25 @@ class VendasViewModel(
                     quantidadeSucos = clienteState.quantidadeSucos,
                     valor = clienteState.valorTotal
                 )
-                val vendaId = vendaRepository.insertVenda(venda)
+                vendaRepository.insertVenda(venda)
 
                 if (clienteState.tipoTransacao == TipoTransacao.A_PRAZO) {
-                    contaRepository.atualizarSaldo(clienteId, clienteState.valorTotal)
+                    // Verificar se a conta existe
+                    val contaExistente = contaRepository.getContaByCliente(clienteId)
+                    if (contaExistente == null) {
+                        // Criar uma nova conta com saldo inicial igual ao valor da venda
+                        val novaConta = Conta(clienteId = clienteId, saldo = clienteState.valorTotal)
+                        contaRepository.insertConta(novaConta)
+                    } else {
+                        // Atualizar o saldo da conta existente
+                        contaRepository.atualizarSaldo(clienteId, clienteState.valorTotal)
+                    }
+
+                    // Notificar que o saldo mudou
+                    atualizarSaldoCliente(clienteId)
                 }
 
                 cancelarOperacao(clienteId)
-                carregarDados()
             } catch (e: Exception) {
                 _error.value = "Erro ao confirmar venda: ${e.message}"
             }
@@ -241,8 +260,10 @@ class VendasViewModel(
 
                 contaRepository.atualizarSaldo(clienteId, -valorPago)
 
+                // Notificar que o saldo mudou
+                atualizarSaldoCliente(clienteId)
+
                 cancelarOperacao(clienteId)
-                carregarDados()
             } catch (e: Exception) {
                 _error.value = "Erro ao confirmar pagamento: ${e.message}"
             }
@@ -256,7 +277,7 @@ class VendasViewModel(
     fun calcularPreviaPagamento(clienteId: Long, valorPagamento: Double) {
         viewModelScope.launch {
             try {
-                val conta = contaRepository.getContaByCliente(clienteId).firstOrNull()
+                val conta = contaRepository.getContaByCliente(clienteId)
                 val saldoDevedor = conta?.saldo ?: 0.0
                 val valorRestante = (saldoDevedor - valorPagamento).coerceAtLeast(0.0)
                 _previaPagamento.value = valorRestante
