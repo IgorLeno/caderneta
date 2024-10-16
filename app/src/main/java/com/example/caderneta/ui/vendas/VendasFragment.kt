@@ -8,6 +8,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -208,6 +209,25 @@ class VendasFragment : Fragment() {
                 Log.d("VendasFragment", "Valor total atualizado no Fragment: clienteId=$clienteId, valor=$valor")
             }
         }
+
+        // Novo observer para operações confirmadas
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.operacaoConfirmada.collectLatest { operacao ->
+                when (operacao) {
+                    is VendasViewModel.OperacaoConfirmada.Venda -> {
+                        showToast("Venda registrada com sucesso!")
+                    }
+                    is VendasViewModel.OperacaoConfirmada.Pagamento -> {
+                        showToast("Pagamento registrado com sucesso!")
+                    }
+                    null -> {} // Nenhuma operação confirmada
+                }
+            }
+        }
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 
     private fun showPreviaPagamento(previa: Double) {

@@ -51,11 +51,6 @@ class VendasViewModel(
     private val _saldoAtualizado = MutableSharedFlow<Long>()
     val saldoAtualizado = _saldoAtualizado.asSharedFlow()
 
-    private fun atualizarSaldoCliente(clienteId: Long) {
-        viewModelScope.launch {
-            _saldoAtualizado.emit(clienteId)
-        }
-    }
 
     init {
         carregarDados()
@@ -194,7 +189,6 @@ class VendasViewModel(
         }
     }
 
-    // Em VendasViewModel.kt
     private fun confirmarVenda(clienteId: Long) {
         viewModelScope.launch {
             try {
@@ -222,22 +216,11 @@ class VendasViewModel(
                 vendaRepository.insertVenda(venda)
 
                 if (clienteState.tipoTransacao == TipoTransacao.A_PRAZO) {
-                    // Verificar se a conta existe
-                    val contaExistente = contaRepository.getContaByCliente(clienteId)
-                    if (contaExistente == null) {
-                        // Criar uma nova conta com saldo inicial igual ao valor da venda
-                        val novaConta = Conta(clienteId = clienteId, saldo = clienteState.valorTotal)
-                        contaRepository.insertConta(novaConta)
-                    } else {
-                        // Atualizar o saldo da conta existente
-                        contaRepository.atualizarSaldo(clienteId, clienteState.valorTotal)
-                    }
-
-                    // Notificar que o saldo mudou
-                    atualizarSaldoCliente(clienteId)
+                    atualizarSaldoCliente(clienteId, clienteState.valorTotal)
                 }
 
-                cancelarOperacao(clienteId)
+                resetClienteState(clienteId)
+                _operacaoConfirmada.value = OperacaoConfirmada.Venda
             } catch (e: Exception) {
                 _error.value = "Erro ao confirmar venda: ${e.message}"
             }
@@ -258,21 +241,58 @@ class VendasViewModel(
                 )
                 operacaoRepository.insertOperacao(operacao)
 
-                contaRepository.atualizarSaldo(clienteId, -valorPago)
+                atualizarSaldoCliente(clienteId, -valorPago)
 
-                // Notificar que o saldo mudou
-                atualizarSaldoCliente(clienteId)
-
-                cancelarOperacao(clienteId)
+                resetClienteState(clienteId)
+                _operacaoConfirmada.value = OperacaoConfirmada.Pagamento
             } catch (e: Exception) {
                 _error.value = "Erro ao confirmar pagamento: ${e.message}"
             }
         }
     }
 
-    fun cancelarOperacao(clienteId: Long) {
-        _clienteStates.value = _clienteStates.value.toMutableMap().apply { remove(clienteId) }
+    private fun atualizarSaldoCliente(clienteId: Long, valor: Double) {
+        viewModelScope.launch {
+            val contaExistente = contaRepository.getContaByCliente(clienteId)
+            if (contaExistente == null) {
+                val novaConta = Conta(clienteId = clienteId, saldo = valor)
+                contaRepository.insertConta(novaConta)
+            } else {
+                contaRepository.atualizarSaldo(clienteId, valor)
+            }
+            _saldoAtualizado.emit(clienteId)
+        }
     }
+
+    fun cancelarOperacao(clienteId: Long) {
+        resetClienteState(clienteId)
+    }
+
+    private fun resetClienteState(clienteId: Long) {
+        _clienteStates.update { currentStates ->
+            currentStates.toMutableMap().apply {
+                put(clienteId, ClienteState(clienteId = clienteId))
+            }
+        }
+        viewModelScope.launch {
+            _valorTotal.emit(clienteId to 0.0)
+        }
+    }
+
+    fun resetOperacaoConfirmada() {
+        _operacaoConfirmada.value = null
+    }
+
+
+
+    private val _operacaoConfirmada = MutableStateFlow<OperacaoConfirmada?>(null)
+    val operacaoConfirmada: StateFlow<OperacaoConfirmada?> = _operacaoConfirmada.asStateFlow()
+
+    sealed class OperacaoConfirmada {
+        object Venda : OperacaoConfirmada()
+        object Pagamento : OperacaoConfirmada()
+    }
+
 
     fun calcularPreviaPagamento(clienteId: Long, valorPagamento: Double) {
         viewModelScope.launch {

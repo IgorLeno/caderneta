@@ -97,7 +97,6 @@ class ClientesAdapter(
             setupButtonStateListeners()
         }
 
-
         fun updateSaldo() {
             lifecycleScope.launch {
                 val cliente = getItem(bindingAdapterPosition)
@@ -116,7 +115,6 @@ class ClientesAdapter(
         private fun updateButtonStates(cliente: Cliente) {
             val clienteState = getClienteState(cliente.id) ?: VendasViewModel.ClienteState(clienteId = cliente.id)
 
-            // Atualize o estado dos botões como antes
             binding.btnVenda.isSelected = clienteState.modoOperacao == ModoOperacao.VENDA
             binding.btnPromocao.isSelected = clienteState.modoOperacao == ModoOperacao.PROMOCAO
             binding.btnPagamento.isSelected = clienteState.modoOperacao == ModoOperacao.PAGAMENTO
@@ -133,13 +131,16 @@ class ClientesAdapter(
 
             updateLayoutVisibility(clienteState)
 
-            // Redefina os contadores para zero na interface do usuário
             binding.contadorItem1.tvQuantidade.text = clienteState.quantidadeSalgados.toString()
             binding.contadorItem2.tvQuantidade.text = clienteState.quantidadeSucos.toString()
 
-            // Atualize o valor total exibido
             binding.tvValorTotal.text = String.format("R$ %.2f", clienteState.valorTotal)
             binding.tvValorTotal.visibility = if (clienteState.valorTotal > 0) View.VISIBLE else View.GONE
+
+            // Reseta os botões se o estado for inicial
+            if (clienteState.modoOperacao == null && clienteState.tipoTransacao == null) {
+                resetContadores()
+            }
 
             Log.d("ClientesAdapter", "Button states updated for cliente ${cliente.id}: venda=${binding.btnVenda.isSelected}, promocao=${binding.btnPromocao.isSelected}, pagamento=${binding.btnPagamento.isSelected}, aVista=${binding.btnAVista.isSelected}, aPrazo=${binding.btnAPrazo.isSelected}")
         }
@@ -309,10 +310,12 @@ class ClientesAdapter(
             binding.btnConfirmarOperacao.setOnClickListener {
                 onConfirmarOperacao(cliente.id)
                 updateButtonStates(cliente)
+                resetContadores()
             }
             binding.btnCancelarOperacao.setOnClickListener {
                 onCancelarOperacao(cliente.id)
                 updateButtonStates(cliente)
+                resetContadores()
             }
         }
 
@@ -320,6 +323,14 @@ class ClientesAdapter(
             binding.tvValorTotal.text = String.format("R$ %.2f", valor)
             binding.tvValorTotal.visibility = if (valor > 0) View.VISIBLE else View.GONE
             Log.d("ClientesAdapter", "Valor total atualizado na UI: clienteId=${bindingAdapterPosition}, valor=$valor")
+        }
+
+        private fun resetContadores() {
+            binding.contadorItem1.tvQuantidade.text = "0"
+            binding.contadorItem2.tvQuantidade.text = "0"
+            binding.tvValorTotal.text = "R$ 0,00"
+            binding.tvValorTotal.visibility = View.GONE
+            binding.etValorPagamento.text?.clear()
         }
     }
 
