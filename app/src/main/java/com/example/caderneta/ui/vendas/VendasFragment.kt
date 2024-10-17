@@ -99,6 +99,8 @@ class VendasFragment : Fragment() {
             onUpdateValorTotal = { clienteId, valorTotal ->
                 viewModel.updateValorTotal(clienteId, valorTotal)
             },
+
+
             observeSaldoAtualizado = { observer ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     viewModel.saldoAtualizado.collect { clienteId ->
@@ -183,7 +185,10 @@ class VendasFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.locais.collectLatest { locais ->
                 Log.d("VendasFragment", "Locais atualizados: ${locais.size}")
-                Log.d("VendasFragment", "Locais: ${locais.map { "${it.id}:${it.nome}(${it.parentId})" }}")
+                Log.d(
+                    "VendasFragment",
+                    "Locais: ${locais.map { "${it.id}:${it.nome}(${it.parentId})" }}"
+                )
                 localAdapter.updateLocais(locais)
             }
         }
@@ -197,30 +202,47 @@ class VendasFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { errorMessage ->
                 errorMessage?.let {
-                    Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
                     viewModel.clearError()
                 }
             }
         }
 
+
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.valorTotal.collectLatest { (clienteId, valor) ->
-                clientesAdapter.updateValorTotal(clienteId, valor)
-                Log.d("VendasFragment", "Valor total atualizado no Fragment: clienteId=$clienteId, valor=$valor")
+            viewModel.clienteStateUpdates.collect { clienteId ->
+                val position = clientesAdapter.currentList.indexOfFirst { it.id == clienteId }
+                if (position != -1) {
+                    clientesAdapter.notifyItemChanged(position)
+                }
             }
         }
 
-        // Novo observer para operações confirmadas
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.valorTotal.collectLatest { (clienteId, valor) ->
+                clientesAdapter.updateValorTotal(clienteId, valor)
+                Log.d(
+                    "VendasFragment",
+                    "Valor total atualizado no Fragment: clienteId=$clienteId, valor=$valor"
+                )
+            }
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.operacaoConfirmada.collectLatest { operacao ->
                 when (operacao) {
                     is VendasViewModel.OperacaoConfirmada.Venda -> {
                         showToast("Venda registrada com sucesso!")
+                        viewModel.resetOperacaoConfirmada() // Reset after handling
                     }
+
                     is VendasViewModel.OperacaoConfirmada.Pagamento -> {
                         showToast("Pagamento registrado com sucesso!")
+                        viewModel.resetOperacaoConfirmada() // Reset after handling
                     }
-                    null -> {} // Nenhuma operação confirmada
+
+                    null -> {} // No operation confirmed
                 }
             }
         }

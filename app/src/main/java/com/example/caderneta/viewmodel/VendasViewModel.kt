@@ -276,13 +276,18 @@ class VendasViewModel(
         }
         viewModelScope.launch {
             _valorTotal.emit(clienteId to 0.0)
+            _clienteStateUpdates.emit(clienteId) // Emit the client ID
         }
     }
+
 
     fun resetOperacaoConfirmada() {
         _operacaoConfirmada.value = null
     }
 
+
+    private val _clienteStateUpdates = MutableSharedFlow<Long>()
+    val clienteStateUpdates = _clienteStateUpdates.asSharedFlow()
 
 
     private val _operacaoConfirmada = MutableStateFlow<OperacaoConfirmada?>(null)
