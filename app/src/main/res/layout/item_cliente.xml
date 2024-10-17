@@ -233,10 +233,8 @@
             android:orientation="horizontal"
             android:visibility="visible"
             android:weightSum="3"
-            app:layout_constraintTop_toBottomOf="@id/layout_botoes_principais"
-            tools:layout_editor_absoluteX="16dp">
+            app:layout_constraintTop_toBottomOf="@id/layout_botoes_principais">
 
-            <!-- Contadores de Itens -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="92dp"
@@ -244,7 +242,6 @@
                 android:gravity="center_vertical"
                 android:orientation="vertical">
 
-                <!-- Item 1 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -266,7 +263,6 @@
 
                 </LinearLayout>
 
-                <!-- Item 2 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -291,36 +287,24 @@
 
             </LinearLayout>
 
-            <!-- Bloco Valor Total -->
-            <LinearLayout
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_valor_total"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="0dp"
-                android:layout_height="75dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="0.7"
                 android:layout_marginStart="7dp"
-                android:background="@drawable/my_border"
-                android:orientation="vertical">
+                android:hint="Valor da Compra">
 
-                <TextView
-                    android:id="@+id/tv_valor_total_title"
-                    android:layout_width="wrap_content"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_valor_total"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:paddingTop="10dp"
-                    android:text="Total"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/tv_valor_total"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:layout_marginTop="4dp"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
+                    android:inputType="numberDecimal"
+                    android:enabled="false"
                     tools:text="R$ 25,00" />
 
-            </LinearLayout>
+            </com.google.android.material.textfield.TextInputLayout>
 
         </LinearLayout>
 
@@ -405,7 +389,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:visibility="gone"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -413,9 +397,9 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1">
+                android:layout_marginBottom="8dp">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_valor_pagamento"
@@ -431,18 +415,34 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
                 android:text="Tudo" />
 
-            <ImageButton
-                android:id="@+id/btn_previa"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/circle_button_background"
-                android:backgroundTint="@color/blue"
-                android:src="@drawable/ic_prev"
-                app:tint="@color/white" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_confirmar_pagamento"
+                    style="@style/ButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Confirmar"
+                    app:icon="@drawable/ic_check"
+                    app:iconGravity="textStart" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_cancelar_pagamento"
+                    style="@style/ButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Cancelar"
+                    app:icon="@drawable/ic_close"
+                    app:iconGravity="textStart" />
+
+            </LinearLayout>
 
         </LinearLayout>
 

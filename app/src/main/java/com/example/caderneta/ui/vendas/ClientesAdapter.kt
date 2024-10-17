@@ -4,6 +4,8 @@ import android.animation.ObjectAnimator
 import android.animation.StateListAnimator
 import android.content.Context
 import android.content.res.ColorStateList
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -134,8 +136,7 @@ class ClientesAdapter(
             binding.contadorItem1.tvQuantidade.text = clienteState.quantidadeSalgados.toString()
             binding.contadorItem2.tvQuantidade.text = clienteState.quantidadeSucos.toString()
 
-            binding.tvValorTotal.text = String.format("R$ %.2f", clienteState.valorTotal)
-            binding.tvValorTotal.visibility = if (clienteState.valorTotal > 0) View.VISIBLE else View.GONE
+            binding.etValorTotal.setText(String.format("%.2f", clienteState.valorTotal))
 
             // Reseta os botões se o estado for inicial
             if (clienteState.modoOperacao == null && clienteState.tipoTransacao == null) {
@@ -275,8 +276,7 @@ class ClientesAdapter(
             }
             binding.contadorItem2.btnMenos.setOnClickListener {
                 val quantidadeAtual = binding.contadorItem2.tvQuantidade.text.toString().toInt()
-                if (quantidadeAtual > 0) {
-                    val novaQuantidade = quantidadeAtual - 1
+                if (quantidadeAtual > 0) {val novaQuantidade = quantidadeAtual - 1
                     binding.contadorItem2.tvQuantidade.text = novaQuantidade.toString()
                     onUpdateQuantidadeSucos(cliente.id, novaQuantidade)
                     updateValorTotalLocal(cliente.id)
@@ -300,10 +300,26 @@ class ClientesAdapter(
                     binding.etValorPagamento.setText(saldo.toString())
                 }
             }
-            binding.btnPrevia.setOnClickListener {
+
+            binding.btnConfirmarPagamento.setOnClickListener {
                 val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull() ?: 0.0
-                onPreviaPagamento(cliente.id, valorPagamento)
+                onUpdateValorTotal(cliente.id, valorPagamento)
+                onConfirmarOperacao(cliente.id)
             }
+
+            binding.btnCancelarPagamento.setOnClickListener {
+                onCancelarOperacao(cliente.id)
+            }
+
+            binding.etValorPagamento.addTextChangedListener(object : TextWatcher {
+                override fun afterTextChanged(s: Editable?) {
+                    val valorPagamento = s.toString().toDoubleOrNull() ?: 0.0
+                    onPreviaPagamento(cliente.id, valorPagamento)
+                }
+
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            })
         }
 
         private fun setupConfirmationButtons(cliente: Cliente) {
@@ -320,16 +336,14 @@ class ClientesAdapter(
         }
 
         fun updateValorTotal(valor: Double) {
-            binding.tvValorTotal.text = String.format("R$ %.2f", valor)
-            binding.tvValorTotal.visibility = if (valor > 0) View.VISIBLE else View.GONE
+            binding.etValorTotal.setText(String.format("%.2f", valor))
             Log.d("ClientesAdapter", "Valor total atualizado na UI: clienteId=${bindingAdapterPosition}, valor=$valor")
         }
 
         private fun resetContadores() {
             binding.contadorItem1.tvQuantidade.text = "0"
             binding.contadorItem2.tvQuantidade.text = "0"
-            binding.tvValorTotal.text = "R$ 0,00"
-            binding.tvValorTotal.visibility = View.GONE
+            binding.etValorTotal.setText("0.00")
             binding.etValorPagamento.text?.clear()
         }
     }

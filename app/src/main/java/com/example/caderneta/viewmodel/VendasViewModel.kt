@@ -227,7 +227,7 @@ class VendasViewModel(
         }
     }
 
-    private fun confirmarPagamento(clienteId: Long) {
+    fun confirmarPagamento(clienteId: Long) {
         viewModelScope.launch {
             try {
                 val clienteState = _clienteStates.value[clienteId] ?: throw IllegalStateException("Estado do cliente não encontrado")

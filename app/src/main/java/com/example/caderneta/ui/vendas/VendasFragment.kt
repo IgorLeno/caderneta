@@ -234,16 +234,20 @@ class VendasFragment : Fragment() {
                 when (operacao) {
                     is VendasViewModel.OperacaoConfirmada.Venda -> {
                         showToast("Venda registrada com sucesso!")
-                        viewModel.resetOperacaoConfirmada() // Reset after handling
+                        viewModel.resetOperacaoConfirmada()
                     }
-
                     is VendasViewModel.OperacaoConfirmada.Pagamento -> {
                         showToast("Pagamento registrado com sucesso!")
-                        viewModel.resetOperacaoConfirmada() // Reset after handling
+                        viewModel.resetOperacaoConfirmada()
                     }
-
                     null -> {} // No operation confirmed
                 }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.saldoAtualizado.collect { clienteId ->
+                clientesAdapter.notifyItemChanged(clienteId.toInt())
             }
         }
     }
