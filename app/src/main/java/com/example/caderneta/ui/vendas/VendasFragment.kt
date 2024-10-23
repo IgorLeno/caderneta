@@ -23,9 +23,10 @@ import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.R
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.FragmentVendasBinding
+import com.example.caderneta.util.showErrorToast
+import com.example.caderneta.util.showSuccessToast
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
-import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.flow.collectLatest
@@ -93,9 +94,7 @@ class VendasFragment : Fragment() {
             onCancelarOperacao = { clienteId ->
                 viewModel.cancelarOperacao(clienteId)
             },
-            onPreviaPagamento = { clienteId, valor ->
-                viewModel.calcularPreviaPagamento(clienteId, valor)
-            },
+
             onUpdateValorTotal = { clienteId, valorTotal ->
                 viewModel.updateValorTotal(clienteId, valorTotal)
             },
@@ -193,11 +192,6 @@ class VendasFragment : Fragment() {
             }
         }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.previaPagamento.collectLatest { previa ->
-                showPreviaPagamento(previa)
-            }
-        }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { errorMessage ->
@@ -233,32 +227,30 @@ class VendasFragment : Fragment() {
             viewModel.operacaoConfirmada.collectLatest { operacao ->
                 when (operacao) {
                     is VendasViewModel.OperacaoConfirmada.Venda -> {
-                        showToast("Venda registrada com sucesso!")
+                        requireContext().showSuccessToast("Venda registrada com sucesso!")
                         viewModel.resetOperacaoConfirmada()
                     }
+
                     is VendasViewModel.OperacaoConfirmada.Pagamento -> {
-                        showToast("Pagamento registrado com sucesso!")
+                        requireContext().showSuccessToast("Pagamento registrado com sucesso!")
                         viewModel.resetOperacaoConfirmada()
                     }
+
                     null -> {} // No operation confirmed
                 }
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.saldoAtualizado.collect { clienteId ->
-                clientesAdapter.notifyItemChanged(clienteId.toInt())
+            viewModel.error.collectLatest { errorMessage ->
+                errorMessage?.let {
+                    requireContext().showErrorToast(it)
+                    viewModel.clearError()
+                }
             }
         }
     }
 
-    private fun showToast(message: String) {
-        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun showPreviaPagamento(previa: Double) {
-        Snackbar.make(binding.root, "Valor restante após pagamento: R$ %.2f".format(previa), Snackbar.LENGTH_LONG).show()
-    }
 
     private fun showAddClienteDialog() {
         viewModel.reloadLocais()

@@ -6,8 +6,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.caderneta.data.entity.*
 import com.example.caderneta.repository.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.*
 
 class VendasViewModel(
@@ -42,8 +45,6 @@ class VendasViewModel(
     private val _valorTotal = MutableStateFlow<Pair<Long, Double>>(0L to 0.0)
     val valorTotal: StateFlow<Pair<Long, Double>> = _valorTotal.asStateFlow()
 
-    private val _previaPagamento = MutableStateFlow(0.0)
-    val previaPagamento: StateFlow<Double> = _previaPagamento
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
@@ -231,21 +232,65 @@ class VendasViewModel(
         viewModelScope.launch {
             try {
                 val clienteState = _clienteStates.value[clienteId] ?: throw IllegalStateException("Estado do cliente não encontrado")
-                val valorPago = clienteState.valorTotal
+                val valorPagamento = clienteState.valorTotal
 
-                val operacao = Operacao(
-                    clienteId = clienteId,
-                    tipoOperacao = "Pagamento",
-                    valor = valorPago,
-                    data = Date()
-                )
-                operacaoRepository.insertOperacao(operacao)
+                Log.d("VendasViewModel", "Tentando confirmar pagamento: clienteId=$clienteId, valor=$valorPagamento")
 
-                atualizarSaldoCliente(clienteId, -valorPago)
+                if (valorPagamento <= 0) {
+                    _error.value = "Valor do pagamento inválido"
+                    return@launch
+                }
 
-                resetClienteState(clienteId)
-                _operacaoConfirmada.value = OperacaoConfirmada.Pagamento
+                // Verifica se tem saldo suficiente
+                val conta = contaRepository.getContaByCliente(clienteId)
+                if (conta == null || valorPagamento > conta.saldo) {
+                    _error.value = "Valor do pagamento maior que o saldo devedor"
+                    return@launch
+                }
+
+                // Processa o pagamento
+                val pagamentoProcessado = withContext(Dispatchers.IO) {
+                    contaRepository.processarPagamento(clienteId, valorPagamento)
+                }
+
+                if (!pagamentoProcessado) {
+                    _error.value = "Erro ao processar pagamento"
+                    return@launch
+                }
+
+                // Registra a operação em background
+                withContext(Dispatchers.IO) {
+                    val operacao = Operacao(
+                        clienteId = clienteId,
+                        tipoOperacao = "Pagamento",
+                        valor = valorPagamento,
+                        data = Date()
+                    )
+                    val operacaoId = operacaoRepository.insertOperacao(operacao)
+
+                    // Registra a venda
+                    val venda = Venda(
+                        operacaoId = operacaoId,
+                        clienteId = clienteId,
+                        localId = _localSelecionado.value?.id ?: 0,
+                        data = Date(),
+                        transacao = "pagamento",
+                        quantidadeSalgados = 0,
+                        quantidadeSucos = 0,
+                        valor = valorPagamento
+                    )
+                    vendaRepository.insertVenda(venda)
+                }
+
+                // Notifica as atualizações na UI thread
+                withContext(Dispatchers.Main) {
+                    _saldoAtualizado.emit(clienteId)
+                    resetClienteState(clienteId)
+                    _operacaoConfirmada.value = OperacaoConfirmada.Pagamento
+                }
+
             } catch (e: Exception) {
+                Log.e("VendasViewModel", "Erro ao confirmar pagamento", e)
                 _error.value = "Erro ao confirmar pagamento: ${e.message}"
             }
         }
@@ -269,14 +314,15 @@ class VendasViewModel(
     }
 
     private fun resetClienteState(clienteId: Long) {
-        _clienteStates.update { currentStates ->
-            currentStates.toMutableMap().apply {
-                put(clienteId, ClienteState(clienteId = clienteId))
+        viewModelScope.launch(Dispatchers.Main) {
+            _clienteStates.update { currentStates ->
+                currentStates.toMutableMap().apply {
+                    put(clienteId, ClienteState(clienteId = clienteId))
+                }
             }
-        }
-        viewModelScope.launch {
             _valorTotal.emit(clienteId to 0.0)
-            _clienteStateUpdates.emit(clienteId) // Emit the client ID
+            delay(100) // Pequeno delay para garantir que a UI esteja pronta
+            _clienteStateUpdates.emit(clienteId)
         }
     }
 
@@ -299,21 +345,15 @@ class VendasViewModel(
     }
 
 
-    fun calcularPreviaPagamento(clienteId: Long, valorPagamento: Double) {
-        viewModelScope.launch {
-            try {
-                val conta = contaRepository.getContaByCliente(clienteId)
-                val saldoDevedor = conta?.saldo ?: 0.0
-                val valorRestante = (saldoDevedor - valorPagamento).coerceAtLeast(0.0)
-                _previaPagamento.value = valorRestante
-            } catch (e: Exception) {
-                _error.value = "Erro ao calcular prévia de pagamento: ${e.message}"
-            }
-        }
-    }
 
     fun updateValorTotal(clienteId: Long, valor: Double) {
         viewModelScope.launch {
+            // Atualiza o estado do cliente com o novo valor
+            _clienteStates.update { currentStates ->
+                val currentState = currentStates[clienteId] ?: ClienteState(clienteId = clienteId)
+                val newState = currentState.copy(valorTotal = valor)
+                currentStates + (clienteId to newState)
+            }
             _valorTotal.emit(clienteId to valor)
         }
     }

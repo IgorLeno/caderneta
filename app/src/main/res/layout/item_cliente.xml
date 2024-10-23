@@ -390,7 +390,7 @@
 
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Botão Tudo alinhado verticalmente com o campo -->
+                <!-- Botão Tudo -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_tudo"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"

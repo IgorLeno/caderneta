@@ -15,6 +15,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import java.text.SimpleDateFormat
 import java.util.*
 import android.graphics.Color
+import androidx.core.content.ContextCompat
+import com.example.caderneta.R
+import java.text.NumberFormat
 
 class ResultadosConsultaAdapter(
     private val onLocalClick: (Long) -> Unit,
@@ -142,14 +145,38 @@ class ExtratoAdapter : ListAdapter<Venda, ExtratoAdapter.ExtratoViewHolder>(Extr
         RecyclerView.ViewHolder(binding.root) {
 
         private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
 
         fun bind(venda: Venda) {
-            binding.tvData.text = dateFormat.format(venda.data)
-            binding.tvQuantidade.text = "${venda.quantidadeSalgados} salgados, ${venda.quantidadeSucos} sucos"
-            binding.tvValor.text = "R$ ${String.format("%.2f", venda.valor)}"
-            binding.tvValor.setTextColor(
-                if (venda.transacao == "a_vista") Color.GREEN else Color.RED
-            )
+            binding.apply {
+                tvData.text = dateFormat.format(venda.data)
+                tvQuantidade.text = formatarQuantidades(venda)
+                tvValor.text = currencyFormat.format(venda.valor)
+
+                // Define a cor baseada no tipo de transação, sem adicionar sinais
+                val corTransacao = when (venda.transacao) {
+                    "pagamento" -> ContextCompat.getColor(itemView.context, R.color.green)
+                    "a_vista" -> ContextCompat.getColor(itemView.context, R.color.blue)
+                    "a_prazo" -> ContextCompat.getColor(itemView.context, R.color.red)
+                    else -> ContextCompat.getColor(itemView.context, R.color.on_surface)
+                }
+                tvValor.setTextColor(corTransacao)
+            }
+        }
+
+        private fun formatarQuantidades(venda: Venda): String {
+            if (venda.transacao == "pagamento") {
+                return "Pagamento"
+            }
+
+            val parts = mutableListOf<String>()
+            if (venda.quantidadeSalgados > 0) {
+                parts.add("${venda.quantidadeSalgados} salgado${if (venda.quantidadeSalgados > 1) "s" else ""}")
+            }
+            if (venda.quantidadeSucos > 0) {
+                parts.add("${venda.quantidadeSucos} suco${if (venda.quantidadeSucos > 1) "s" else ""}")
+            }
+            return parts.joinToString(", ")
         }
     }
 

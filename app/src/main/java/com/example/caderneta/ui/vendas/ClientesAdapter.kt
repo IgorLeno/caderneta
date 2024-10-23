@@ -2,8 +2,11 @@ package com.example.caderneta.ui.vendas
 
 import android.animation.ObjectAnimator
 import android.animation.StateListAnimator
+import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
@@ -35,7 +38,6 @@ class ClientesAdapter(
     private val onUpdateQuantidadeSucos: (Long, Int) -> Unit,
     private val onConfirmarOperacao: (Long) -> Unit,
     private val onCancelarOperacao: (Long) -> Unit,
-    private val onPreviaPagamento: (Long, Double) -> Unit,
     private val onUpdateValorTotal: (Long, Double) -> Unit,
     private val observeSaldoAtualizado: ((suspend (Long) -> Unit) -> Unit)
 ) : ListAdapter<Cliente, ClientesAdapter.ClienteViewHolder>(ClienteDiffCallback()) {
@@ -55,6 +57,7 @@ class ClientesAdapter(
         val binding = ItemClienteBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return ClienteViewHolder(binding)
     }
+
 
     override fun onBindViewHolder(holder: ClienteViewHolder, position: Int) {
         val cliente = getItem(position)
@@ -77,8 +80,24 @@ class ClientesAdapter(
     fun updateValorTotal(clienteId: Long, valor: Double) {
         val position = currentList.indexOfFirst { it.id == clienteId }
         if (position != -1) {
-            notifyItemChanged(position, Payload.ValorTotalChanged(valor))
+            // Usa Handler para postar a atualização
+            Handler(Looper.getMainLooper()).post {
+                notifyItemChanged(position, Payload.ValorTotalChanged(valor))
+            }
             Log.d("ClientesAdapter", "updateValorTotal chamado: clienteId=$clienteId, valor=$valor, position=$position")
+        }
+    }
+
+    init {
+        lifecycleScope.launch {
+            observeSaldoAtualizado { clienteId ->
+                val position = currentList.indexOfFirst { it.id == clienteId }
+                if (position != -1) {
+                    Handler(Looper.getMainLooper()).post {
+                        notifyItemChanged(position, Payload.SaldoChanged)
+                    }
+                }
+            }
         }
     }
 
@@ -298,28 +317,31 @@ class ClientesAdapter(
                     val conta = contaRepository.getContaByCliente(cliente.id)
                     val saldo = conta?.saldo ?: 0.0
                     binding.etValorPagamento.setText(saldo.toString())
+                    onUpdateValorTotal(cliente.id, saldo) // Atualiza o estado quando clica em "Tudo"
                 }
-            }
-
-            binding.btnConfirmarPagamento.setOnClickListener {
-                val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull() ?: 0.0
-                onUpdateValorTotal(cliente.id, valorPagamento)
-                onConfirmarOperacao(cliente.id)
-            }
-
-            binding.btnCancelarPagamento.setOnClickListener {
-                onCancelarOperacao(cliente.id)
             }
 
             binding.etValorPagamento.addTextChangedListener(object : TextWatcher {
                 override fun afterTextChanged(s: Editable?) {
                     val valorPagamento = s.toString().toDoubleOrNull() ?: 0.0
-                    onPreviaPagamento(cliente.id, valorPagamento)
+                    onUpdateValorTotal(cliente.id, valorPagamento) // Atualiza o estado quando o texto muda
                 }
 
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             })
+
+            binding.btnConfirmarPagamento.setOnClickListener {
+                val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull() ?: 0.0
+                onUpdateValorTotal(cliente.id, valorPagamento) // Atualiza o estado antes de confirmar
+                onConfirmarOperacao(cliente.id)
+            }
+
+            binding.btnCancelarPagamento.setOnClickListener {
+                binding.etValorPagamento.text?.clear()
+                onUpdateValorTotal(cliente.id, 0.0)
+                onCancelarOperacao(cliente.id)
+            }
         }
 
         private fun setupConfirmationButtons(cliente: Cliente) {
