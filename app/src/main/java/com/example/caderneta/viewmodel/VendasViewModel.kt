@@ -61,10 +61,40 @@ class VendasViewModel(
         val clienteId: Long,
         var modoOperacao: ModoOperacao? = null,
         var tipoTransacao: TipoTransacao? = null,
+        // Para modo normal
         var quantidadeSalgados: Int = 0,
         var quantidadeSucos: Int = 0,
+        // Para modo promoção
+        var quantidadePromo1: Int = 0,
+        var quantidadePromo2: Int = 0,
         var valorTotal: Double = 0.0
-    )
+    ) {
+        fun resetQuantidades() {
+            quantidadeSalgados = 0
+            quantidadeSucos = 0
+            quantidadePromo1 = 0
+            quantidadePromo2 = 0
+            valorTotal = 0.0
+        }
+
+        fun isPromocao() = modoOperacao == ModoOperacao.PROMOCAO
+    }
+
+    fun updateQuantidadePromocao(clienteId: Long, numeroPromocao: Int, quantidade: Int) {
+        val clienteState = _clienteStates.value[clienteId] ?: return
+        if (clienteState.modoOperacao != ModoOperacao.PROMOCAO) return
+
+        when (numeroPromocao) {
+            1 -> clienteState.quantidadePromo1 = quantidade
+            2 -> clienteState.quantidadePromo2 = quantidade
+        }
+
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply {
+            put(clienteId, clienteState)
+        }
+
+        calcularValorTotal(clienteState)
+    }
 
     private fun carregarDados() {
         viewModelScope.launch {
@@ -157,18 +187,12 @@ class VendasViewModel(
 
     private fun calcularValorTotal(state: ClienteState) {
         val config = _configuracoes.value ?: return
+
         state.valorTotal = when (state.modoOperacao) {
-            ModoOperacao.VENDA -> when (state.tipoTransacao) {
-                TipoTransacao.A_VISTA -> (state.quantidadeSalgados * config.precoSalgadoVista) + (state.quantidadeSucos * config.precoSucoVista)
-                TipoTransacao.A_PRAZO -> (state.quantidadeSalgados * config.precoSalgadoPrazo) + (state.quantidadeSucos * config.precoSucoPrazo)
-                null -> 0.0
-            }
-            ModoOperacao.PROMOCAO -> when (state.tipoTransacao) {
-                TipoTransacao.A_VISTA -> config.promo1Vista
-                TipoTransacao.A_PRAZO -> config.promo2Prazo
-                null -> 0.0
-            }
-            else -> 0.0
+            ModoOperacao.VENDA -> calcularValorVenda(state, config)
+            ModoOperacao.PROMOCAO -> calcularValorPromocao(state, config)
+            ModoOperacao.PAGAMENTO -> state.valorTotal // Mantém o valor informado
+            null -> 0.0
         }
 
         viewModelScope.launch {
@@ -180,6 +204,31 @@ class VendasViewModel(
             }
         }
     }
+
+    private fun calcularValorVenda(state: ClienteState, config: Configuracoes): Double {
+        return when (state.tipoTransacao) {
+            TipoTransacao.A_VISTA -> {
+                (state.quantidadeSalgados * config.precoSalgadoVista) +
+                        (state.quantidadeSucos * config.precoSucoVista)
+            }
+            TipoTransacao.A_PRAZO -> {
+                (state.quantidadeSalgados * config.precoSalgadoPrazo) +
+                        (state.quantidadeSucos * config.precoSucoPrazo)
+            }
+            null -> 0.0
+        }
+    }
+
+    private fun calcularValorPromocao(state: ClienteState, config: Configuracoes): Double {
+        if (!config.promocoesAtivadas) return 0.0
+
+        val tipoTransacao = state.tipoTransacao ?: return 0.0
+
+        return config.calcularValorPromocao(1, state.quantidadePromo1, tipoTransacao) +
+                config.calcularValorPromocao(2, state.quantidadePromo2, tipoTransacao)
+    }
+
+
 
     fun confirmarOperacao(clienteId: Long) {
         val clienteState = _clienteStates.value[clienteId] ?: return
@@ -193,12 +242,32 @@ class VendasViewModel(
     private fun confirmarVenda(clienteId: Long) {
         viewModelScope.launch {
             try {
-                val clienteState = _clienteStates.value[clienteId] ?: throw IllegalStateException("Estado do cliente não encontrado")
-                val localId = _localSelecionado.value?.id ?: throw IllegalStateException("Local não selecionado")
+                val clienteState = _clienteStates.value[clienteId]
+                    ?: throw IllegalStateException("Estado do cliente não encontrado")
+                val localId = _localSelecionado.value?.id
+                    ?: throw IllegalStateException("Local não selecionado")
+                val config = _configuracoes.value
+                    ?: throw IllegalStateException("Configurações não encontradas")
+
+                // Calcula as quantidades totais considerando promoções
+                val (quantidadeSalgadosFinal, quantidadeSucosFinal) = if (clienteState.isPromocao()) {
+                    val quant1 = config.calcularQuantidadesPromocao(1, clienteState.quantidadePromo1)
+                    val quant2 = config.calcularQuantidadesPromocao(2, clienteState.quantidadePromo2)
+                    Pair(
+                        quant1.salgados + quant2.salgados,
+                        quant1.sucos + quant2.sucos
+                    )
+                } else {
+                    Pair(clienteState.quantidadeSalgados, clienteState.quantidadeSucos)
+                }
 
                 val operacao = Operacao(
                     clienteId = clienteId,
-                    tipoOperacao = if (clienteState.modoOperacao == ModoOperacao.PROMOCAO) "Promo" else "Venda",
+                    tipoOperacao = when {
+                        clienteState.modoOperacao == ModoOperacao.PROMOCAO -> "Promo"
+                        clienteState.modoOperacao == ModoOperacao.VENDA -> "Venda"
+                        else -> throw IllegalStateException("Modo de operação inválido")
+                    },
                     valor = clienteState.valorTotal,
                     data = Date()
                 )
@@ -209,10 +278,18 @@ class VendasViewModel(
                     clienteId = clienteId,
                     localId = localId,
                     data = Date(),
-                    transacao = if (clienteState.tipoTransacao == TipoTransacao.A_VISTA) "a_vista" else "a_prazo",
-                    quantidadeSalgados = clienteState.quantidadeSalgados,
-                    quantidadeSucos = clienteState.quantidadeSucos,
-                    valor = clienteState.valorTotal
+                    transacao = when (clienteState.tipoTransacao) {
+                        TipoTransacao.A_VISTA -> "a_vista"
+                        TipoTransacao.A_PRAZO -> "a_prazo"
+                        null -> throw IllegalStateException("Tipo de transação não selecionado")
+                    },
+                    quantidadeSalgados = quantidadeSalgadosFinal,
+                    quantidadeSucos = quantidadeSucosFinal,
+                    valor = clienteState.valorTotal,
+                    isPromocao = clienteState.isPromocao(),
+                    promocaoDetalhes = if (clienteState.isPromocao()) {
+                        buildPromocaoDetalhes(clienteState, config)
+                    } else null
                 )
                 vendaRepository.insertVenda(venda)
 
@@ -226,6 +303,19 @@ class VendasViewModel(
                 _error.value = "Erro ao confirmar venda: ${e.message}"
             }
         }
+    }
+
+    private fun buildPromocaoDetalhes(state: ClienteState, config: Configuracoes): String {
+        val detalhes = mutableListOf<String>()
+
+        if (state.quantidadePromo1 > 0) {
+            detalhes.add("${state.quantidadePromo1}x ${config.promo1Nome}")
+        }
+        if (state.quantidadePromo2 > 0) {
+            detalhes.add("${state.quantidadePromo2}x ${config.promo2Nome}")
+        }
+
+        return detalhes.joinToString(", ")
     }
 
     fun confirmarPagamento(clienteId: Long) {
@@ -294,6 +384,19 @@ class VendasViewModel(
                 _error.value = "Erro ao confirmar pagamento: ${e.message}"
             }
         }
+    }
+
+    // Adicionados ao VendasViewModel
+    fun updateQuantidadePromo1(clienteId: Long, quantidade: Int) {
+        val clienteState = getClienteState(clienteId) ?: return
+        clienteState.quantidadePromo1 = quantidade
+        calcularValorTotal(clienteState)
+    }
+
+    fun updateQuantidadePromo2(clienteId: Long, quantidade: Int) {
+        val clienteState = getClienteState(clienteId) ?: return
+        clienteState.quantidadePromo2 = quantidade
+        calcularValorTotal(clienteState)
     }
 
     private fun atualizarSaldoCliente(clienteId: Long, valor: Double) {

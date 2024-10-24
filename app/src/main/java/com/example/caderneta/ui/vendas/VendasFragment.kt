@@ -76,17 +76,24 @@ class VendasFragment : Fragment() {
             contaRepository = (requireActivity().application as CadernetaApplication).contaRepository,
             lifecycleScope = viewLifecycleOwner.lifecycleScope,
             getClienteState = { clienteId -> viewModel.getClienteState(clienteId) },
+            getConfiguracoes = { viewModel.configuracoes.value }, // Novo callback
             onModoOperacaoSelected = { cliente, modoOperacao ->
                 viewModel.selecionarModoOperacao(cliente, modoOperacao)
             },
             onTipoTransacaoSelected = { cliente, tipoTransacao ->
                 viewModel.selecionarTipoTransacao(cliente, tipoTransacao)
             },
-            onUpdateQuantidadeSalgados = { clienteId, quantidade ->
-                viewModel.updateQuantidadeSalgados(clienteId, quantidade)
-            },
-            onUpdateQuantidadeSucos = { clienteId, quantidade ->
-                viewModel.updateQuantidadeSucos(clienteId, quantidade)
+            onQuantidadeChanged = { clienteId, tipo, quantidade -> // Novo callback unificado
+                when (tipo) {
+                    ClientesAdapter.TipoQuantidade.SALGADO ->
+                        viewModel.updateQuantidadeSalgados(clienteId, quantidade)
+                    ClientesAdapter.TipoQuantidade.SUCO ->
+                        viewModel.updateQuantidadeSucos(clienteId, quantidade)
+                    ClientesAdapter.TipoQuantidade.PROMO1 ->
+                        viewModel.updateQuantidadePromo1(clienteId, quantidade)
+                    ClientesAdapter.TipoQuantidade.PROMO2 ->
+                        viewModel.updateQuantidadePromo2(clienteId, quantidade)
+                }
             },
             onConfirmarOperacao = { clienteId ->
                 viewModel.confirmarOperacao(clienteId)
@@ -94,12 +101,9 @@ class VendasFragment : Fragment() {
             onCancelarOperacao = { clienteId ->
                 viewModel.cancelarOperacao(clienteId)
             },
-
             onUpdateValorTotal = { clienteId, valorTotal ->
                 viewModel.updateValorTotal(clienteId, valorTotal)
             },
-
-
             observeSaldoAtualizado = { observer ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     viewModel.saldoAtualizado.collect { clienteId ->
@@ -215,13 +219,18 @@ class VendasFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.valorTotal.collectLatest { (clienteId, valor) ->
-                clientesAdapter.updateValorTotal(clienteId, valor)
+                // Em vez de chamar updateValorTotal diretamente, vamos usar o correto payload
+                clientesAdapter.notifyItemChanged(
+                    clientesAdapter.currentList.indexOfFirst { it.id == clienteId },
+                    ClientesAdapter.Payload.ValorTotalChanged(valor)
+                )
                 Log.d(
                     "VendasFragment",
                     "Valor total atualizado no Fragment: clienteId=$clienteId, valor=$valor"
                 )
             }
         }
+
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.operacaoConfirmada.collectLatest { operacao ->

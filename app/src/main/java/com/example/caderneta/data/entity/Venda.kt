@@ -32,5 +32,7 @@ data class Venda(
     val transacao: String,
     val quantidadeSalgados: Int,
     val quantidadeSucos: Int,
+    val isPromocao: Boolean = false,
+    val promocaoDetalhes: String? = null,
     val valor: Double
 )

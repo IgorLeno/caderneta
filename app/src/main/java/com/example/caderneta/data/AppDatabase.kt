@@ -20,7 +20,7 @@ import com.example.caderneta.util.DateConverter
         Operacao::class,
         Conta::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(DateConverter::class)

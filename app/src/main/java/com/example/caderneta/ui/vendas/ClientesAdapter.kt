@@ -20,6 +20,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
+import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.databinding.ItemClienteBinding
@@ -32,15 +33,19 @@ class ClientesAdapter(
     private val contaRepository: ContaRepository,
     private val lifecycleScope: LifecycleCoroutineScope,
     private val getClienteState: (Long) -> VendasViewModel.ClienteState?,
+    private val getConfiguracoes: () -> Configuracoes?,
     private val onModoOperacaoSelected: (Cliente, ModoOperacao?) -> Unit,
     private val onTipoTransacaoSelected: (Cliente, TipoTransacao?) -> Unit,
-    private val onUpdateQuantidadeSalgados: (Long, Int) -> Unit,
-    private val onUpdateQuantidadeSucos: (Long, Int) -> Unit,
+    private val onQuantidadeChanged: (Long, TipoQuantidade, Int) -> Unit,
     private val onConfirmarOperacao: (Long) -> Unit,
     private val onCancelarOperacao: (Long) -> Unit,
     private val onUpdateValorTotal: (Long, Double) -> Unit,
     private val observeSaldoAtualizado: ((suspend (Long) -> Unit) -> Unit)
 ) : ListAdapter<Cliente, ClientesAdapter.ClienteViewHolder>(ClienteDiffCallback()) {
+
+    enum class TipoQuantidade {
+        SALGADO, SUCO, PROMO1, PROMO2
+    }
 
     init {
         lifecycleScope.launch {
@@ -58,17 +63,14 @@ class ClientesAdapter(
         return ClienteViewHolder(binding)
     }
 
-
     override fun onBindViewHolder(holder: ClienteViewHolder, position: Int) {
-        val cliente = getItem(position)
-        holder.bind(cliente)
+        holder.bind(getItem(position))
     }
 
     override fun onBindViewHolder(holder: ClienteViewHolder, position: Int, payloads: List<Any>) {
         if (payloads.isNotEmpty()) {
-            val payload = payloads[0]
-            when (payload) {
-                is Payload.ValorTotalChanged -> holder.updateValorTotal(payload.novoValor)
+            when (payloads[0]) {
+                is Payload.ValorTotalChanged -> holder.updateValorTotal(payloads[0] as Payload.ValorTotalChanged)
                 is Payload.SaldoChanged -> holder.updateSaldo()
                 else -> super.onBindViewHolder(holder, position, payloads)
             }
@@ -77,38 +79,11 @@ class ClientesAdapter(
         }
     }
 
-    fun updateValorTotal(clienteId: Long, valor: Double) {
-        val position = currentList.indexOfFirst { it.id == clienteId }
-        if (position != -1) {
-            // Usa Handler para postar a atualização
-            Handler(Looper.getMainLooper()).post {
-                notifyItemChanged(position, Payload.ValorTotalChanged(valor))
-            }
-            Log.d("ClientesAdapter", "updateValorTotal chamado: clienteId=$clienteId, valor=$valor, position=$position")
-        }
-    }
-
-    init {
-        lifecycleScope.launch {
-            observeSaldoAtualizado { clienteId ->
-                val position = currentList.indexOfFirst { it.id == clienteId }
-                if (position != -1) {
-                    Handler(Looper.getMainLooper()).post {
-                        notifyItemChanged(position, Payload.SaldoChanged)
-                    }
-                }
-            }
-        }
-    }
-
     inner class ClienteViewHolder(private val binding: ItemClienteBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(cliente: Cliente) {
-            binding.tvNomeCliente.text = cliente.nome
-
-            updateSaldo()
-
+            setupBasicInfo(cliente)
             setupMainButtons(cliente)
             setupVendaButtons(cliente)
             setupContadores(cliente)
@@ -118,63 +93,385 @@ class ClientesAdapter(
             setupButtonStateListeners()
         }
 
+        private fun setupBasicInfo(cliente: Cliente) {
+            binding.tvNomeCliente.text = cliente.nome
+            updateSaldo()
+        }
+
         fun updateSaldo() {
             lifecycleScope.launch {
                 val cliente = getItem(bindingAdapterPosition)
-                val conta = contaRepository.getContaByCliente(cliente.id)
-                val saldo = conta?.saldo ?: 0.0
+                val saldo = contaRepository.getContaByCliente(cliente.id)?.saldo ?: 0.0
                 binding.tvValorDevido.text = "R$ %.2f".format(saldo)
                 binding.tvValorDevido.setTextColor(
-                    if (saldo > 0)
-                        ContextCompat.getColor(itemView.context, R.color.delete_color)
-                    else
-                        ContextCompat.getColor(itemView.context, R.color.add_color)
+                    ContextCompat.getColor(
+                        itemView.context,
+                        if (saldo > 0) R.color.delete_color else R.color.add_color
+                    )
                 )
             }
         }
 
-        private fun updateButtonStates(cliente: Cliente) {
-            val clienteState = getClienteState(cliente.id) ?: VendasViewModel.ClienteState(clienteId = cliente.id)
+        private fun setupMainButtons(cliente: Cliente) {
+            binding.apply {
+                btnVenda.setOnClickListener {
+                    val currentState = getClienteState(cliente.id)?.modoOperacao
+                    val newModoOperacao = if (currentState == ModoOperacao.VENDA) null else ModoOperacao.VENDA
+                    onModoOperacaoSelected(cliente, newModoOperacao)
+                    updateButtonStates(cliente)
+                }
 
-            binding.btnVenda.isSelected = clienteState.modoOperacao == ModoOperacao.VENDA
-            binding.btnPromocao.isSelected = clienteState.modoOperacao == ModoOperacao.PROMOCAO
-            binding.btnPagamento.isSelected = clienteState.modoOperacao == ModoOperacao.PAGAMENTO
+                btnPromocao.setOnClickListener {
+                    val currentState = getClienteState(cliente.id)?.modoOperacao
+                    val newModoOperacao = if (currentState == ModoOperacao.PROMOCAO) null else ModoOperacao.PROMOCAO
+                    onModoOperacaoSelected(cliente, newModoOperacao)
+                    updateButtonStates(cliente)
+                }
 
-            val isVendaOrPromocao = clienteState.modoOperacao == ModoOperacao.VENDA || clienteState.modoOperacao == ModoOperacao.PROMOCAO
-            binding.btnAVista.isSelected = isVendaOrPromocao && clienteState.tipoTransacao == TipoTransacao.A_VISTA
-            binding.btnAPrazo.isSelected = isVendaOrPromocao && clienteState.tipoTransacao == TipoTransacao.A_PRAZO
-
-            updateButtonStyle(binding.btnVenda)
-            updateButtonStyle(binding.btnPromocao)
-            updateButtonStyle(binding.btnPagamento)
-            updateButtonStyle(binding.btnAVista)
-            updateButtonStyle(binding.btnAPrazo)
-
-            updateLayoutVisibility(clienteState)
-
-            binding.contadorItem1.tvQuantidade.text = clienteState.quantidadeSalgados.toString()
-            binding.contadorItem2.tvQuantidade.text = clienteState.quantidadeSucos.toString()
-
-            binding.etValorTotal.setText(String.format("%.2f", clienteState.valorTotal))
-
-            // Reseta os botões se o estado for inicial
-            if (clienteState.modoOperacao == null && clienteState.tipoTransacao == null) {
-                resetContadores()
+                btnPagamento.setOnClickListener {
+                    val currentState = getClienteState(cliente.id)?.modoOperacao
+                    val newModoOperacao = if (currentState == ModoOperacao.PAGAMENTO) null else ModoOperacao.PAGAMENTO
+                    onModoOperacaoSelected(cliente, newModoOperacao)
+                    updateButtonStates(cliente)
+                }
             }
-
-            Log.d("ClientesAdapter", "Button states updated for cliente ${cliente.id}: venda=${binding.btnVenda.isSelected}, promocao=${binding.btnPromocao.isSelected}, pagamento=${binding.btnPagamento.isSelected}, aVista=${binding.btnAVista.isSelected}, aPrazo=${binding.btnAPrazo.isSelected}")
         }
 
-        private fun updateLayoutVisibility(clienteState: VendasViewModel.ClienteState) {
-            binding.layoutBotoesVenda.visibility = if (clienteState.modoOperacao == ModoOperacao.VENDA || clienteState.modoOperacao == ModoOperacao.PROMOCAO) View.VISIBLE else View.GONE
-            binding.layoutVenda.visibility = if ((clienteState.modoOperacao == ModoOperacao.VENDA || clienteState.modoOperacao == ModoOperacao.PROMOCAO) && clienteState.tipoTransacao != null) View.VISIBLE else View.GONE
-            binding.layoutPagamento.visibility = if (clienteState.modoOperacao == ModoOperacao.PAGAMENTO) View.VISIBLE else View.GONE
+        private fun setupVendaButtons(cliente: Cliente) {
+            binding.apply {
+                btnAVista.setOnClickListener {
+                    val newTipoTransacao = if (getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_VISTA)
+                        null else TipoTransacao.A_VISTA
+                    onTipoTransacaoSelected(cliente, newTipoTransacao)
+                    updateButtonStates(cliente)
+                }
 
-            val showConfirmationButtons = clienteState.modoOperacao != null &&
-                    (clienteState.modoOperacao == ModoOperacao.PAGAMENTO ||
-                            (clienteState.modoOperacao != ModoOperacao.PAGAMENTO && clienteState.tipoTransacao != null))
+                btnAPrazo.setOnClickListener {
+                    val newTipoTransacao = if (getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_PRAZO)
+                        null else TipoTransacao.A_PRAZO
+                    onTipoTransacaoSelected(cliente, newTipoTransacao)
+                    updateButtonStates(cliente)
+                }
+            }
+        }
 
-            binding.layoutBotoesConfirmacao.visibility = if (showConfirmationButtons) View.VISIBLE else View.GONE
+        private fun setupContadores(cliente: Cliente) {
+            binding.apply {
+                // Setup contadores modo normal
+                contadorSalgados.apply {
+                    btnMais.setOnClickListener {
+                        atualizarQuantidade(cliente.id, TipoQuantidade.SALGADO, 1)
+                    }
+                    btnMenos.setOnClickListener {
+                        atualizarQuantidade(cliente.id, TipoQuantidade.SALGADO, -1)
+                    }
+                    // Garantir visibilidade inicial
+                    root.visibility = View.VISIBLE
+                }
+
+                contadorSucos.apply {
+                    btnMais.setOnClickListener {
+                        atualizarQuantidade(cliente.id, TipoQuantidade.SUCO, 1)
+                    }
+                    btnMenos.setOnClickListener {
+                        atualizarQuantidade(cliente.id, TipoQuantidade.SUCO, -1)
+                    }
+                    // Garantir visibilidade inicial
+                    root.visibility = View.VISIBLE
+                }
+
+                // Setup contadores modo promoção
+                contadorPromo1.apply {
+                    btnMais.setOnClickListener {
+                        atualizarQuantidade(cliente.id, TipoQuantidade.PROMO1, 1)
+                    }
+                    btnMenos.setOnClickListener {
+                        atualizarQuantidade(cliente.id, TipoQuantidade.PROMO1, -1)
+                    }
+                    // Garantir visibilidade inicial
+                    root.visibility = View.VISIBLE
+                }
+
+                contadorPromo2.apply {
+                    btnMais.setOnClickListener {
+                        atualizarQuantidade(cliente.id, TipoQuantidade.PROMO2, 1)
+                    }
+                    btnMenos.setOnClickListener {
+                        atualizarQuantidade(cliente.id, TipoQuantidade.PROMO2, -1)
+                    }
+                    // Garantir visibilidade inicial
+                    root.visibility = View.VISIBLE
+                }
+            }
+        }
+
+
+        private fun setupContadorNormal(cliente: Cliente) {
+            binding.contadorSalgados.apply {
+                btnMais.setOnClickListener {
+                    atualizarQuantidade(cliente.id, TipoQuantidade.SALGADO, 1)
+                }
+                btnMenos.setOnClickListener {
+                    atualizarQuantidade(cliente.id, TipoQuantidade.SALGADO, -1)
+                }
+            }
+
+            binding.contadorSucos.apply {
+                btnMais.setOnClickListener {
+                    atualizarQuantidade(cliente.id, TipoQuantidade.SUCO, 1)
+                }
+                btnMenos.setOnClickListener {
+                    atualizarQuantidade(cliente.id, TipoQuantidade.SUCO, -1)
+                }
+            }
+        }
+
+        private fun setupContadorPromocao(cliente: Cliente) {
+            binding.contadorPromo1.apply {
+                btnMais.setOnClickListener {
+                    atualizarQuantidade(cliente.id, TipoQuantidade.PROMO1, 1)
+                }
+                btnMenos.setOnClickListener {
+                    atualizarQuantidade(cliente.id, TipoQuantidade.PROMO1, -1)
+                }
+            }
+
+            binding.contadorPromo2.apply {
+                btnMais.setOnClickListener {
+                    atualizarQuantidade(cliente.id, TipoQuantidade.PROMO2, 1)
+                }
+                btnMenos.setOnClickListener {
+                    atualizarQuantidade(cliente.id, TipoQuantidade.PROMO2, -1)
+                }
+            }
+        }
+
+
+
+        private fun atualizarQuantidade(clienteId: Long, tipo: TipoQuantidade, delta: Int) {
+            val state = getClienteState(clienteId) ?: return
+            val novaQuantidade = when (tipo) {
+                TipoQuantidade.SALGADO -> (state.quantidadeSalgados + delta).coerceAtLeast(0)
+                TipoQuantidade.SUCO -> (state.quantidadeSucos + delta).coerceAtLeast(0)
+                TipoQuantidade.PROMO1 -> (state.quantidadePromo1 + delta).coerceAtLeast(0)
+                TipoQuantidade.PROMO2 -> (state.quantidadePromo2 + delta).coerceAtLeast(0)
+            }
+            onQuantidadeChanged(clienteId, tipo, novaQuantidade)
+        }
+
+        private fun setupPagamentoLayout(cliente: Cliente) {
+            binding.apply {
+                btnTudo.setOnClickListener {
+                    lifecycleScope.launch {
+                        val saldo = contaRepository.getContaByCliente(cliente.id)?.saldo ?: 0.0
+                        etValorPagamento.setText(saldo.toString())
+                        onUpdateValorTotal(cliente.id, saldo)
+                    }
+                }
+
+                etValorPagamento.addTextChangedListener(object : TextWatcher {
+                    override fun afterTextChanged(s: Editable?) {
+                        onUpdateValorTotal(cliente.id, s.toString().toDoubleOrNull() ?: 0.0)
+                    }
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                })
+
+                btnConfirmarPagamento.setOnClickListener {
+                    onConfirmarOperacao(cliente.id)
+                }
+
+                btnCancelarPagamento.setOnClickListener {
+                    etValorPagamento.text?.clear()
+                    onUpdateValorTotal(cliente.id, 0.0)
+                    onCancelarOperacao(cliente.id)
+                }
+            }
+        }
+
+        private fun setupConfirmationButtons(cliente: Cliente) {
+            binding.apply {
+                btnConfirmarOperacao.setOnClickListener {
+                    onConfirmarOperacao(cliente.id)
+                    updateButtonStates(cliente)
+                    resetContadores()
+                }
+
+                btnCancelarOperacao.setOnClickListener {
+                    onCancelarOperacao(cliente.id)
+                    updateButtonStates(cliente)
+                    resetContadores()
+                }
+            }
+        }
+
+        private fun updateButtonStates(cliente: Cliente) {
+            val state = getClienteState(cliente.id) ?: return
+            val config = getConfiguracoes() ?: return
+
+            updateButtonSelections(state)
+            updateLayoutVisibility(state)
+
+            // Garantir que os contadores estão visíveis e com valores corretos
+            binding.apply {
+                // Atualizar valores dos contadores
+                contadorSalgados.tvQuantidade.text = state.quantidadeSalgados.toString()
+                contadorSucos.tvQuantidade.text = state.quantidadeSucos.toString()
+                contadorPromo1.tvQuantidade.text = state.quantidadePromo1.toString()
+                contadorPromo2.tvQuantidade.text = state.quantidadePromo2.toString()
+
+                // Atualizar valores totais
+                etValorTotal.setText(String.format("%.2f", state.valorTotal))
+                etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
+            }
+
+            updateContadoresState(state)
+            updatePromocoesInfo(state, config)
+        }
+
+        private fun updateButtonSelections(state: VendasViewModel.ClienteState) {
+            binding.apply {
+                btnVenda.isSelected = state.modoOperacao == ModoOperacao.VENDA
+                btnPromocao.isSelected = state.modoOperacao == ModoOperacao.PROMOCAO
+                btnPagamento.isSelected = state.modoOperacao == ModoOperacao.PAGAMENTO
+
+                val isVendaOrPromocao = state.modoOperacao == ModoOperacao.VENDA ||
+                        state.modoOperacao == ModoOperacao.PROMOCAO
+                btnAVista.isSelected = isVendaOrPromocao && state.tipoTransacao == TipoTransacao.A_VISTA
+                btnAPrazo.isSelected = isVendaOrPromocao && state.tipoTransacao == TipoTransacao.A_PRAZO
+
+                updateButtonStyles()
+            }
+        }
+
+        private fun updateButtonStyles() {
+            binding.apply {
+                listOf(btnVenda, btnPromocao, btnPagamento, btnAVista, btnAPrazo).forEach { button ->
+                    updateButtonStyle(button)
+                }
+            }
+        }
+
+        private fun updateButtonStyle(button: MaterialButton) {
+            val context = button.context
+            var (backgroundColor, iconTint, strokeColor) = if (button.isSelected) {
+                Triple(
+                    R.color.button_background_selected,
+                    R.color.button_icon_selected,
+                    R.color.button_background_selected
+                )
+            } else {
+                Triple(
+                    R.color.button_background_unselected,
+                    R.color.button_icon_unselected,
+                    R.color.button_stroke
+                )
+            }
+
+            button.apply {
+                setBackgroundColor(ContextCompat.getColor(context, backgroundColor))
+                setIconTintResource(iconTint)
+                elevation = 0f
+                stateListAnimator = null
+            }
+        }
+
+        private fun updateLayoutVisibility(state: VendasViewModel.ClienteState) {
+            binding.apply {
+                // Layout principal de venda (container para ambos os modos)
+                layoutVenda.visibility = when {
+                    state.modoOperacao == null -> View.GONE
+                    state.modoOperacao == ModoOperacao.PAGAMENTO -> View.GONE
+                    else -> View.VISIBLE
+                }
+
+                // Layout de botões de tipo de transação
+                layoutBotoesVenda.visibility = when {
+                    state.modoOperacao == ModoOperacao.VENDA ||
+                            state.modoOperacao == ModoOperacao.PROMOCAO -> View.VISIBLE
+                    else -> View.GONE
+                }
+
+                // Layout específico de venda normal
+                layoutVendaNormal.visibility = when {
+                    state.modoOperacao == ModoOperacao.VENDA &&
+                            state.tipoTransacao != null -> View.VISIBLE
+                    else -> View.GONE
+                }
+
+                // Layout específico de promoção
+                layoutVendaPromocao.visibility = when {
+                    state.modoOperacao == ModoOperacao.PROMOCAO &&
+                            state.tipoTransacao != null -> View.VISIBLE
+                    else -> View.GONE
+                }
+
+                // Layout de pagamento
+                layoutPagamento.visibility = when {
+                    state.modoOperacao == ModoOperacao.PAGAMENTO -> View.VISIBLE
+                    else -> View.GONE
+                }
+
+                // Botões de confirmação
+                layoutBotoesConfirmacao.visibility = when {
+                    (state.modoOperacao == ModoOperacao.VENDA ||
+                            state.modoOperacao == ModoOperacao.PROMOCAO) &&
+                            state.tipoTransacao != null -> View.VISIBLE
+                    else -> View.GONE
+                }
+            }
+        }
+
+        private fun updateContadoresState(state: VendasViewModel.ClienteState) {
+            if (state.modoOperacao == ModoOperacao.PROMOCAO) {
+                binding.contadorPromo1.tvQuantidade.text = state.quantidadePromo1.toString()
+                binding.contadorPromo2.tvQuantidade.text = state.quantidadePromo2.toString()
+                binding.etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
+            } else {
+                binding.contadorSalgados.tvQuantidade.text = state.quantidadeSalgados.toString()
+                binding.contadorSucos.tvQuantidade.text = state.quantidadeSucos.toString()
+                binding.etValorTotal.setText(String.format("%.2f", state.valorTotal))
+            }
+        }
+
+
+        private fun updatePromocoesInfo(state: VendasViewModel.ClienteState, config: Configuracoes) {
+            if (state.modoOperacao == ModoOperacao.PROMOCAO) {
+                // Atualizar texto e visibilidade de Promo 1
+                if (config.isPromocaoValida(1)) {
+                    binding.contadorPromo1.root.visibility = View.VISIBLE
+                    binding.icPromo1.setImageResource(R.drawable.ic_promotion)
+                } else {
+                    binding.contadorPromo1.root.visibility = View.GONE
+                }
+
+                // Atualizar texto e visibilidade de Promo 2
+                if (config.isPromocaoValida(2)) {
+                    binding.contadorPromo2.root.visibility = View.VISIBLE
+                    binding.icPromo2.setImageResource(R.drawable.ic_promotion)
+                } else {
+                    binding.contadorPromo2.root.visibility = View.GONE
+                }
+
+                // Atualizar valor total da promoção
+                binding.etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
+            }
+        }
+
+        fun updateValorTotal(payload: Payload.ValorTotalChanged) {
+            binding.etValorTotal.setText(String.format("%.2f", payload.novoValor))
+        }
+
+        private fun resetContadores() {
+            binding.apply {
+                contadorSalgados.tvQuantidade.text = "0"
+                contadorSucos.tvQuantidade.text = "0"
+                contadorPromo1.tvQuantidade.text = "0"
+                contadorPromo2.tvQuantidade.text = "0"
+                etValorTotal.setText("0.00")
+                etValorTotalPromocao.setText("0.00")
+                etValorPagamento.text?.clear()
+            }
         }
 
         private fun setupButtonStateListeners() {
@@ -189,184 +486,13 @@ class ClientesAdapter(
                 )
             }
 
-            binding.btnVenda.stateListAnimator = stateListAnimator
-            binding.btnPromocao.stateListAnimator = stateListAnimator
-            binding.btnPagamento.stateListAnimator = stateListAnimator
-            binding.btnAVista.stateListAnimator = stateListAnimator
-            binding.btnAPrazo.stateListAnimator = stateListAnimator
-        }
-
-        private fun updateButtonStyle(button: MaterialButton) {
-            val context = button.context
-            if (button.isSelected) {
-                button.setBackgroundColor(
-                    ContextCompat.getColor(
-                        context,
-                        R.color.button_background_selected
-                    )
-                )
-                button.setIconTintResource(R.color.button_icon_selected)
-                button.strokeColor = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.button_background_selected))
-            } else {
-                button.setBackgroundColor(
-                    ContextCompat.getColor(
-                        context,
-                        R.color.button_background_unselected
-                    )
-                )
-                button.setIconTintResource(R.color.button_icon_unselected)
-                button.strokeColor = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.button_stroke))
+            binding.apply {
+                btnVenda.stateListAnimator = stateListAnimator
+                btnPromocao.stateListAnimator = stateListAnimator
+                btnPagamento.stateListAnimator = stateListAnimator
+                btnAVista.stateListAnimator = stateListAnimator
+                btnAPrazo.stateListAnimator = stateListAnimator
             }
-            button.elevation = 0f
-            button.stateListAnimator = null
-        }
-
-        private fun setupMainButtons(cliente: Cliente) {
-            binding.btnVenda.setOnClickListener {
-                Log.d("ClientesAdapter", "Venda button clicked for cliente ${cliente.id}")
-                val currentState = getClienteState(cliente.id)?.modoOperacao
-                val newModoOperacao = if (currentState == ModoOperacao.VENDA) null else ModoOperacao.VENDA
-                onModoOperacaoSelected(cliente, newModoOperacao)
-                updateButtonStates(cliente)
-            }
-
-            binding.btnPromocao.setOnClickListener {
-                Log.d("ClientesAdapter", "Promocao button clicked for cliente ${cliente.id}")
-                val currentState = getClienteState(cliente.id)?.modoOperacao
-                val newModoOperacao = if (currentState == ModoOperacao.PROMOCAO) null else ModoOperacao.PROMOCAO
-                onModoOperacaoSelected(cliente, newModoOperacao)
-                updateButtonStates(cliente)
-            }
-
-            binding.btnPagamento.setOnClickListener {
-                Log.d("ClientesAdapter", "Pagamento button clicked for cliente ${cliente.id}")
-                val currentState = getClienteState(cliente.id)?.modoOperacao
-                val newModoOperacao = if (currentState == ModoOperacao.PAGAMENTO) null else ModoOperacao.PAGAMENTO
-                onModoOperacaoSelected(cliente, newModoOperacao)
-                updateButtonStates(cliente)
-            }
-        }
-
-        private fun setupVendaButtons(cliente: Cliente) {
-            binding.btnAVista.setOnClickListener {
-                Log.d("ClientesAdapter", "A Vista button clicked for cliente ${cliente.id}")
-                val clienteState = getClienteState(cliente.id) ?: VendasViewModel.ClienteState(clienteId = cliente.id)
-                val newTipoTransacao = if (clienteState.tipoTransacao == TipoTransacao.A_VISTA) null else TipoTransacao.A_VISTA
-                onTipoTransacaoSelected(cliente, newTipoTransacao)
-                updateButtonStates(cliente)
-            }
-
-            binding.btnAPrazo.setOnClickListener {
-                Log.d("ClientesAdapter", "A Prazo button clicked for cliente ${cliente.id}")
-                val clienteState = getClienteState(cliente.id) ?: VendasViewModel.ClienteState(clienteId = cliente.id)
-                val newTipoTransacao = if (clienteState.tipoTransacao == TipoTransacao.A_PRAZO) null else TipoTransacao.A_PRAZO
-                onTipoTransacaoSelected(cliente, newTipoTransacao)
-                updateButtonStates(cliente)
-            }
-        }
-
-        private fun setupContadores(cliente: Cliente) {
-            binding.contadorItem1.btnMais.setOnClickListener {
-                val quantidadeAtual = binding.contadorItem1.tvQuantidade.text.toString().toInt()
-                val novaQuantidade = quantidadeAtual + 1
-                binding.contadorItem1.tvQuantidade.text = novaQuantidade.toString()
-                onUpdateQuantidadeSalgados(cliente.id, novaQuantidade)
-                updateValorTotalLocal(cliente.id)
-                Log.d("ClientesAdapter", "Botão + de salgados clicado: clienteId=${cliente.id}, novaQuantidade=$novaQuantidade")
-            }
-            binding.contadorItem1.btnMenos.setOnClickListener {
-                val quantidadeAtual = binding.contadorItem1.tvQuantidade.text.toString().toInt()
-                if (quantidadeAtual > 0) {
-                    val novaQuantidade = quantidadeAtual - 1
-                    binding.contadorItem1.tvQuantidade.text = novaQuantidade.toString()
-                    onUpdateQuantidadeSalgados(cliente.id, novaQuantidade)
-                    updateValorTotalLocal(cliente.id)
-                    Log.d("ClientesAdapter", "Botão - de salgados clicado: clienteId=${cliente.id}, novaQuantidade=$novaQuantidade")
-                }
-            }
-
-            binding.contadorItem2.btnMais.setOnClickListener {
-                val quantidadeAtual = binding.contadorItem2.tvQuantidade.text.toString().toInt()
-                val novaQuantidade = quantidadeAtual + 1
-                binding.contadorItem2.tvQuantidade.text = novaQuantidade.toString()
-                onUpdateQuantidadeSucos(cliente.id, novaQuantidade)
-                updateValorTotalLocal(cliente.id)
-                Log.d("ClientesAdapter", "Quantidade de sucos atualizada: $novaQuantidade para cliente ${cliente.id}")
-            }
-            binding.contadorItem2.btnMenos.setOnClickListener {
-                val quantidadeAtual = binding.contadorItem2.tvQuantidade.text.toString().toInt()
-                if (quantidadeAtual > 0) {val novaQuantidade = quantidadeAtual - 1
-                    binding.contadorItem2.tvQuantidade.text = novaQuantidade.toString()
-                    onUpdateQuantidadeSucos(cliente.id, novaQuantidade)
-                    updateValorTotalLocal(cliente.id)
-                    Log.d("ClientesAdapter", "Quantidade de sucos atualizada: $novaQuantidade para cliente ${cliente.id}")
-                }
-            }
-        }
-
-        private fun updateValorTotalLocal(clienteId: Long) {
-            val clienteState = getClienteState(clienteId)
-            clienteState?.let {
-                updateValorTotal(it.valorTotal)
-            }
-        }
-
-        private fun setupPagamentoLayout(cliente: Cliente) {
-            binding.btnTudo.setOnClickListener {
-                lifecycleScope.launch {
-                    val conta = contaRepository.getContaByCliente(cliente.id)
-                    val saldo = conta?.saldo ?: 0.0
-                    binding.etValorPagamento.setText(saldo.toString())
-                    onUpdateValorTotal(cliente.id, saldo) // Atualiza o estado quando clica em "Tudo"
-                }
-            }
-
-            binding.etValorPagamento.addTextChangedListener(object : TextWatcher {
-                override fun afterTextChanged(s: Editable?) {
-                    val valorPagamento = s.toString().toDoubleOrNull() ?: 0.0
-                    onUpdateValorTotal(cliente.id, valorPagamento) // Atualiza o estado quando o texto muda
-                }
-
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            })
-
-            binding.btnConfirmarPagamento.setOnClickListener {
-                val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull() ?: 0.0
-                onUpdateValorTotal(cliente.id, valorPagamento) // Atualiza o estado antes de confirmar
-                onConfirmarOperacao(cliente.id)
-            }
-
-            binding.btnCancelarPagamento.setOnClickListener {
-                binding.etValorPagamento.text?.clear()
-                onUpdateValorTotal(cliente.id, 0.0)
-                onCancelarOperacao(cliente.id)
-            }
-        }
-
-        private fun setupConfirmationButtons(cliente: Cliente) {
-            binding.btnConfirmarOperacao.setOnClickListener {
-                onConfirmarOperacao(cliente.id)
-                updateButtonStates(cliente)
-                resetContadores()
-            }
-            binding.btnCancelarOperacao.setOnClickListener {
-                onCancelarOperacao(cliente.id)
-                updateButtonStates(cliente)
-                resetContadores()
-            }
-        }
-
-        fun updateValorTotal(valor: Double) {
-            binding.etValorTotal.setText(String.format("%.2f", valor))
-            Log.d("ClientesAdapter", "Valor total atualizado na UI: clienteId=${bindingAdapterPosition}, valor=$valor")
-        }
-
-        private fun resetContadores() {
-            binding.contadorItem1.tvQuantidade.text = "0"
-            binding.contadorItem2.tvQuantidade.text = "0"
-            binding.etValorTotal.setText("0.00")
-            binding.etValorPagamento.text?.clear()
         }
     }
 
@@ -380,14 +506,14 @@ class ClientesAdapter(
         }
     }
 
+    sealed class Payload {
+        data class ValorTotalChanged(val novoValor: Double) : Payload()
+        object SaldoChanged : Payload()
+    }
+
     companion object {
         private fun dpToPx(context: Context, dp: Float): Float {
             return dp * context.resources.displayMetrics.density
         }
-    }
-
-    sealed class Payload {
-        data class ValorTotalChanged(val novoValor: Double) : Payload()
-        object SaldoChanged : Payload()
     }
 }
