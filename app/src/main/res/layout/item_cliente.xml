@@ -341,7 +341,7 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:layout_marginEnd="8dp"
-                            android:src="@drawable/ic_promotion" />
+                            android:src="@drawable/ic_promo_one" />
 
                         <include
                             android:id="@+id/contador_promo1"
@@ -363,7 +363,7 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:layout_marginEnd="8dp"
-                            android:src="@drawable/ic_promotion" />
+                            android:src="@drawable/ic_promo_two" />
 
                         <include
                             android:id="@+id/contador_promo2"

@@ -2,14 +2,11 @@ package com.example.caderneta.ui.vendas
 
 import android.animation.ObjectAnimator
 import android.animation.StateListAnimator
-import android.app.Activity
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
-import android.os.Handler
-import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -25,6 +22,7 @@ import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.databinding.ItemClienteBinding
 import com.example.caderneta.repository.ContaRepository
+import com.example.caderneta.util.ContadorHelper
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
@@ -79,8 +77,18 @@ class ClientesAdapter(
         }
     }
 
+    override fun onViewRecycled(holder: ClienteViewHolder) {
+        super.onViewRecycled(holder)
+        holder.cleanupContadores()
+    }
+
     inner class ClienteViewHolder(private val binding: ItemClienteBinding) :
         RecyclerView.ViewHolder(binding.root) {
+
+        private var contadorSalgadosHelper: ContadorHelper? = null
+        private var contadorSucosHelper: ContadorHelper? = null
+        private var contadorPromo1Helper: ContadorHelper? = null
+        private var contadorPromo2Helper: ContadorHelper? = null
 
         fun bind(cliente: Cliente) {
             setupBasicInfo(cliente)
@@ -91,6 +99,13 @@ class ClientesAdapter(
             setupConfirmationButtons(cliente)
             updateButtonStates(cliente)
             setupButtonStateListeners()
+        }
+
+        fun cleanupContadores() {
+            contadorSalgadosHelper = null
+            contadorSucosHelper = null
+            contadorPromo1Helper = null
+            contadorPromo2Helper = null
         }
 
         private fun setupBasicInfo(cliente: Cliente) {
@@ -109,6 +124,41 @@ class ClientesAdapter(
                         if (saldo > 0) R.color.delete_color else R.color.add_color
                     )
                 )
+            }
+        }
+
+        private fun setupContadores(cliente: Cliente) {
+            contadorSalgadosHelper = ContadorHelper(binding.contadorSalgados.root).apply {
+                setOnQuantidadeChangedListener { quantidade ->
+                    onQuantidadeChanged(cliente.id, TipoQuantidade.SALGADO, quantidade)
+                }
+            }
+
+            contadorSucosHelper = ContadorHelper(binding.contadorSucos.root).apply {
+                setOnQuantidadeChangedListener { quantidade ->
+                    onQuantidadeChanged(cliente.id, TipoQuantidade.SUCO, quantidade)
+                }
+            }
+
+            contadorPromo1Helper = ContadorHelper(binding.contadorPromo1.root).apply {
+                setOnQuantidadeChangedListener { quantidade ->
+                    onQuantidadeChanged(cliente.id, TipoQuantidade.PROMO1, quantidade)
+                }
+            }
+
+            contadorPromo2Helper = ContadorHelper(binding.contadorPromo2.root).apply {
+                setOnQuantidadeChangedListener { quantidade ->
+                    onQuantidadeChanged(cliente.id, TipoQuantidade.PROMO2, quantidade)
+                }
+            }
+
+            // Atualizar valores iniciais
+            val state = getClienteState(cliente.id)
+            if (state != null) {
+                contadorSalgadosHelper?.setQuantidade(state.quantidadeSalgados)
+                contadorSucosHelper?.setQuantidade(state.quantidadeSucos)
+                contadorPromo1Helper?.setQuantidade(state.quantidadePromo1)
+                contadorPromo2Helper?.setQuantidade(state.quantidadePromo2)
             }
         }
 
@@ -153,110 +203,6 @@ class ClientesAdapter(
                     updateButtonStates(cliente)
                 }
             }
-        }
-
-        private fun setupContadores(cliente: Cliente) {
-            binding.apply {
-                // Setup contadores modo normal
-                contadorSalgados.apply {
-                    btnMais.setOnClickListener {
-                        atualizarQuantidade(cliente.id, TipoQuantidade.SALGADO, 1)
-                    }
-                    btnMenos.setOnClickListener {
-                        atualizarQuantidade(cliente.id, TipoQuantidade.SALGADO, -1)
-                    }
-                    // Garantir visibilidade inicial
-                    root.visibility = View.VISIBLE
-                }
-
-                contadorSucos.apply {
-                    btnMais.setOnClickListener {
-                        atualizarQuantidade(cliente.id, TipoQuantidade.SUCO, 1)
-                    }
-                    btnMenos.setOnClickListener {
-                        atualizarQuantidade(cliente.id, TipoQuantidade.SUCO, -1)
-                    }
-                    // Garantir visibilidade inicial
-                    root.visibility = View.VISIBLE
-                }
-
-                // Setup contadores modo promoção
-                contadorPromo1.apply {
-                    btnMais.setOnClickListener {
-                        atualizarQuantidade(cliente.id, TipoQuantidade.PROMO1, 1)
-                    }
-                    btnMenos.setOnClickListener {
-                        atualizarQuantidade(cliente.id, TipoQuantidade.PROMO1, -1)
-                    }
-                    // Garantir visibilidade inicial
-                    root.visibility = View.VISIBLE
-                }
-
-                contadorPromo2.apply {
-                    btnMais.setOnClickListener {
-                        atualizarQuantidade(cliente.id, TipoQuantidade.PROMO2, 1)
-                    }
-                    btnMenos.setOnClickListener {
-                        atualizarQuantidade(cliente.id, TipoQuantidade.PROMO2, -1)
-                    }
-                    // Garantir visibilidade inicial
-                    root.visibility = View.VISIBLE
-                }
-            }
-        }
-
-
-        private fun setupContadorNormal(cliente: Cliente) {
-            binding.contadorSalgados.apply {
-                btnMais.setOnClickListener {
-                    atualizarQuantidade(cliente.id, TipoQuantidade.SALGADO, 1)
-                }
-                btnMenos.setOnClickListener {
-                    atualizarQuantidade(cliente.id, TipoQuantidade.SALGADO, -1)
-                }
-            }
-
-            binding.contadorSucos.apply {
-                btnMais.setOnClickListener {
-                    atualizarQuantidade(cliente.id, TipoQuantidade.SUCO, 1)
-                }
-                btnMenos.setOnClickListener {
-                    atualizarQuantidade(cliente.id, TipoQuantidade.SUCO, -1)
-                }
-            }
-        }
-
-        private fun setupContadorPromocao(cliente: Cliente) {
-            binding.contadorPromo1.apply {
-                btnMais.setOnClickListener {
-                    atualizarQuantidade(cliente.id, TipoQuantidade.PROMO1, 1)
-                }
-                btnMenos.setOnClickListener {
-                    atualizarQuantidade(cliente.id, TipoQuantidade.PROMO1, -1)
-                }
-            }
-
-            binding.contadorPromo2.apply {
-                btnMais.setOnClickListener {
-                    atualizarQuantidade(cliente.id, TipoQuantidade.PROMO2, 1)
-                }
-                btnMenos.setOnClickListener {
-                    atualizarQuantidade(cliente.id, TipoQuantidade.PROMO2, -1)
-                }
-            }
-        }
-
-
-
-        private fun atualizarQuantidade(clienteId: Long, tipo: TipoQuantidade, delta: Int) {
-            val state = getClienteState(clienteId) ?: return
-            val novaQuantidade = when (tipo) {
-                TipoQuantidade.SALGADO -> (state.quantidadeSalgados + delta).coerceAtLeast(0)
-                TipoQuantidade.SUCO -> (state.quantidadeSucos + delta).coerceAtLeast(0)
-                TipoQuantidade.PROMO1 -> (state.quantidadePromo1 + delta).coerceAtLeast(0)
-                TipoQuantidade.PROMO2 -> (state.quantidadePromo2 + delta).coerceAtLeast(0)
-            }
-            onQuantidadeChanged(clienteId, tipo, novaQuantidade)
         }
 
         private fun setupPagamentoLayout(cliente: Cliente) {
@@ -311,20 +257,6 @@ class ClientesAdapter(
 
             updateButtonSelections(state)
             updateLayoutVisibility(state)
-
-            // Garantir que os contadores estão visíveis e com valores corretos
-            binding.apply {
-                // Atualizar valores dos contadores
-                contadorSalgados.tvQuantidade.text = state.quantidadeSalgados.toString()
-                contadorSucos.tvQuantidade.text = state.quantidadeSucos.toString()
-                contadorPromo1.tvQuantidade.text = state.quantidadePromo1.toString()
-                contadorPromo2.tvQuantidade.text = state.quantidadePromo2.toString()
-
-                // Atualizar valores totais
-                etValorTotal.setText(String.format("%.2f", state.valorTotal))
-                etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
-            }
-
             updateContadoresState(state)
             updatePromocoesInfo(state, config)
         }
@@ -344,75 +276,37 @@ class ClientesAdapter(
             }
         }
 
-        private fun updateButtonStyles() {
-            binding.apply {
-                listOf(btnVenda, btnPromocao, btnPagamento, btnAVista, btnAPrazo).forEach { button ->
-                    updateButtonStyle(button)
-                }
-            }
-        }
-
-        private fun updateButtonStyle(button: MaterialButton) {
-            val context = button.context
-            var (backgroundColor, iconTint, strokeColor) = if (button.isSelected) {
-                Triple(
-                    R.color.button_background_selected,
-                    R.color.button_icon_selected,
-                    R.color.button_background_selected
-                )
-            } else {
-                Triple(
-                    R.color.button_background_unselected,
-                    R.color.button_icon_unselected,
-                    R.color.button_stroke
-                )
-            }
-
-            button.apply {
-                setBackgroundColor(ContextCompat.getColor(context, backgroundColor))
-                setIconTintResource(iconTint)
-                elevation = 0f
-                stateListAnimator = null
-            }
-        }
-
         private fun updateLayoutVisibility(state: VendasViewModel.ClienteState) {
             binding.apply {
-                // Layout principal de venda (container para ambos os modos)
                 layoutVenda.visibility = when {
                     state.modoOperacao == null -> View.GONE
                     state.modoOperacao == ModoOperacao.PAGAMENTO -> View.GONE
                     else -> View.VISIBLE
                 }
 
-                // Layout de botões de tipo de transação
                 layoutBotoesVenda.visibility = when {
                     state.modoOperacao == ModoOperacao.VENDA ||
                             state.modoOperacao == ModoOperacao.PROMOCAO -> View.VISIBLE
                     else -> View.GONE
                 }
 
-                // Layout específico de venda normal
                 layoutVendaNormal.visibility = when {
                     state.modoOperacao == ModoOperacao.VENDA &&
                             state.tipoTransacao != null -> View.VISIBLE
                     else -> View.GONE
                 }
 
-                // Layout específico de promoção
                 layoutVendaPromocao.visibility = when {
                     state.modoOperacao == ModoOperacao.PROMOCAO &&
                             state.tipoTransacao != null -> View.VISIBLE
                     else -> View.GONE
                 }
 
-                // Layout de pagamento
                 layoutPagamento.visibility = when {
                     state.modoOperacao == ModoOperacao.PAGAMENTO -> View.VISIBLE
                     else -> View.GONE
                 }
 
-                // Botões de confirmação
                 layoutBotoesConfirmacao.visibility = when {
                     (state.modoOperacao == ModoOperacao.VENDA ||
                             state.modoOperacao == ModoOperacao.PROMOCAO) &&
@@ -424,74 +318,89 @@ class ClientesAdapter(
 
         private fun updateContadoresState(state: VendasViewModel.ClienteState) {
             if (state.modoOperacao == ModoOperacao.PROMOCAO) {
-                binding.contadorPromo1.tvQuantidade.text = state.quantidadePromo1.toString()
-                binding.contadorPromo2.tvQuantidade.text = state.quantidadePromo2.toString()
+                contadorPromo1Helper?.setQuantidade(state.quantidadePromo1)
+                contadorPromo2Helper?.setQuantidade(state.quantidadePromo2)
                 binding.etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
             } else {
-                binding.contadorSalgados.tvQuantidade.text = state.quantidadeSalgados.toString()
-                binding.contadorSucos.tvQuantidade.text = state.quantidadeSucos.toString()
+                contadorSalgadosHelper?.setQuantidade(state.quantidadeSalgados)
+                contadorSucosHelper?.setQuantidade(state.quantidadeSucos)
                 binding.etValorTotal.setText(String.format("%.2f", state.valorTotal))
             }
         }
 
-
         private fun updatePromocoesInfo(state: VendasViewModel.ClienteState, config: Configuracoes) {
             if (state.modoOperacao == ModoOperacao.PROMOCAO) {
-                // Atualizar texto e visibilidade de Promo 1
-                if (config.isPromocaoValida(1)) {
-                    binding.contadorPromo1.root.visibility = View.VISIBLE
-                    binding.icPromo1.setImageResource(R.drawable.ic_promotion)
-                } else {
-                    binding.contadorPromo1.root.visibility = View.GONE
+                binding.apply {
+                    contadorPromo1.root.visibility =
+                        if (config.isPromocaoValida(1)) View.VISIBLE else View.GONE
+                    contadorPromo2.root.visibility =
+                        if (config.isPromocaoValida(2)) View.VISIBLE else View.GONE
+                    etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
                 }
-
-                // Atualizar texto e visibilidade de Promo 2
-                if (config.isPromocaoValida(2)) {
-                    binding.contadorPromo2.root.visibility = View.VISIBLE
-                    binding.icPromo2.setImageResource(R.drawable.ic_promotion)
-                } else {
-                    binding.contadorPromo2.root.visibility = View.GONE
-                }
-
-                // Atualizar valor total da promoção
-                binding.etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
             }
         }
 
         fun updateValorTotal(payload: Payload.ValorTotalChanged) {
             binding.etValorTotal.setText(String.format("%.2f", payload.novoValor))
+            binding.etValorTotalPromocao.setText(String.format("%.2f", payload.novoValor))
         }
 
         private fun resetContadores() {
+            contadorSalgadosHelper?.reset()
+            contadorSucosHelper?.reset()
+            contadorPromo1Helper?.reset()
+            contadorPromo2Helper?.reset()
+
             binding.apply {
-                contadorSalgados.tvQuantidade.text = "0"
-                contadorSucos.tvQuantidade.text = "0"
-                contadorPromo1.tvQuantidade.text = "0"
-                contadorPromo2.tvQuantidade.text = "0"
                 etValorTotal.setText("0.00")
                 etValorTotalPromocao.setText("0.00")
                 etValorPagamento.text?.clear()
             }
         }
 
+        private fun updateButtonStyles() {
+            binding.apply {
+                listOf(btnVenda, btnPromocao, btnPagamento, btnAVista, btnAPrazo).forEach { button ->
+                    updateButtonStyle(button)
+                }
+            }
+        }
+
+        private fun updateButtonStyle(button: MaterialButton) {
+            val context = button.context
+            val (backgroundColor, iconTint) = if (button.isSelected) {
+                Pair(R.color.button_background_selected, R.color.button_icon_selected)
+            } else {
+                Pair(R.color.button_background_unselected, R.color.button_icon_unselected)
+            }
+
+            button.apply {
+                setBackgroundColor(ContextCompat.getColor(context, backgroundColor))
+                setIconTintResource(iconTint)
+                elevation = 0f
+                stateListAnimator = createStateListAnimator()
+            }
+        }
+
         private fun setupButtonStateListeners() {
-            val stateListAnimator = StateListAnimator().apply {
+            binding.apply {
+                listOf(btnVenda, btnPromocao, btnPagamento, btnAVista, btnAPrazo).forEach { button ->
+                    button.stateListAnimator = createStateListAnimator()
+                }
+            }
+        }
+
+        @SuppressLint("ObjectAnimatorBinding")
+        private fun createStateListAnimator(): StateListAnimator {
+            return StateListAnimator().apply {
                 addState(
                     intArrayOf(android.R.attr.state_selected),
-                    ObjectAnimator.ofFloat(itemView, "elevation", dpToPx(itemView.context, 8f))
+                    ObjectAnimator.ofFloat(null, "elevation", dpToPx(itemView.context, 8f))
                 )
                 addState(
                     intArrayOf(),
-                    ObjectAnimator.ofFloat(itemView, "elevation", 0f)
+                    ObjectAnimator.ofFloat(null, "elevation", 0f)
                 )
-            }
-
-            binding.apply {
-                btnVenda.stateListAnimator = stateListAnimator
-                btnPromocao.stateListAnimator = stateListAnimator
-                btnPagamento.stateListAnimator = stateListAnimator
-                btnAVista.stateListAnimator = stateListAnimator
-                btnAPrazo.stateListAnimator = stateListAnimator
             }
         }
     }
