@@ -120,14 +120,17 @@ class VendasViewModel(
     fun selecionarLocal(localId: Long) {
         viewModelScope.launch {
             try {
-                _localSelecionado.value = localRepository.getLocalById(localId)
+                val local = localRepository.getLocalById(localId)
+                _localSelecionado.value = local
+
+                Log.d("VendasViewModel", """
+                === Selecionando Local ===
+                Local: ${local?.nome} (ID: $localId)
+            """.trimIndent())
 
                 clienteRepository.getClientesByLocalHierarchy(localId).collect { clientesFiltrados ->
-                    _clientes.value = clientesFiltrados
-                    // Mantemos apenas um log sintético aqui
                     Log.d("VendasViewModel", "Clientes filtrados para local $localId: ${clientesFiltrados.size}")
-
-                    // Chamamos logHieraquiaClientes apenas uma vez após a filtragem
+                    _clientes.value = clientesFiltrados
                     logHieraquiaClientes(localId, clientesFiltrados)
                 }
             } catch (e: Exception) {
@@ -578,13 +581,15 @@ class VendasViewModel(
         var currentId: Long? = localId
 
         while (currentId != null) {
-            val currentLocal = _locais.value.find { it.id == currentId }
-            if (currentLocal != null) {
-                hierarchy.add(0, currentLocal)
-                currentId = currentLocal.parentId
-            } else {
-                break
-            }
+            val currentLocal = _locais.value.find { it.id == currentId } ?: break
+            hierarchy.add(0, currentLocal) // Adiciona no início para manter a ordem correta
+            currentId = currentLocal.parentId
+        }
+
+        // Valida se a hierarquia está ordenada por nível
+        if (hierarchy.zipWithNext().any { (parent, child) -> child.level <= parent.level }) {
+            Log.w("VendasViewModel", "Hierarquia com níveis inconsistentes detectada")
+            return emptyList()
         }
 
         return hierarchy
@@ -593,7 +598,6 @@ class VendasViewModel(
     fun addCliente(nome: String, telefone: String, localId: Long, sublocal1Id: Long?, sublocal2Id: Long?, sublocal3Id: Long?) {
         viewModelScope.launch {
             try {
-                // Log inicial com os dados de cadastro (mantemos este por ser relevante)
                 Log.d("VendasViewModel", """
                 === Iniciando cadastro de novo cliente ===
                 Nome: $nome
@@ -603,28 +607,38 @@ class VendasViewModel(
                 Sublocal 3 ID: $sublocal3Id
             """.trimIndent())
 
-                // Verifica o local e sublocais
+                // Verifica a existência dos locais
                 val local = localRepository.getLocalById(localId)
-                val sublocal1 = sublocal1Id?.let { localRepository.getLocalById(it) }
-                val sublocal2 = sublocal2Id?.let { localRepository.getLocalById(it) }
-                val sublocal3 = sublocal3Id?.let { localRepository.getLocalById(it) }
+                    ?: throw IllegalStateException("Local principal não encontrado")
 
-                // Determina o local efetivo do cadastro
-                val localEfetivo = sublocal3 ?: sublocal2 ?: sublocal1 ?: local
+                // Validamos a hierarquia completa
+                val hierarchy = listOfNotNull(
+                    local,
+                    sublocal1Id?.let { localRepository.getLocalById(it) },
+                    sublocal2Id?.let { localRepository.getLocalById(it) },
+                    sublocal3Id?.let { localRepository.getLocalById(it) }
+                )
+
+                // Validamos a ordem da hierarquia pelos níveis
+                hierarchy.zipWithNext().forEach { (parent, child) ->
+                    if (child.level <= parent.level) {
+                        throw IllegalStateException("Hierarquia de locais inválida: nível do filho não é maior que do pai")
+                    }
+                }
 
                 val novoCliente = Cliente(
                     nome = nome,
                     telefone = telefone,
-                    localId = localEfetivo?.id ?: localId,
-                    sublocal1Id = if (localEfetivo == sublocal1) null else sublocal1Id,
-                    sublocal2Id = if (localEfetivo == sublocal2) null else sublocal2Id,
-                    sublocal3Id = if (localEfetivo == sublocal3) null else sublocal3Id
+                    localId = localId,
+                    sublocal1Id = sublocal1Id,
+                    sublocal2Id = sublocal2Id,
+                    sublocal3Id = sublocal3Id
                 )
 
-                // Log dos dados finais do cliente (mantemos este por ser crítico)
                 Log.d("VendasViewModel", """
                 === Dados finais do cliente para cadastro ===
-                Local efetivo: ${localEfetivo?.nome} (ID: ${localEfetivo?.id})
+                Local principal: ${local.nome} (ID: ${local.id})
+                Hierarquia completa: ${hierarchy.joinToString { it.nome }}
                 Cliente: ${novoCliente.nome}
                 - Local ID: ${novoCliente.localId}
                 - Sublocal 1 ID: ${novoCliente.sublocal1Id}
@@ -635,11 +649,10 @@ class VendasViewModel(
                 val clienteId = clienteRepository.insertCliente(novoCliente)
                 Log.d("VendasViewModel", "Cliente cadastrado com sucesso! ID: $clienteId")
 
-                // Atualiza a lista de clientes
-                val clientesAtualizados = clienteRepository.getAllClientes().first()
-                _clientes.value = clientesAtualizados
-
-                // Não chamamos logHieraquiaClientes aqui pois selecionarLocal já o fará
+                // Reaplicar o filtro do local atualmente selecionado
+                _localSelecionado.value?.let { localAtual ->
+                    selecionarLocal(localAtual.id)
+                }
 
             } catch (e: Exception) {
                 Log.e("VendasViewModel", "Erro ao adicionar cliente", e)
@@ -648,7 +661,6 @@ class VendasViewModel(
         }
     }
 
-
     private fun logHieraquiaClientes(localId: Long, clientes: List<Cliente>) {
         viewModelScope.launch {
             val local = localRepository.getLocalById(localId)
@@ -656,6 +668,7 @@ class VendasViewModel(
             Log.d("VendasViewModel", "Local selecionado: ${local?.nome} (ID: $localId)")
             Log.d("VendasViewModel", "Total de clientes nesta hierarquia: ${clientes.size}")
 
+            // Agrupa clientes por nível na hierarquia
             // Agrupa clientes por nível na hierarquia
             val clientesPorNivel = clientes.groupBy { cliente ->
                 when {

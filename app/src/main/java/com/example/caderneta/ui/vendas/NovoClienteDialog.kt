@@ -4,10 +4,12 @@ import android.app.Dialog
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
@@ -27,9 +29,11 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
     private lateinit var sublocal2Adapter: ArrayAdapter<Local>
     private lateinit var sublocal3Adapter: ArrayAdapter<Local>
 
+    // Cache para manter a hierarquia importada
+    private var importedHierarchy: List<Local>? = null
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogNovoClienteBinding.inflate(LayoutInflater.from(context))
-
         return AlertDialog.Builder(requireContext())
             .setTitle("Adicionar Novo Cliente")
             .setView(binding.root)
@@ -69,22 +73,37 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
     }
 
     private fun setupSpinners() {
-        localAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, mutableListOf<Local>())
-        sublocal1Adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, mutableListOf<Local>())
-        sublocal2Adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, mutableListOf<Local>())
-        sublocal3Adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, mutableListOf<Local>())
+        localAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, mutableListOf())
+        sublocal1Adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, mutableListOf())
+        sublocal2Adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, mutableListOf())
+        sublocal3Adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, mutableListOf())
 
         binding.spinnerLocal.setAdapter(localAdapter)
         binding.spinnerSublocal1.setAdapter(sublocal1Adapter)
         binding.spinnerSublocal2.setAdapter(sublocal2Adapter)
         binding.spinnerSublocal3.setAdapter(sublocal3Adapter)
 
+        // Inicialmente, apenas o spinner de local principal está visível
+        binding.tilSublocal1.visibility = View.GONE
+        binding.tilSublocal2.visibility = View.GONE
+        binding.tilSublocal3.visibility = View.GONE
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.locais.collect { locais ->
-                updateLocalSpinner(locais)
+                val rootLocals = locais.filter { it.parentId == null }
+                localAdapter.clear()
+                localAdapter.addAll(rootLocals)
+                localAdapter.notifyDataSetChanged()
+
+                // Reaplica a hierarquia importada, se existir
+                importedHierarchy?.let { updateAdaptersWithHierarchy(it) }
             }
         }
 
+        setupSpinnerListeners()
+    }
+
+    private fun setupSpinnerListeners() {
         binding.spinnerLocal.setOnItemClickListener { _, _, position, _ ->
             val selectedLocal = localAdapter.getItem(position)
             selectedLocal?.let {
@@ -116,45 +135,70 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
         }
     }
 
-    private fun updateLocalSpinner(locais: List<Local>) {
-        val rootLocals = locais.filter { it.parentId == null }
-        localAdapter.clear()
-        localAdapter.addAll(rootLocals)
-        localAdapter.notifyDataSetChanged()
-        clearSublocals()
-    }
-
-    private fun updateSublocals(local: Local) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val sublocais = viewModel.getSublocais(local.id)
-            updateSublocal1Spinner(sublocais)
-        }
-    }
-
     private fun updateSublocal1Spinner(sublocais: List<Local>) {
+        Log.d("NovoClienteDialog", """
+        Atualizando Sublocal1Spinner:
+        Sublocais: ${sublocais.joinToString { "${it.nome}(${it.id})" }}
+        Spinner atual: ${binding.spinnerSublocal1.text}
+    """.trimIndent())
+
         sublocal1Adapter.clear()
         sublocal1Adapter.addAll(sublocais)
         sublocal1Adapter.notifyDataSetChanged()
+
+        // Só exibe se houver sublocais disponíveis
         binding.tilSublocal1.visibility = if (sublocais.isNotEmpty()) View.VISIBLE else View.GONE
-        binding.spinnerSublocal1.setText("") // Limpa a seleção anterior
-        clearSublocals(2)
+
+        // Se não for uma importação, limpa os níveis subsequentes
+        if (importedHierarchy == null) {
+            binding.spinnerSublocal1.setText("")
+            clearSublocals(2)
+        }
     }
 
     private fun updateSublocal2Spinner(sublocais: List<Local>) {
+        Log.d("NovoClienteDialog", """
+        Atualizando Sublocal2Spinner:
+        Sublocais: ${sublocais.joinToString { "${it.nome}(${it.id})" }}
+        Spinner atual: ${binding.spinnerSublocal2.text}
+    """.trimIndent())
+
         sublocal2Adapter.clear()
         sublocal2Adapter.addAll(sublocais)
         sublocal2Adapter.notifyDataSetChanged()
-        binding.tilSublocal2.visibility = if (sublocais.isNotEmpty()) View.VISIBLE else View.GONE
-        binding.spinnerSublocal2.setText("") // Limpa a seleção anterior
-        clearSublocals(3)
+
+        // Só exibe se houver sublocais disponíveis e o sublocal1 estiver preenchido
+        binding.tilSublocal2.visibility = if (sublocais.isNotEmpty() &&
+            !binding.spinnerSublocal1.text.isNullOrBlank())
+            View.VISIBLE else View.GONE
+
+        // Se não for uma importação, limpa os níveis subsequentes
+        if (importedHierarchy == null) {
+            binding.spinnerSublocal2.setText("")
+            clearSublocals(3)
+        }
     }
 
     private fun updateSublocal3Spinner(sublocais: List<Local>) {
+        Log.d("NovoClienteDialog", """
+        Atualizando Sublocal3Spinner:
+        Sublocais: ${sublocais.joinToString { "${it.nome}(${it.id})" }}
+        Spinner atual: ${binding.spinnerSublocal3.text}
+    """.trimIndent())
+
         sublocal3Adapter.clear()
         sublocal3Adapter.addAll(sublocais)
         sublocal3Adapter.notifyDataSetChanged()
-        binding.tilSublocal3.visibility = if (sublocais.isNotEmpty()) View.VISIBLE else View.GONE
-        binding.spinnerSublocal3.setText("") // Limpa a seleção anterior
+
+        // Só exibe se houver sublocais disponíveis e o sublocal2 estiver preenchido
+        binding.tilSublocal3.visibility = if (sublocais.isNotEmpty() &&
+            !binding.spinnerSublocal2.text.isNullOrBlank())
+            View.VISIBLE else View.GONE
+
+        // Se não for uma importação, limpa o campo
+        if (importedHierarchy == null) {
+            binding.spinnerSublocal3.setText("")
+        }
     }
 
     private fun clearSublocals(startLevel: Int = 1) {
@@ -176,6 +220,45 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
         }
     }
 
+    private fun updateAdaptersWithHierarchy(hierarchy: List<Local>) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            hierarchy.forEachIndexed { index, local ->
+                when (index) {
+                    0 -> {
+                        binding.spinnerLocal.setText(local.nome)
+                    }
+                    1 -> {
+                        val sublocais = viewModel.getSublocais(hierarchy[0].id)
+                        sublocal1Adapter.clear()
+                        sublocal1Adapter.addAll(sublocais)
+                        binding.spinnerSublocal1.setText(local.nome)
+                        // Exibe apenas se o local principal estiver preenchido
+                        binding.tilSublocal1.visibility = if (!binding.spinnerLocal.text.isNullOrBlank())
+                            View.VISIBLE else View.GONE
+                    }
+                    2 -> {
+                        val sublocais = viewModel.getSublocais(hierarchy[1].id)
+                        sublocal2Adapter.clear()
+                        sublocal2Adapter.addAll(sublocais)
+                        binding.spinnerSublocal2.setText(local.nome)
+                        // Exibe apenas se o sublocal1 estiver preenchido
+                        binding.tilSublocal2.visibility = if (!binding.spinnerSublocal1.text.isNullOrBlank())
+                            View.VISIBLE else View.GONE
+                    }
+                    3 -> {
+                        val sublocais = viewModel.getSublocais(hierarchy[2].id)
+                        sublocal3Adapter.clear()
+                        sublocal3Adapter.addAll(sublocais)
+                        binding.spinnerSublocal3.setText(local.nome)
+                        // Exibe apenas se o sublocal2 estiver preenchido
+                        binding.tilSublocal3.visibility = if (!binding.spinnerSublocal2.text.isNullOrBlank())
+                            View.VISIBLE else View.GONE
+                    }
+                }
+            }
+        }
+    }
+
     private fun setupDialogButtons() {
         (dialog as? AlertDialog)?.setOnShowListener { dialog ->
             (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -183,19 +266,40 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
                     val nome = binding.etNome.text.toString()
                     val telefone = binding.etTelefone.text.toString()
 
-                    val localId = binding.spinnerLocal.text.toString().let { text ->
-                        localAdapter.getAllItems().find { it.nome == text }?.id
-                    } ?: return@setOnClickListener
+                    val localId = importedHierarchy?.firstOrNull()?.id
+                        ?: binding.spinnerLocal.text.toString().let { text ->
+                            localAdapter.getAllItems().find { it.nome == text }?.id
+                        } ?: return@setOnClickListener
 
-                    val sublocal1Id = binding.spinnerSublocal1.text.toString().let { text ->
-                        sublocal1Adapter.getAllItems().find { it.nome == text }?.id
-                    }
-                    val sublocal2Id = binding.spinnerSublocal2.text.toString().let { text ->
-                        sublocal2Adapter.getAllItems().find { it.nome == text }?.id
-                    }
-                    val sublocal3Id = binding.spinnerSublocal3.text.toString().let { text ->
-                        sublocal3Adapter.getAllItems().find { it.nome == text }?.id
-                    }
+                    val sublocal1Id = importedHierarchy?.getOrNull(1)?.id
+                        ?: (if (binding.tilSublocal1.visibility == View.VISIBLE) {
+                            binding.spinnerSublocal1.text.toString().let { text ->
+                                sublocal1Adapter.getAllItems().find { it.nome == text }?.id
+                            }
+                        } else null)
+
+                    val sublocal2Id = importedHierarchy?.getOrNull(2)?.id
+                        ?: (if (binding.tilSublocal2.visibility == View.VISIBLE) {
+                            binding.spinnerSublocal2.text.toString().let { text ->
+                                sublocal2Adapter.getAllItems().find { it.nome == text }?.id
+                            }
+                        } else null)
+
+                    val sublocal3Id = importedHierarchy?.getOrNull(3)?.id
+                        ?: (if (binding.tilSublocal3.visibility == View.VISIBLE) {
+                            binding.spinnerSublocal3.text.toString().let { text ->
+                                sublocal3Adapter.getAllItems().find { it.nome == text }?.id
+                            }
+                        } else null)
+
+                    Log.d("NovoClienteDialog", """
+                        Valores sendo enviados para cadastro:
+                        Nome: $nome
+                        Local ID: $localId
+                        Sublocal 1 ID: $sublocal1Id
+                        Sublocal 2 ID: $sublocal2Id
+                        Sublocal 3 ID: $sublocal3Id
+                    """.trimIndent())
 
                     onClienteAdicionado?.invoke(nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id)
                     dismiss()
@@ -207,6 +311,7 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
     private fun setupImportButton() {
         binding.btnImportar.setOnClickListener {
             viewModel.localSelecionado.value?.let { selectedLocal ->
+                Log.d("NovoClienteDialog", "Importando local: ${selectedLocal.nome} (ID: ${selectedLocal.id})")
                 importLocalHierarchy(selectedLocal)
             }
         }
@@ -214,31 +319,19 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
 
     private fun importLocalHierarchy(selectedLocal: Local) {
         viewLifecycleOwner.lifecycleScope.launch {
-            val hierarchy = viewModel.getLocalHierarchy(selectedLocal.id)
-            if (hierarchy.isNotEmpty()) {
-                updateLocalSpinnerWithHierarchy(hierarchy)
+            try {
+                val hierarchy = viewModel.getLocalHierarchy(selectedLocal.id)
+                Log.d("NovoClienteDialog", "Hierarquia obtida: ${hierarchy.joinToString(" -> ") { "${it.nome}(${it.id})" }}")
+
+                if (hierarchy.isNotEmpty()) {
+                    importedHierarchy = hierarchy
+                    updateAdaptersWithHierarchy(hierarchy)
+                }
+            } catch (e: Exception) {
+                Log.e("NovoClienteDialog", "Erro ao importar hierarquia", e)
+                Toast.makeText(context, "Erro ao importar local: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
-    }
-
-    private fun updateLocalSpinnerWithHierarchy(hierarchy: List<Local>) {
-        binding.spinnerLocal.setText("")
-        binding.spinnerSublocal1.setText("")
-        binding.spinnerSublocal2.setText("")
-        binding.spinnerSublocal3.setText("")
-
-        hierarchy.forEach { local ->
-            when (local.level) {
-                0 -> binding.spinnerLocal.setText(local.nome)
-                1 -> binding.spinnerSublocal1.setText(local.nome)
-                2 -> binding.spinnerSublocal2.setText(local.nome)
-                3 -> binding.spinnerSublocal3.setText(local.nome)
-            }
-        }
-
-        binding.tilSublocal1.visibility = if (hierarchy.any { it.level == 1 }) View.VISIBLE else View.GONE
-        binding.tilSublocal2.visibility = if (hierarchy.any { it.level == 2 }) View.VISIBLE else View.GONE
-        binding.tilSublocal3.visibility = if (hierarchy.any { it.level == 3 }) View.VISIBLE else View.VISIBLE
     }
 
     private fun validateInputs(): Boolean {
@@ -267,7 +360,6 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
         _binding = null
     }
 
-    // Extensão para ArrayAdapter
     private fun <T> ArrayAdapter<T>.getAllItems(): List<T> {
         return (0 until count).map { getItem(it) }.filterNotNull()
     }
