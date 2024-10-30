@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 class ClienteRepository(private val clienteDao: ClienteDao) {
-
     fun getAllClientes(): Flow<List<Cliente>> = clienteDao.getAllClientes()
 
     suspend fun getClienteById(id: Long): Cliente? = withContext(Dispatchers.IO) {
@@ -26,11 +25,16 @@ class ClienteRepository(private val clienteDao: ClienteDao) {
         clienteDao.deleteCliente(cliente)
     }
 
+    // Novo método para buscar clientes hierarquicamente
+    fun getClientesByLocalHierarchy(localId: Long): Flow<List<Cliente>> =
+        clienteDao.getClientesByLocalHierarchy(localId)
+
+    // Método original mantido para compatibilidade
     suspend fun getClientesByLocal(localId: Long): List<Cliente> = withContext(Dispatchers.IO) {
         clienteDao.getClientesByLocal(localId)
     }
 
     suspend fun buscarClientes(query: String): List<Cliente> = withContext(Dispatchers.IO) {
-        clienteDao.buscarClientes("%$query%")
+        clienteDao.buscarClientes(query)
     }
 }

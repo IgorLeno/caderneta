@@ -121,12 +121,22 @@ class VendasViewModel(
         viewModelScope.launch {
             try {
                 _localSelecionado.value = localRepository.getLocalById(localId)
-                _clientes.value = clienteRepository.getClientesByLocal(localId)
+
+                clienteRepository.getClientesByLocalHierarchy(localId).collect { clientesFiltrados ->
+                    _clientes.value = clientesFiltrados
+                    // Mantemos apenas um log sintético aqui
+                    Log.d("VendasViewModel", "Clientes filtrados para local $localId: ${clientesFiltrados.size}")
+
+                    // Chamamos logHieraquiaClientes apenas uma vez após a filtragem
+                    logHieraquiaClientes(localId, clientesFiltrados)
+                }
             } catch (e: Exception) {
+                Log.e("VendasViewModel", "Erro ao selecionar local", e)
                 _error.value = "Erro ao selecionar local: ${e.message}"
             }
         }
     }
+
 
     fun getClienteState(clienteId: Long): ClienteState? {
         return _clienteStates.value[clienteId]
@@ -583,18 +593,93 @@ class VendasViewModel(
     fun addCliente(nome: String, telefone: String, localId: Long, sublocal1Id: Long?, sublocal2Id: Long?, sublocal3Id: Long?) {
         viewModelScope.launch {
             try {
+                // Log inicial com os dados de cadastro (mantemos este por ser relevante)
+                Log.d("VendasViewModel", """
+                === Iniciando cadastro de novo cliente ===
+                Nome: $nome
+                Local ID: $localId
+                Sublocal 1 ID: $sublocal1Id
+                Sublocal 2 ID: $sublocal2Id
+                Sublocal 3 ID: $sublocal3Id
+            """.trimIndent())
+
+                // Verifica o local e sublocais
+                val local = localRepository.getLocalById(localId)
+                val sublocal1 = sublocal1Id?.let { localRepository.getLocalById(it) }
+                val sublocal2 = sublocal2Id?.let { localRepository.getLocalById(it) }
+                val sublocal3 = sublocal3Id?.let { localRepository.getLocalById(it) }
+
+                // Determina o local efetivo do cadastro
+                val localEfetivo = sublocal3 ?: sublocal2 ?: sublocal1 ?: local
+
                 val novoCliente = Cliente(
                     nome = nome,
                     telefone = telefone,
-                    localId = localId,
-                    sublocal1Id = sublocal1Id,
-                    sublocal2Id = sublocal2Id,
-                    sublocal3Id = sublocal3Id
+                    localId = localEfetivo?.id ?: localId,
+                    sublocal1Id = if (localEfetivo == sublocal1) null else sublocal1Id,
+                    sublocal2Id = if (localEfetivo == sublocal2) null else sublocal2Id,
+                    sublocal3Id = if (localEfetivo == sublocal3) null else sublocal3Id
                 )
-                clienteRepository.insertCliente(novoCliente)
-                _clientes.value = clienteRepository.getAllClientes().first()
+
+                // Log dos dados finais do cliente (mantemos este por ser crítico)
+                Log.d("VendasViewModel", """
+                === Dados finais do cliente para cadastro ===
+                Local efetivo: ${localEfetivo?.nome} (ID: ${localEfetivo?.id})
+                Cliente: ${novoCliente.nome}
+                - Local ID: ${novoCliente.localId}
+                - Sublocal 1 ID: ${novoCliente.sublocal1Id}
+                - Sublocal 2 ID: ${novoCliente.sublocal2Id}
+                - Sublocal 3 ID: ${novoCliente.sublocal3Id}
+            """.trimIndent())
+
+                val clienteId = clienteRepository.insertCliente(novoCliente)
+                Log.d("VendasViewModel", "Cliente cadastrado com sucesso! ID: $clienteId")
+
+                // Atualiza a lista de clientes
+                val clientesAtualizados = clienteRepository.getAllClientes().first()
+                _clientes.value = clientesAtualizados
+
+                // Não chamamos logHieraquiaClientes aqui pois selecionarLocal já o fará
+
             } catch (e: Exception) {
+                Log.e("VendasViewModel", "Erro ao adicionar cliente", e)
                 _error.value = "Erro ao adicionar cliente: ${e.message}"
+            }
+        }
+    }
+
+
+    private fun logHieraquiaClientes(localId: Long, clientes: List<Cliente>) {
+        viewModelScope.launch {
+            val local = localRepository.getLocalById(localId)
+            Log.d("VendasViewModel", "=== Análise de Hierarquia de Clientes ===")
+            Log.d("VendasViewModel", "Local selecionado: ${local?.nome} (ID: $localId)")
+            Log.d("VendasViewModel", "Total de clientes nesta hierarquia: ${clientes.size}")
+
+            // Agrupa clientes por nível na hierarquia
+            val clientesPorNivel = clientes.groupBy { cliente ->
+                when {
+                    cliente.localId == localId -> "Principal"
+                    cliente.sublocal1Id == localId -> "Sublocal 1"
+                    cliente.sublocal2Id == localId -> "Sublocal 2"
+                    cliente.sublocal3Id == localId -> "Sublocal 3"
+                    else -> "Outro"
+                }
+            }
+
+            clientesPorNivel.forEach { (nivel, clientesDoNivel) ->
+                Log.d("VendasViewModel", "\n=== Clientes no nível: $nivel (${clientesDoNivel.size}) ===")
+                clientesDoNivel.forEach { cliente ->
+                    Log.d("VendasViewModel", """
+                    Cliente: ${cliente.nome}
+                    ID: ${cliente.id}
+                    - Local principal: ${cliente.localId}
+                    - Sublocal 1: ${cliente.sublocal1Id}
+                    - Sublocal 2: ${cliente.sublocal2Id}
+                    - Sublocal 3: ${cliente.sublocal3Id}
+                    ---------------------
+                """.trimIndent())
+                }
             }
         }
     }
