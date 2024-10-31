@@ -6,44 +6,50 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.ItemResultadoConsultaBinding
-import com.example.caderneta.databinding.ItemExtratoBinding
-import androidx.recyclerview.widget.LinearLayoutManager
-import java.text.SimpleDateFormat
-import java.util.*
-import android.graphics.Color
-import androidx.core.content.ContextCompat
-import com.example.caderneta.R
 import java.text.NumberFormat
+import java.util.Locale
+import android.animation.ValueAnimator
+import android.annotation.SuppressLint
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.util.Log
+import kotlinx.coroutines.launch
 
 class ResultadosConsultaAdapter(
     private val onLocalClick: (Long) -> Unit,
     private val onClienteClick: (Long) -> Unit,
-    private val onLimparExtratoClick: (Long) -> Unit
+    private val onLimparExtratoClick: (Long) -> Unit,
+    private val localRepository: com.example.caderneta.repository.LocalRepository
 ) : ListAdapter<ResultadoConsulta, RecyclerView.ViewHolder>(ResultadoConsultaDiffCallback()) {
 
     private var vendasPorCliente: Map<Long, List<Venda>> = emptyMap()
+    private val expandedClientes = mutableSetOf<Long>()
+    private val numberFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         return when (viewType) {
             VIEW_TYPE_LOCAL -> LocalViewHolder(
-                ItemResultadoConsultaBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                ItemResultadoConsultaBinding.inflate(
+                    LayoutInflater.from(parent.context), parent, false
+                )
             )
             VIEW_TYPE_CLIENTE -> ClienteViewHolder(
-                ItemResultadoConsultaBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                ItemResultadoConsultaBinding.inflate(
+                    LayoutInflater.from(parent.context), parent, false
+                )
             )
             else -> throw IllegalArgumentException("Invalid view type")
         }
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        val item = getItem(position)
         when (holder) {
-            is LocalViewHolder -> holder.bind(item as ResultadoConsulta.Local)
-            is ClienteViewHolder -> holder.bind(item as ResultadoConsulta.Cliente)
+            is LocalViewHolder -> holder.bind(getItem(position) as ResultadoConsulta.Local)
+            is ClienteViewHolder -> holder.bind(getItem(position) as ResultadoConsulta.Cliente)
         }
     }
 
@@ -59,134 +65,190 @@ class ResultadosConsultaAdapter(
         notifyDataSetChanged()
     }
 
+    inner class ClienteViewHolder(private val binding: ItemResultadoConsultaBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+
+        private var extratoAdapter: ExtratoAdapter? = null
+
+        fun bind(resultado: ResultadoConsulta.Cliente) {
+            val cliente = resultado.cliente
+
+            binding.apply {
+                // Informações básicas do cliente
+                tvNomeCliente.text = cliente.nome
+                tvTelefone.text = cliente.telefone ?: "-"
+
+                // Valor devido
+                tvValorDevido.text = numberFormat.format(resultado.saldo)
+                tvValorDevido.setTextColor(
+                    if (resultado.saldo > 0) android.graphics.Color.RED
+                    else android.graphics.Color.GREEN
+                )
+
+                // Hierarquia de local
+                construirHierarquiaLocal(cliente) { hierarquia ->
+                    tvLocalHierarquia.text = hierarquia
+                }
+
+                // Setup do RecyclerView do extrato
+                if (extratoAdapter == null) {
+                    extratoAdapter = ExtratoAdapter()
+                    rvExtrato.apply {
+                        layoutManager = LinearLayoutManager(context)
+                        adapter = extratoAdapter
+                    }
+                }
+
+                // Configurar o clique no card
+                root.setOnClickListener {
+                    val clienteId = cliente.id
+                    if (expandedClientes.contains(clienteId)) {
+                        // Recolher
+                        collapseExtrato()
+                        expandedClientes.remove(clienteId)
+                    } else {
+                        // Expandir
+                        onClienteClick(clienteId)
+                        expandedClientes.add(clienteId)
+                        vendasPorCliente[clienteId]?.let { vendas ->
+                            extratoAdapter?.submitList(vendas)
+                            expandExtrato()
+                        }
+                    }
+                }
+
+                // Atualizar visibilidade inicial do extrato
+                layoutExtrato.visibility = if (expandedClientes.contains(cliente.id)) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+
+                // Atualizar dados do extrato se expandido
+                if (expandedClientes.contains(cliente.id)) {
+                    vendasPorCliente[cliente.id]?.let { vendas ->
+                        extratoAdapter?.submitList(vendas)
+                    }
+                }
+            }
+        }
+
+        @SuppressLint("LongLogTag")
+        private fun construirHierarquiaLocal(cliente: Cliente, onComplete: (String) -> Unit) {
+            val locais = mutableListOf<String>()
+
+            // Buscar todos os locais necessários de forma assíncrona
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                try {
+                    // Local principal
+                    localRepository.getLocalById(cliente.localId)?.let {
+                        locais.add(it.nome)
+                    }
+
+                    // Sublocal nível 1
+                    cliente.sublocal1Id?.let { id ->
+                        localRepository.getLocalById(id)?.let {
+                            locais.add(it.nome)
+                        }
+                    }
+
+                    // Sublocal nível 2
+                    cliente.sublocal2Id?.let { id ->
+                        localRepository.getLocalById(id)?.let {
+                            locais.add(it.nome)
+                        }
+                    }
+
+                    // Sublocal nível 3
+                    cliente.sublocal3Id?.let { id ->
+                        localRepository.getLocalById(id)?.let {
+                            locais.add(it.nome)
+                        }
+                    }
+
+                    // Montar hierarquia com separador
+                    val hierarquia = locais.joinToString(" > ")
+                    onComplete(hierarquia)
+
+                } catch (e: Exception) {
+                    Log.e("ResultadosConsultaAdapter", "Erro ao buscar hierarquia: ${e.message}")
+                    onComplete(cliente.localId.toString())
+                }
+            }
+        }
+
+        private fun expandExtrato() {
+            binding.layoutExtrato.apply {
+                visibility = View.VISIBLE
+                alpha = 0f
+                ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = 300
+                    interpolator = AccelerateDecelerateInterpolator()
+                    addUpdateListener { animator ->
+                        alpha = animator.animatedValue as Float
+                    }
+                    start()
+                }
+            }
+        }
+
+        private fun collapseExtrato() {
+            binding.layoutExtrato.apply {
+                ValueAnimator.ofFloat(1f, 0f).apply {
+                    duration = 300
+                    interpolator = AccelerateDecelerateInterpolator()
+                    addUpdateListener { animator ->
+                        alpha = animator.animatedValue as Float
+                        if (animator.animatedValue as Float == 0f) {
+                            visibility = View.GONE
+                        }
+                    }
+                    start()
+                }
+            }
+        }
+    }
+
     inner class LocalViewHolder(private val binding: ItemResultadoConsultaBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(local: ResultadoConsulta.Local) {
-            binding.tvNomeCliente.text = local.local.nome
-            binding.tvNomePredio.visibility = View.GONE
-            binding.tvValorDevido.visibility = View.GONE
-            binding.layoutExtrato.visibility = View.GONE
+            binding.apply {
+                tvNomeCliente.text = local.local.nome
+                tvTelefone.visibility = View.GONE
+                tvLocalHierarquia.visibility = View.GONE
+                tvValorDevido.visibility = View.GONE
+                layoutExtrato.visibility = View.GONE
+            }
 
             itemView.setOnClickListener { onLocalClick(local.local.id) }
         }
     }
 
-    inner class ClienteViewHolder(private val binding: ItemResultadoConsultaBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-
-        fun bind(cliente: ResultadoConsulta.Cliente) {
-            binding.tvNomeCliente.text = cliente.cliente.nome
-            binding.tvNomePredio.text = "Prédio: ${cliente.cliente.localId}" // Você pode buscar o nome do prédio aqui
-            binding.tvValorDevido.text = "Valor devido: R$ ${String.format("%.2f", cliente.saldo)}"
-            binding.tvValorDevido.setTextColor(
-                if (cliente.saldo > 0) Color.RED else Color.GREEN
-            )
-
-            val vendas = vendasPorCliente[cliente.cliente.id] ?: emptyList()
-            setupExtrato(cliente.cliente.id, vendas)
-
-            itemView.setOnClickListener { onClienteClick(cliente.cliente.id) }
+    private class ResultadoConsultaDiffCallback : DiffUtil.ItemCallback<ResultadoConsulta>() {
+        override fun areItemsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
+            return when {
+                oldItem is ResultadoConsulta.Local && newItem is ResultadoConsulta.Local ->
+                    oldItem.local.id == newItem.local.id
+                oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente ->
+                    oldItem.cliente.id == newItem.cliente.id
+                else -> false
+            }
         }
 
-        private fun setupExtrato(clienteId: Long, vendas: List<Venda>) {
-            val extratoAdapter = ExtratoAdapter()
-            binding.rvExtrato.apply {
-                layoutManager = LinearLayoutManager(context)
-                adapter = extratoAdapter
+        override fun areContentsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
+            return when {
+                oldItem is ResultadoConsulta.Local && newItem is ResultadoConsulta.Local ->
+                    oldItem == newItem
+                oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente ->
+                    oldItem.cliente == newItem.cliente && oldItem.saldo == newItem.saldo
+                else -> false
             }
-            extratoAdapter.submitList(vendas)
-
-            binding.btnLimparExtrato.setOnClickListener { onLimparExtratoClick(clienteId) }
-
-            binding.layoutExtrato.visibility = if (vendas.isNotEmpty()) View.VISIBLE else View.GONE
         }
     }
 
     companion object {
         private const val VIEW_TYPE_LOCAL = 0
         private const val VIEW_TYPE_CLIENTE = 1
-    }
-}
-
-class ResultadoConsultaDiffCallback : DiffUtil.ItemCallback<ResultadoConsulta>() {
-    override fun areItemsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
-        return when {
-            oldItem is ResultadoConsulta.Local && newItem is ResultadoConsulta.Local ->
-                oldItem.local.id == newItem.local.id
-            oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente ->
-                oldItem.cliente.id == newItem.cliente.id
-            else -> false
-        }
-    }
-
-    override fun areContentsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
-        return oldItem == newItem
-    }
-}
-
-sealed class ResultadoConsulta {
-    data class Local(val local: com.example.caderneta.data.entity.Local) : ResultadoConsulta()
-    data class Cliente(val cliente: com.example.caderneta.data.entity.Cliente, val saldo: Double) : ResultadoConsulta()
-}
-
-class ExtratoAdapter : ListAdapter<Venda, ExtratoAdapter.ExtratoViewHolder>(ExtratoDiffCallback()) {
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ExtratoViewHolder {
-        val binding = ItemExtratoBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return ExtratoViewHolder(binding)
-    }
-
-    override fun onBindViewHolder(holder: ExtratoViewHolder, position: Int) {
-        holder.bind(getItem(position))
-    }
-
-    class ExtratoViewHolder(private val binding: ItemExtratoBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-
-        private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-        private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
-
-        fun bind(venda: Venda) {
-            binding.apply {
-                tvData.text = dateFormat.format(venda.data)
-                tvQuantidade.text = formatarQuantidades(venda)
-                tvValor.text = currencyFormat.format(venda.valor)
-
-                // Define a cor baseada no tipo de transação, sem adicionar sinais
-                val corTransacao = when (venda.transacao) {
-                    "pagamento" -> ContextCompat.getColor(itemView.context, R.color.green)
-                    "a_vista" -> ContextCompat.getColor(itemView.context, R.color.blue)
-                    "a_prazo" -> ContextCompat.getColor(itemView.context, R.color.red)
-                    else -> ContextCompat.getColor(itemView.context, R.color.on_surface)
-                }
-                tvValor.setTextColor(corTransacao)
-            }
-        }
-
-        private fun formatarQuantidades(venda: Venda): String {
-            if (venda.transacao == "pagamento") {
-                return "Pagamento"
-            }
-
-            val parts = mutableListOf<String>()
-            if (venda.quantidadeSalgados > 0) {
-                parts.add("${venda.quantidadeSalgados} salgado${if (venda.quantidadeSalgados > 1) "s" else ""}")
-            }
-            if (venda.quantidadeSucos > 0) {
-                parts.add("${venda.quantidadeSucos} suco${if (venda.quantidadeSucos > 1) "s" else ""}")
-            }
-            return parts.joinToString(", ")
-        }
-    }
-
-    class ExtratoDiffCallback : DiffUtil.ItemCallback<Venda>() {
-        override fun areItemsTheSame(oldItem: Venda, newItem: Venda): Boolean {
-            return oldItem.id == newItem.id
-        }
-
-        override fun areContentsTheSame(oldItem: Venda, newItem: Venda): Boolean {
-            return oldItem == newItem
-        }
     }
 }

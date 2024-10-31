@@ -1,5 +1,6 @@
 package com.example.caderneta.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -10,11 +11,7 @@ import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class ConsultasViewModel(
@@ -27,8 +24,13 @@ class ConsultasViewModel(
     private val _locais = MutableStateFlow<List<Local>>(emptyList())
     val locais: StateFlow<List<Local>> = _locais
 
-    private val _clientes = MutableStateFlow<List<Cliente>>(emptyList())
-    val clientes: StateFlow<List<Cliente>> = _clientes
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
+
+    private val _localSelecionado = MutableStateFlow<Local?>(null)
+    val localSelecionado: StateFlow<Local?> = _localSelecionado
 
     private val _vendasPorCliente = MutableStateFlow<Map<Long, List<Venda>>>(emptyMap())
     val vendasPorCliente: StateFlow<Map<Long, List<Venda>>> = _vendasPorCliente
@@ -36,55 +38,124 @@ class ConsultasViewModel(
     private val _clientesComSaldo = MutableStateFlow<List<Pair<Cliente, Double>>>(emptyList())
     val clientesComSaldo: StateFlow<List<Pair<Cliente, Double>>> = _clientesComSaldo
 
-    private val _modoBusca = MutableStateFlow(ModoBusca.POR_PREDIO)
-    val modoBusca: StateFlow<ModoBusca> = _modoBusca
+    private val _searchQuery = MutableStateFlow("")
 
-    private val _saldoAtualizado = MutableSharedFlow<Long>()
-    val saldoAtualizado = _saldoAtualizado.asSharedFlow()
-
-    fun setModoBusca(modo: ModoBusca) {
-        _modoBusca.value = modo
+    init {
+        carregarLocais()
     }
 
-    fun buscar(query: String) {
+    private fun carregarLocais() {
         viewModelScope.launch {
-            when (_modoBusca.value) {
-                ModoBusca.POR_PREDIO -> {
-                    _locais.value = localRepository.buscarLocais(query)
-                    _clientesComSaldo.value = emptyList()
+            try {
+                localRepository.getAllLocais().collect { locaisList ->
+                    _locais.value = locaisList
+                    Log.d("ConsultasViewModel", "Locais carregados: ${locaisList.size}")
                 }
-                ModoBusca.POR_NOME -> {
-                    buscarClientesComSaldo(query)
-                    _locais.value = emptyList()
-                }
+            } catch (e: Exception) {
+                Log.e("ConsultasViewModel", "Erro ao carregar locais", e)
             }
         }
     }
 
-    private fun buscarClientesComSaldo(query: String) {
+    private fun handleError(e: Exception) {
+        _error.value = e.message
+        Log.e("ConsultasViewModel", "Erro:", e)
+    }
+
+
+    fun selecionarLocal(localId: Long) {
         viewModelScope.launch {
-            val clientes = clienteRepository.buscarClientes(query)
-            val clientesComSaldo = clientes.map { cliente ->
-                val saldo = getSaldoCliente(cliente.id)
-                Pair(cliente, saldo)
+            try {
+                val local = localRepository.getLocalById(localId)
+                _localSelecionado.value = local
+                Log.d("ConsultasViewModel", "Local selecionado: ${local?.nome}")
+
+                // Busca clientes considerando a hierarquia completa
+                clienteRepository.getClientesByLocalHierarchy(localId).collect { clientes ->
+                    atualizarClientesComSaldo(clientes, _searchQuery.value)
+                }
+            } catch (e: Exception) {
+                Log.e("ConsultasViewModel", "Erro ao selecionar local", e)
             }
-            _clientesComSaldo.value = clientesComSaldo
         }
+    }
+
+    fun buscarClientes(query: String) {
+        viewModelScope.launch {
+            _searchQuery.value = query
+            try {
+                when (val localAtual = _localSelecionado.value) {
+                    null -> {
+                        // Busca global em todos os clientes
+                        val clientes = if (query.isEmpty()) {
+                            clienteRepository.getAllClientes().first()
+                        } else {
+                            clienteRepository.buscarClientes(query)
+                        }
+                        atualizarClientesComSaldo(clientes, query)
+                    }
+                    else -> {
+                        // Busca dentro do local selecionado
+                        clienteRepository.getClientesByLocalHierarchy(localAtual.id).collect { clientes ->
+                            val clientesFiltrados = if (query.isEmpty()) {
+                                clientes
+                            } else {
+                                clientes.filter {
+                                    it.nome.contains(query, ignoreCase = true)
+                                }
+                            }
+                            atualizarClientesComSaldo(clientesFiltrados, query)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ConsultasViewModel", "Erro ao buscar clientes", e)
+            }
+        }
+    }
+
+    fun buscarLocais(query: String) {
+        viewModelScope.launch {
+            try {
+                _locais.value = if (query.isEmpty()) {
+                    localRepository.getAllLocais().first()
+                } else {
+                    localRepository.buscarLocais(query)
+                }
+            } catch (e: Exception) {
+                Log.e("ConsultasViewModel", "Erro ao buscar locais", e)
+            }
+        }
+    }
+
+    private suspend fun atualizarClientesComSaldo(clientes: List<Cliente>, query: String) {
+        val clientesFiltrados = if (query.isNotEmpty()) {
+            clientes.filter { it.nome.contains(query, ignoreCase = true) }
+        } else {
+            clientes
+        }
+
+        val clientesComSaldoAtualizado = clientesFiltrados.map { cliente ->
+            val saldo = getSaldoCliente(cliente.id)
+            Pair(cliente, saldo)
+        }
+        _clientesComSaldo.value = clientesComSaldoAtualizado
     }
 
     suspend fun getSaldoCliente(clienteId: Long): Double {
         return contaRepository.getContaByCliente(clienteId)?.saldo ?: 0.0
     }
 
-    fun carregarClientesPorLocal(localId: Long) {
+    fun toggleLocalExpansion(local: Local) {
         viewModelScope.launch {
-            _clientes.value = clienteRepository.getClientesByLocal(localId)
-        }
-    }
-
-    fun atualizarSaldoCliente(clienteId: Long) {
-        viewModelScope.launch {
-            _saldoAtualizado.emit(clienteId)
+            try {
+                val updatedLocal = local.copy(isExpanded = !local.isExpanded)
+                localRepository.updateLocal(updatedLocal)
+                // Recarrega a lista de locais para refletir a mudança
+                _locais.value = localRepository.getAllLocais().first()
+            } catch (e: Exception) {
+                Log.e("ConsultasViewModel", "Erro ao alternar expansão do local", e)
+            }
         }
     }
 
@@ -102,10 +173,6 @@ class ConsultasViewModel(
         _vendasPorCliente.value = _vendasPorCliente.value.toMutableMap().apply {
             remove(clienteId)
         }
-    }
-
-    enum class ModoBusca {
-        POR_PREDIO, POR_NOME
     }
 }
 

@@ -5,6 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:minHeight="50dp"
     android:padding="8dp">
 
     <ImageButton
@@ -23,7 +24,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="4dp"
-        android:textSize="15sp"
+        android:textSize="16sp"
         android:textColor="@color/on_surface"
         app:layout_constraintStart_toEndOf="@id/btn_expandir"
         app:layout_constraintTop_toTopOf="parent"

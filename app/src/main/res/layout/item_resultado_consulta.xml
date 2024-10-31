@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -14,29 +15,56 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView
-            android:id="@+id/tv_nome_cliente"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            tools:text="Nome do Cliente" />
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/tv_nome_predio"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            tools:text="Nome do Prédio" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tv_valor_devido"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="@android:color/holo_red_dark"
-            android:textStyle="bold"
-            tools:text="Valor devido: R$ 50,00" />
+                <TextView
+                    android:id="@+id/tv_nome_cliente"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    tools:text="Nome do Cliente" />
+
+                <TextView
+                    android:id="@+id/tv_telefone"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="14sp"
+                    android:textColor="?android:textColorSecondary"
+                    tools:text="(99) 99999-9999" />
+
+                <TextView
+                    android:id="@+id/tv_local_hierarquia"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="14sp"
+                    android:textColor="?android:textColorSecondary"
+                    tools:text="Prédio A > Andar 1 > Sala 101" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_valor_devido"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginStart="16dp"
+                tools:text="R$ 50,00"
+                tools:textColor="@color/red" />
+
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/layout_extrato"
@@ -58,17 +86,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:nestedScrollingEnabled="false"
-                tools:itemCount="3"
-                tools:listitem="@layout/item_extrato" />
-
-            <Button
-                android:id="@+id/btn_limpar_extrato"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_marginTop="8dp"
-                android:text="Limpar Extrato" />
+                android:nestedScrollingEnabled="false" />
 
         </LinearLayout>
 
