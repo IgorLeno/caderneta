@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.NavigationUI
@@ -16,6 +17,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var appBarConfiguration: AppBarConfiguration
+    private lateinit var navController: NavController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,9 +27,11 @@ class MainActivity : AppCompatActivity() {
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
 
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        val navController = navHostFragment.navController
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+        navController = navHostFragment.navController
 
+        // Configurar destinos de nível superior
         appBarConfiguration = AppBarConfiguration(
             setOf(
                 R.id.vendasFragment,
@@ -37,22 +41,39 @@ class MainActivity : AppCompatActivity() {
                 R.id.configuracoesFragment
             )
         )
+
+        // Setup da ActionBar e BottomNavigation
         setupActionBarWithNavController(navController, appBarConfiguration)
         binding.bottomNavigation.setupWithNavController(navController)
 
-        // Adicione este listener para depuração
+        // Monitorar mudanças de destino
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            Log.d("Navigation", "Navigated to destination: ${destination.label}")
+        }
+
+        // Listener para navegação do BottomNav
         binding.bottomNavigation.setOnItemSelectedListener { item ->
             val handled = NavigationUI.onNavDestinationSelected(item, navController)
             if (!handled) {
-                Log.d("Navigation", "Failed to navigate to ${item.itemId}")
+                Log.e("Navigation", "Failed to navigate to ${item.itemId}")
             }
             handled
         }
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        val navController = navHostFragment.navController
-        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+        return when (navController.currentDestination?.id) {
+            R.id.consultasFragment -> {
+                // Se estiver nas consultas, tenta navegar para vendas
+                try {
+                    navController.navigate(R.id.vendasFragment)
+                    true
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Erro ao navegar para vendas", e)
+                    navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+                }
+            }
+            else -> navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+        }
     }
 }

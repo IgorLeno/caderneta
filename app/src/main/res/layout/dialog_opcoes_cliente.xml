@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_consultar"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Consultar"
+        android:textAlignment="textStart"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        app:icon="@drawable/ic_search"
+        app:iconGravity="start" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_editar"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Editar"
+        android:textAlignment="textStart"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        app:icon="@drawable/ic_edit"
+        app:iconGravity="start" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_excluir"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Excluir"
+        android:textAlignment="textStart"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:textColor="@color/delete_color"
+        app:icon="@drawable/ic_delete"
+        app:iconGravity="start"
+        app:iconTint="@color/delete_color" />
+
+</LinearLayout>

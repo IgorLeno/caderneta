@@ -145,6 +145,72 @@ class VendasViewModel(
         return _clienteStates.value[clienteId]
     }
 
+    fun editarCliente(
+        cliente: Cliente,
+        novoNome: String,
+        novoTelefone: String,
+        novoLocalId: Long,
+        novoSublocal1Id: Long?,
+        novoSublocal2Id: Long?,
+        novoSublocal3Id: Long?
+    ) {
+        viewModelScope.launch {
+            try {
+                val clienteAtualizado = cliente.copy(
+                    nome = novoNome,
+                    telefone = novoTelefone,
+                    localId = novoLocalId,
+                    sublocal1Id = novoSublocal1Id,
+                    sublocal2Id = novoSublocal2Id,
+                    sublocal3Id = novoSublocal3Id
+                )
+
+                // Validar hierarquia de locais
+                val locais = listOfNotNull(
+                    localRepository.getLocalById(novoLocalId),
+                    novoSublocal1Id?.let { localRepository.getLocalById(it) },
+                    novoSublocal2Id?.let { localRepository.getLocalById(it) },
+                    novoSublocal3Id?.let { localRepository.getLocalById(it) }
+                )
+
+                // Validar níveis da hierarquia
+                if (locais.zipWithNext().any { (parent, child) ->
+                        child.level <= parent.level
+                    }) {
+                    throw IllegalStateException("Hierarquia de locais inválida")
+                }
+
+                clienteRepository.updateCliente(clienteAtualizado)
+
+                // Recarregar clientes do local atual
+                _localSelecionado.value?.let { local ->
+                    clienteRepository.getClientesByLocalHierarchy(local.id).collect { clientes ->
+                        _clientes.value = clientes
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = "Erro ao atualizar cliente: ${e.message}"
+            }
+        }
+    }
+
+    fun excluirCliente(cliente: Cliente) {
+        viewModelScope.launch {
+            try {
+                clienteRepository.deleteCliente(cliente)
+
+                // Recarregar lista de clientes
+                _localSelecionado.value?.let { local ->
+                    clienteRepository.getClientesByLocalHierarchy(local.id).collect { clientes ->
+                        _clientes.value = clientes
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = "Erro ao excluir cliente: ${e.message}"
+            }
+        }
+    }
+
     fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao?) {
         val currentState = _clienteStates.value[cliente.id]
         val newState = if (currentState == null || currentState.modoOperacao != modoOperacao) {
@@ -391,7 +457,7 @@ class VendasViewModel(
         return detalhes.joinToString(", ")
     }
 
-    fun confirmarPagamento(clienteId: Long) {
+    private fun confirmarPagamento(clienteId: Long) {
         viewModelScope.launch {
             try {
                 val clienteState = _clienteStates.value[clienteId]

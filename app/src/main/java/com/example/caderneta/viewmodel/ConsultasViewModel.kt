@@ -67,18 +67,26 @@ class ConsultasViewModel(
         viewModelScope.launch {
             try {
                 val local = localRepository.getLocalById(localId)
-                _localSelecionado.value = local
-                Log.d("ConsultasViewModel", "Local selecionado: ${local?.nome}")
+                if (local != null) {
+                    // Emitir o local selecionado
+                    _localSelecionado.value = local
 
-                // Busca clientes considerando a hierarquia completa
-                clienteRepository.getClientesByLocalHierarchy(localId).collect { clientes ->
-                    atualizarClientesComSaldo(clientes, _searchQuery.value)
+                    // Buscar clientes considerando a hierarquia
+                    clienteRepository.getClientesByLocalHierarchy(localId)
+                        .collect { clientes ->
+                            // Atualizar a lista de clientes
+                            _clientesComSaldo.value = clientes.map { cliente ->
+                                val saldo = contaRepository.getContaByCliente(cliente.id)?.saldo ?: 0.0
+                                cliente to saldo
+                            }
+                        }
                 }
             } catch (e: Exception) {
-                Log.e("ConsultasViewModel", "Erro ao selecionar local", e)
+                _error.value = "Erro ao selecionar local: ${e.message}"
             }
         }
     }
+
 
     fun buscarClientes(query: String) {
         viewModelScope.launch {
@@ -156,6 +164,12 @@ class ConsultasViewModel(
             } catch (e: Exception) {
                 Log.e("ConsultasViewModel", "Erro ao alternar expansão do local", e)
             }
+        }
+    }
+
+    fun clearSearch() {
+        viewModelScope.launch {
+            _searchQuery.value = ""
         }
     }
 

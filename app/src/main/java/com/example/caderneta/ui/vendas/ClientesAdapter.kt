@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 class ClientesAdapter(
     private val contaRepository: ContaRepository,
     private val lifecycleScope: LifecycleCoroutineScope,
+    private val fragmentManager: androidx.fragment.app.FragmentManager,  // Novo parâmetro
     private val getClienteState: (Long) -> VendasViewModel.ClienteState?,
     private val getConfiguracoes: () -> Configuracoes?,
     private val onModoOperacaoSelected: (Cliente, ModoOperacao?) -> Unit,
@@ -38,7 +39,10 @@ class ClientesAdapter(
     private val onConfirmarOperacao: (Long) -> Unit,
     private val onCancelarOperacao: (Long) -> Unit,
     private val onUpdateValorTotal: (Long, Double) -> Unit,
-    private val observeSaldoAtualizado: ((suspend (Long) -> Unit) -> Unit)
+    private val observeSaldoAtualizado: ((suspend (Long) -> Unit) -> Unit),
+    private val onEditarCliente: (Cliente) -> Unit,
+    private val onExcluirCliente: (Cliente) -> Unit
+
 ) : ListAdapter<Cliente, ClientesAdapter.ClienteViewHolder>(ClienteDiffCallback()) {
 
     enum class TipoQuantidade {
@@ -99,6 +103,8 @@ class ClientesAdapter(
             setupConfirmationButtons(cliente)
             updateButtonStates(cliente)
             setupButtonStateListeners()
+            setupMenuOpcoes(cliente)
+
         }
 
         fun cleanupContadores() {
@@ -387,6 +393,17 @@ class ClientesAdapter(
                 listOf(btnVenda, btnPromocao, btnPagamento, btnAVista, btnAPrazo).forEach { button ->
                     button.stateListAnimator = createStateListAnimator()
                 }
+            }
+        }
+
+        private fun setupMenuOpcoes(cliente: Cliente) {
+            binding.root.setOnLongClickListener {
+                OpcoesClienteDialog(
+                    cliente = cliente,
+                    onEditarClick = { onEditarCliente(it) },
+                    onExcluirClick = { onExcluirCliente(it) }
+                ).show(fragmentManager, OpcoesClienteDialog.TAG)
+                true
             }
         }
 

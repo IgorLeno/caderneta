@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.R
+import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.FragmentVendasBinding
 import com.example.caderneta.util.showErrorToast
@@ -75,15 +76,16 @@ class VendasFragment : Fragment() {
         clientesAdapter = ClientesAdapter(
             contaRepository = (requireActivity().application as CadernetaApplication).contaRepository,
             lifecycleScope = viewLifecycleOwner.lifecycleScope,
+            fragmentManager = childFragmentManager,  // Passando o FragmentManager
             getClienteState = { clienteId -> viewModel.getClienteState(clienteId) },
-            getConfiguracoes = { viewModel.configuracoes.value }, // Novo callback
+            getConfiguracoes = { viewModel.configuracoes.value },
             onModoOperacaoSelected = { cliente, modoOperacao ->
                 viewModel.selecionarModoOperacao(cliente, modoOperacao)
             },
             onTipoTransacaoSelected = { cliente, tipoTransacao ->
                 viewModel.selecionarTipoTransacao(cliente, tipoTransacao)
             },
-            onQuantidadeChanged = { clienteId, tipo, quantidade -> // Novo callback unificado
+            onQuantidadeChanged = { clienteId, tipo, quantidade ->
                 when (tipo) {
                     ClientesAdapter.TipoQuantidade.SALGADO ->
                         viewModel.updateQuantidadeSalgados(clienteId, quantidade)
@@ -110,11 +112,17 @@ class VendasFragment : Fragment() {
                         observer(clienteId)
                     }
                 }
+            },
+            onEditarCliente = { cliente ->
+                showEditClienteDialog(cliente)
+            },
+            onExcluirCliente = { cliente ->
+                viewModel.excluirCliente(cliente)
             }
         )
 
         binding.rvClientes.apply {
-            layoutManager = LinearLayoutManager(requireContext())
+            layoutManager = LinearLayoutManager(context)
             adapter = clientesAdapter
         }
     }
@@ -128,6 +136,25 @@ class VendasFragment : Fragment() {
         )
         binding.drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
+    }
+
+    private fun showEditClienteDialog(cliente: Cliente) {
+        viewModel.reloadLocais()
+        val dialog = NovoClienteDialog(viewModel).apply {
+            setClienteExistente(cliente)
+            onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
+                viewModel.editarCliente(
+                    cliente = cliente,
+                    novoNome = nome,
+                    novoTelefone = telefone,
+                    novoLocalId = localId,
+                    novoSublocal1Id = sublocal1Id,
+                    novoSublocal2Id = sublocal2Id,
+                    novoSublocal3Id = sublocal3Id
+                )
+            }
+        }
+        dialog.show(childFragmentManager, "EditClienteDialog")
     }
 
     private fun setupLocalRecyclerView() {

@@ -56,6 +56,8 @@ val roomVersion = "2.6.1"
 val navVersion = "2.7.7"
 
 dependencies {
+    implementation("androidx.drawerlayout:drawerlayout:1.2.0")
+
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
@@ -73,6 +75,7 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     implementation("androidx.room:room-paging:$roomVersion")
+    implementation(libs.filament.android)
 
     kapt("androidx.room:room-compiler:$roomVersion")
 
@@ -83,7 +86,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
 
-    implementation("androidx.drawerlayout:drawerlayout:1.2.0")
+
     implementation("com.google.android.material:material:1.11.0")
 
     implementation("androidx.navigation:navigation-fragment-ktx:$navVersion")

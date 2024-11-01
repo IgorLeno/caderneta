@@ -13,8 +13,10 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
+import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogNovoClienteBinding
+import com.example.caderneta.databinding.DialogOpcoesClienteBinding
 import com.example.caderneta.viewmodel.VendasViewModel
 import kotlinx.coroutines.launch
 
@@ -32,12 +34,21 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
     // Cache para manter a hierarquia importada
     private var importedHierarchy: List<Local>? = null
 
+
+    private var clienteExistente: Cliente? = null
+
+    fun setClienteExistente(cliente: Cliente) {
+        clienteExistente = cliente
+    }
+
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        _binding = DialogNovoClienteBinding.inflate(LayoutInflater.from(context))
+        _binding = DialogNovoClienteBinding.inflate(LayoutInflater.from(context))  // Correção aqui
+
         return AlertDialog.Builder(requireContext())
-            .setTitle("Adicionar Novo Cliente")
+            .setTitle(if (clienteExistente != null) "Editar Cliente" else "Novo Cliente")
             .setView(binding.root)
-            .setPositiveButton("Adicionar", null)
+            .setPositiveButton(if (clienteExistente != null) "Salvar" else "Adicionar", null)
             .setNegativeButton("Cancelar", null)
             .create()
     }
@@ -52,7 +63,31 @@ class NovoClienteDialog(private val viewModel: VendasViewModel) : DialogFragment
         setupSpinners()
         setupDialogButtons()
         setupImportButton()
+
+        // Preencher campos se for edição
+        clienteExistente?.let { cliente ->
+            // Preencher apenas nome e telefone
+            binding.etNome.setText(cliente.nome)
+            binding.etTelefone.setText(cliente.telefone)
+
+            // Limpar campos de local
+            binding.spinnerLocal.text = null
+            binding.spinnerSublocal1.text = null
+            binding.spinnerSublocal2.text = null
+            binding.spinnerSublocal3.text = null
+
+            // Esconder sublocais
+            binding.tilSublocal1.visibility = View.GONE
+            binding.tilSublocal2.visibility = View.GONE
+            binding.tilSublocal3.visibility = View.GONE
+        }
+
+        // Alterar título se for edição
+        (dialog as? AlertDialog)?.setTitle(
+            if (clienteExistente != null) "Editar Cliente" else "Novo Cliente"
+        )
     }
+
 
     private fun setupInputValidation() {
         binding.etNome.addTextChangedListener(object : TextWatcher {
