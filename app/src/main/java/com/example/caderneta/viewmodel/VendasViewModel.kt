@@ -212,12 +212,16 @@ class VendasViewModel(
     }
 
     fun setInitialState(clienteId: Long, state: ClienteState) {
-        _clienteStates.update { currentStates ->
-            currentStates.toMutableMap().apply {
-                put(clienteId, state)
+        viewModelScope.launch {
+            _clienteStates.update { currentStates ->
+                currentStates.toMutableMap().apply {
+                    put(clienteId, state)
+                }
             }
         }
     }
+
+
 
     suspend fun confirmarEdicaoOperacao(vendaOriginal: Venda): Boolean {
         val clienteState = _clienteStates.value[vendaOriginal.clienteId] ?: return false
@@ -285,6 +289,7 @@ class VendasViewModel(
             return false
         }
     }
+
 
     fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao?) {
         val currentState = _clienteStates.value[cliente.id]

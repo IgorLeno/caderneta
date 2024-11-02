@@ -334,6 +334,16 @@ class ConsultasViewModel(
         }
     }
 
+    fun updateClienteState(state: VendasViewModel.ClienteState) {
+        viewModelScope.launch {
+            _clienteStates.update { currentStates ->
+                currentStates.toMutableMap().apply {
+                    put(state.clienteId, state)
+                }
+            }
+        }
+    }
+
     suspend fun abrirEdicaoOperacao(venda: Venda) {
         try {
             // Lógica para preparar edição da operação

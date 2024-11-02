@@ -1,17 +1,23 @@
 package com.example.caderneta.ui.consultas
 
+import android.animation.ObjectAnimator
+import android.animation.StateListAnimator
 import android.app.Dialog
+import android.content.res.ColorStateList
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.caderneta.CadernetaApplication
+import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
@@ -24,7 +30,7 @@ import com.example.caderneta.viewmodel.ConsultasViewModel
 import com.example.caderneta.viewmodel.ConsultasViewModelFactory
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
-import com.google.android.gms.tasks.Tasks.await
+import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -70,7 +76,7 @@ class EditarOperacaoDialog(
         return AlertDialog.Builder(requireContext())
             .setTitle("Editar Operação")
             .setView(binding.root)
-            .setPositiveButton("Salvar", null) // Será configurado no onStart
+            .setPositiveButton("Salvar", null)
             .setNegativeButton("Cancelar", null)
             .create()
             .apply {
@@ -97,6 +103,7 @@ class EditarOperacaoDialog(
         setupContadores()
         setupButtons()
         setupValueFields()
+        setupClienteInfo()
     }
 
     private fun setupContadores() {
@@ -127,113 +134,106 @@ class EditarOperacaoDialog(
 
     private fun setupButtons() {
         binding.apply {
-            // Configurar listeners para botões principais
-            btnVenda.setOnClickListener {
-                vendasViewModel.selecionarModoOperacao(cliente, ModoOperacao.VENDA)
-            }
-            btnPromocao.setOnClickListener {
-                vendasViewModel.selecionarModoOperacao(cliente, ModoOperacao.PROMOCAO)
-            }
-            btnPagamento.setOnClickListener {
-                vendasViewModel.selecionarModoOperacao(cliente, ModoOperacao.PAGAMENTO)
+            btnVenda.apply {
+                insets(0)
+                setupButtonBase(this)
+                setOnClickListener {
+                    vendasViewModel.selecionarModoOperacao(cliente, ModoOperacao.VENDA)
+                }
             }
 
-            // Configurar listeners para botões de tipo de transação
+            btnPromocao.apply {
+                insets(0)
+                setupButtonBase(this)
+                setOnClickListener {
+                    vendasViewModel.selecionarModoOperacao(cliente, ModoOperacao.PROMOCAO)
+                }
+            }
+
+            btnPagamento.apply {
+                insets(0)
+                setupButtonBase(this)
+                setOnClickListener {
+                    vendasViewModel.selecionarModoOperacao(cliente, ModoOperacao.PAGAMENTO)
+                }
+            }
+
+            listOf(btnAVista, btnAPrazo).forEach { button ->
+                button.apply {
+                    insets(0)
+                    setupButtonBase(this)
+                }
+            }
+
             btnAVista.setOnClickListener {
                 vendasViewModel.selecionarTipoTransacao(cliente, TipoTransacao.A_VISTA)
             }
+
             btnAPrazo.setOnClickListener {
                 vendasViewModel.selecionarTipoTransacao(cliente, TipoTransacao.A_PRAZO)
             }
 
-            // Configurar visibilidade inicial
-            etValorPagamento.visibility = View.GONE
+            layoutPagamento.visibility = View.GONE
             btnTudo.visibility = View.GONE
             btnConfirmarPagamento.visibility = View.GONE
             btnCancelarPagamento.visibility = View.GONE
+            btnConfirmarOperacao.visibility = View.GONE
+            btnCancelarOperacao.visibility = View.GONE
+        }
+    }
+
+    private fun MaterialButton.insets(value: Int) {
+        insetTop = value
+        insetBottom = value
+
+    }
+
+
+    private fun setupButtonBase(button: MaterialButton) {
+        button.apply {
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            iconPadding = 0
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            strokeWidth = 1
+            val buttonStrokeColor = ContextCompat.getColor(context, R.color.button_stroke)
+            strokeColor = ColorStateList.valueOf(buttonStrokeColor)
+
+            // Definir estilo inicial com um Drawable compatível
+            val unselectedColor = ContextCompat.getColor(context, R.color.button_background_unselected)
+            setBackgroundColor(unselectedColor)
+            val unselectedIconColor = ContextCompat.getColor(context, R.color.button_icon_unselected)
+            setIconTint(ColorStateList.valueOf(unselectedIconColor))
+            elevation = 0f
         }
     }
 
     private fun setupValueFields() {
-        binding.etValorPagamento.addTextChangedListener(object : android.text.TextWatcher {
-            override fun afterTextChanged(s: android.text.Editable?) {
-                val valor = s.toString().toDoubleOrNull() ?: 0.0
-                vendasViewModel.updateValorTotal(cliente.id, valor)
-            }
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
-    }
-
-    private fun observeViewModels() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    vendasViewModel.clienteStates.collectLatest { states ->
-                        states[cliente.id]?.let { state ->
-                            updateUI(state)
-                        }
-                    }
-                }
-
-                launch {
-                    vendasViewModel.error.collectLatest { error ->
-                        error?.let {
-                            requireContext().showErrorToast(it)
-                            vendasViewModel.clearError()
-                        }
-                    }
-                }
-
-                launch {
-                    consultasViewModel.error.collectLatest { error ->
-                        error?.let {
-                            requireContext().showErrorToast(it)
-                            consultasViewModel.clearError()
-                        }
-                    }
-                }
-            }
+        binding.apply {
+            etValorTotal.isEnabled = false
+            etValorTotalPromocao.isEnabled = false
         }
     }
 
-    private fun updateUI(state: VendasViewModel.ClienteState) {
+    private fun setupClienteInfo() {
         binding.apply {
-            // Atualizar visibilidade dos layouts
-            layoutVenda.visibility = if (state.modoOperacao != null &&
-                state.modoOperacao != ModoOperacao.PAGAMENTO)
-                View.VISIBLE else View.GONE
-
-            layoutPagamento.visibility = View.GONE // Desabilitar pagamento na edição
-
-            // Atualizar seleção dos botões
-            btnVenda.isSelected = state.modoOperacao == ModoOperacao.VENDA
-            btnPromocao.isSelected = state.modoOperacao == ModoOperacao.PROMOCAO
-            btnPagamento.isSelected = false // Desabilitar pagamento na edição
-
-            // Atualizar tipo de transação
-            btnAVista.isSelected = state.tipoTransacao == TipoTransacao.A_VISTA
-            btnAPrazo.isSelected = state.tipoTransacao == TipoTransacao.A_PRAZO
-
-            // Atualizar valores
-            if (state.modoOperacao != ModoOperacao.PAGAMENTO) {
-                etValorTotal.setText(state.valorTotal.toString())
+            tvNomeCliente.text = cliente.nome
+            viewLifecycleOwner.lifecycleScope.launch {
+                val saldo = consultasViewModel.getSaldoCliente(cliente.id)
+                tvValorDevido.text = String.format("R$ %.2f", saldo)
+                tvValorDevido.setTextColor(
+                    if (saldo > 0) requireContext().getColor(android.R.color.holo_red_dark)
+                    else requireContext().getColor(android.R.color.holo_green_dark)
+                )
             }
-
-            // Atualizar contadores
-            contadorSalgadosHelper?.setQuantidade(state.quantidadeSalgados)
-            contadorSucosHelper?.setQuantidade(state.quantidadeSucos)
-            contadorPromo1Helper?.setQuantidade(state.quantidadePromo1)
-            contadorPromo2Helper?.setQuantidade(state.quantidadePromo2)
         }
     }
 
     private fun initializeOperation() {
-        // Inicializar estado com base na venda atual
         val initialState = VendasViewModel.ClienteState(
             clienteId = cliente.id,
             modoOperacao = when {
                 venda.isPromocao -> ModoOperacao.PROMOCAO
+                venda.transacao == "pagamento" -> ModoOperacao.PAGAMENTO
                 else -> ModoOperacao.VENDA
             },
             tipoTransacao = when (venda.transacao) {
@@ -246,14 +246,136 @@ class EditarOperacaoDialog(
             valorTotal = venda.valor
         )
 
-        // Aplicar estado inicial
         vendasViewModel.setInitialState(cliente.id, initialState)
+        viewLifecycleOwner.lifecycleScope.launch {
+            consultasViewModel.abrirEdicaoOperacao(venda)
+        }
+    }
+
+    private fun observeViewModels() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    vendasViewModel.clienteStates.collectLatest { states ->
+                        states[cliente.id]?.let { state ->
+                            updateUI(state)
+                            consultasViewModel.updateClienteState(state)
+                        }
+                    }
+                }
+
+                launch {
+                    vendasViewModel.configuracoes.collectLatest { config ->
+                        config?.let {
+                            binding.layoutVendaPromocao.visibility =
+                                if (it.promocoesAtivadas) View.VISIBLE else View.GONE
+                        }
+                    }
+                }
+
+                launch {
+                    consultasViewModel.error.collectLatest { error ->
+                        error?.let {
+                            requireContext().showErrorToast(it)
+                            consultasViewModel.clearError()
+                        }
+                    }
+                }
+
+                launch {
+                    vendasViewModel.error.collectLatest { error ->
+                        error?.let {
+                            requireContext().showErrorToast(it)
+                            vendasViewModel.clearError()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updateUI(state: VendasViewModel.ClienteState) {
+        binding.apply {
+            btnVenda.isSelected = state.modoOperacao == ModoOperacao.VENDA
+            btnPromocao.isSelected = state.modoOperacao == ModoOperacao.PROMOCAO
+            btnPagamento.isSelected = state.modoOperacao == ModoOperacao.PAGAMENTO
+
+            updateButtonStyle(btnVenda)
+            updateButtonStyle(btnPromocao)
+            updateButtonStyle(btnPagamento)
+
+            layoutVenda.visibility = when (state.modoOperacao) {
+                ModoOperacao.VENDA, ModoOperacao.PROMOCAO -> View.VISIBLE
+                else -> View.GONE
+            }
+
+            layoutPagamento.visibility = View.GONE
+
+            if (state.modoOperacao != ModoOperacao.PAGAMENTO) {
+                layoutBotoesVenda.visibility = View.VISIBLE
+                btnAVista.isSelected = state.tipoTransacao == TipoTransacao.A_VISTA
+                btnAPrazo.isSelected = state.tipoTransacao == TipoTransacao.A_PRAZO
+
+                updateButtonStyle(btnAVista)
+                updateButtonStyle(btnAPrazo)
+            } else {
+                layoutBotoesVenda.visibility = View.GONE
+            }
+
+            layoutVendaNormal.visibility = when {
+                state.modoOperacao == ModoOperacao.VENDA && state.tipoTransacao != null -> View.VISIBLE
+                else -> View.GONE
+            }
+
+            layoutVendaPromocao.visibility = when {
+                state.modoOperacao == ModoOperacao.PROMOCAO && state.tipoTransacao != null -> View.VISIBLE
+                else -> View.GONE
+            }
+
+            updateQuantidades(state)
+            updateValores(state)
+        }
+    }
+
+    private fun updateButtonStyle(button: MaterialButton) {
+        if (button.isSelected) {
+            button.apply {
+                val selectedColor = ContextCompat.getColor(context, R.color.button_background_selected)
+                setBackgroundColor(selectedColor)
+                val selectedIconColor = ContextCompat.getColor(context, R.color.button_icon_selected)
+                setIconTint(ColorStateList.valueOf(selectedIconColor))
+                elevation = 8f
+            }
+        } else {
+            button.apply {
+                val unselectedColor = ContextCompat.getColor(context, R.color.button_background_unselected)
+                setBackgroundColor(unselectedColor)
+                val unselectedIconColor = ContextCompat.getColor(context, R.color.button_icon_unselected)
+                setIconTint(ColorStateList.valueOf(unselectedIconColor))
+                elevation = 0f
+            }
+        }
+    }
+
+    private fun updateQuantidades(state: VendasViewModel.ClienteState) {
+        contadorSalgadosHelper?.setQuantidade(state.quantidadeSalgados)
+        contadorSucosHelper?.setQuantidade(state.quantidadeSucos)
+        contadorPromo1Helper?.setQuantidade(state.quantidadePromo1)
+        contadorPromo2Helper?.setQuantidade(state.quantidadePromo2)
+    }
+
+    private fun updateValores(state: VendasViewModel.ClienteState) {
+        binding.apply {
+            when (state.modoOperacao) {
+                ModoOperacao.VENDA -> etValorTotal.setText(String.format("%.2f", state.valorTotal))
+                ModoOperacao.PROMOCAO -> etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
+                else -> {}
+            }
+        }
     }
 
     override fun onStart() {
         super.onStart()
-
-        // Configurar o botão positivo para salvar as alterações
         (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
