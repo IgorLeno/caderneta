@@ -32,9 +32,11 @@ class ConsultasViewModel(
     val locais: StateFlow<List<Local>> = _locais
 
 
+    private val _clienteStates = MutableStateFlow<Map<Long, VendasViewModel.ClienteState>>(emptyMap())
+    val clienteStates: StateFlow<Map<Long, VendasViewModel.ClienteState>> = _clienteStates
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
-
 
     private val _localSelecionado = MutableStateFlow<Local?>(null)
     val localSelecionado: StateFlow<Local?> = _localSelecionado
@@ -193,6 +195,75 @@ class ConsultasViewModel(
                     put(clienteId, vendas)
                 }
             }
+        }
+    }
+
+    suspend fun confirmarEdicaoOperacao(venda: Venda): Boolean {
+        return try {
+            // Obter o estado atual do cliente do VendasViewModel
+            val clienteState = _clienteStates.value[venda.clienteId]
+                ?: return false
+
+            // Calcular saldo a ser ajustado
+            val ajusteSaldo = when {
+                // Se a operação original era a prazo e a nova não é, diminuir saldo antigo
+                venda.transacao == "a_prazo" &&
+                        clienteState.tipoTransacao != TipoTransacao.A_PRAZO -> -venda.valor
+                // Se a operação original não era a prazo e a nova é, aumentar com novo valor
+                venda.transacao != "a_prazo" &&
+                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO -> clienteState.valorTotal
+                // Se ambas são a prazo, ajustar a diferença
+                venda.transacao == "a_prazo" &&
+                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO ->
+                    clienteState.valorTotal - venda.valor
+                else -> 0.0
+            }
+
+            // Criar nova venda baseada no estado atual
+            val novaVenda = venda.copy(
+                transacao = when (clienteState.tipoTransacao) {
+                    TipoTransacao.A_VISTA -> "a_vista"
+                    TipoTransacao.A_PRAZO -> "a_prazo"
+                    null -> venda.transacao // Mantém o original se não houver mudança
+                },
+                quantidadeSalgados = clienteState.quantidadeSalgados,
+                quantidadeSucos = clienteState.quantidadeSucos,
+                isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
+                valor = clienteState.valorTotal
+            )
+
+            // Atualizar venda no banco de dados
+            vendaRepository.updateVenda(novaVenda)
+
+            // Atualizar operação correspondente
+            operacaoRepository.updateOperacao(
+                Operacao(
+                    id = venda.operacaoId,
+                    clienteId = venda.clienteId,
+                    tipoOperacao = when (clienteState.modoOperacao) {
+                        ModoOperacao.VENDA -> "Venda"
+                        ModoOperacao.PROMOCAO -> "Promo"
+                        ModoOperacao.PAGAMENTO -> "Pagamento"
+                        null -> "Venda" // Valor padrão
+                    },
+                    valor = clienteState.valorTotal,
+                    data = venda.data
+                )
+            )
+
+            // Atualizar saldo se necessário
+            if (ajusteSaldo != 0.0) {
+                contaRepository.atualizarSaldo(venda.clienteId, ajusteSaldo)
+                _saldoAtualizado.emit(venda.clienteId)
+            }
+
+            // Recarregar vendas do cliente
+            carregarVendasPorCliente(venda.clienteId)
+
+            true
+        } catch (e: Exception) {
+            _error.value = "Erro ao atualizar operação: ${e.message}"
+            false
         }
     }
 
