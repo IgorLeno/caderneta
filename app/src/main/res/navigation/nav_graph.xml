@@ -9,29 +9,7 @@
         android:id="@+id/vendasFragment"
         android:name="com.example.caderneta.ui.vendas.VendasFragment"
         android:label="Vendas"
-        tools:layout="@layout/fragment_vendas">
-        <action
-            android:id="@+id/action_vendasFragment_to_consultasFragment"
-            app:destination="@id/consultasFragment"
-            app:enterAnim="@anim/nav_default_enter_anim"
-            app:exitAnim="@anim/nav_default_exit_anim"
-            app:popEnterAnim="@anim/nav_default_pop_enter_anim"
-            app:popExitAnim="@anim/nav_default_pop_exit_anim">
-            <argument
-                android:name="clienteId"
-                app:argType="long"
-                android:defaultValue="-1L" />
-            <argument
-                android:name="localId"
-                app:argType="long"
-                android:defaultValue="-1L" />
-            <argument
-                android:name="filtroNomeCliente"
-                app:argType="string"
-                app:nullable="true"
-                android:defaultValue="@null" />
-        </action>
-    </fragment>
+        tools:layout="@layout/fragment_vendas" />
 
     <fragment
         android:id="@+id/consultasFragment"
@@ -51,62 +29,19 @@
             app:argType="string"
             app:nullable="true"
             android:defaultValue="@null" />
-        <action
-            android:id="@+id/action_consultasFragment_to_vendasFragment"
-            app:destination="@id/vendasFragment"
-            app:popUpTo="@id/nav_graph"
-            app:popUpToInclusive="true"
-            app:enterAnim="@anim/nav_default_enter_anim"
-            app:exitAnim="@anim/nav_default_exit_anim"/>
     </fragment>
 
     <fragment
         android:id="@+id/balancoCaixaFragment"
         android:name="com.example.caderneta.ui.balanco.BalancoCaixaFragment"
         android:label="Balanço de Caixa"
-        tools:layout="@layout/fragment_balanco_caixa">
-        <action
-            android:id="@+id/action_balancoCaixaFragment_to_consultasFragment"
-            app:destination="@id/consultasFragment">
-            <argument
-                android:name="clienteId"
-                app:argType="long"
-                android:defaultValue="-1L" />
-            <argument
-                android:name="localId"
-                app:argType="long"
-                android:defaultValue="-1L" />
-            <argument
-                android:name="filtroNomeCliente"
-                app:argType="string"
-                app:nullable="true"
-                android:defaultValue="@null" />
-        </action>
-    </fragment>
+        tools:layout="@layout/fragment_balanco_caixa" />
 
     <fragment
         android:id="@+id/historicoVendasFragment"
         android:name="com.example.caderneta.ui.historico.HistoricoVendasFragment"
         android:label="Histórico de Vendas"
-        tools:layout="@layout/fragment_historico_vendas">
-        <action
-            android:id="@+id/action_historicoVendasFragment_to_consultasFragment"
-            app:destination="@id/consultasFragment">
-            <argument
-                android:name="clienteId"
-                app:argType="long"
-                android:defaultValue="-1L" />
-            <argument
-                android:name="localId"
-                app:argType="long"
-                android:defaultValue="-1L" />
-            <argument
-                android:name="filtroNomeCliente"
-                app:argType="string"
-                app:nullable="true"
-                android:defaultValue="@null" />
-        </action>
-    </fragment>
+        tools:layout="@layout/fragment_historico_vendas" />
 
     <fragment
         android:id="@+id/configuracoesFragment"
@@ -120,7 +55,9 @@
         app:enterAnim="@anim/nav_default_enter_anim"
         app:exitAnim="@anim/nav_default_exit_anim"
         app:popEnterAnim="@anim/nav_default_pop_enter_anim"
-        app:popExitAnim="@anim/nav_default_pop_exit_anim">
+        app:popExitAnim="@anim/nav_default_pop_exit_anim"
+        app:popUpTo="@id/nav_graph"
+        app:popUpToSaveState="true">
         <argument
             android:name="clienteId"
             app:argType="long"

@@ -62,7 +62,7 @@ class ConsultasFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupUI()
-        setupBackNavigation()  // Adicionado aqui
+        setupBackNavigation()
         observeViewModel()
         handleNavigationArgs()
     }
@@ -71,28 +71,14 @@ class ConsultasFragment : Fragment() {
     private fun handleNavigationArgs() {
         val args = ConsultasFragmentArgs.fromBundle(requireArguments())
         if (args.clienteId != -1L && args.localId != -1L) {
-            Log.d("ConsultasFragment", """
-                Processando args:
-                clienteId: ${args.clienteId}
-                localId: ${args.localId}
-                filtroNome: ${args.filtroNomeCliente}
-            """.trimIndent())
-
             lifecycleScope.launch {
                 try {
-                    // Primeiro seleciona o local
                     viewModel.selecionarLocal(args.localId)
-
-                    // Aguarda um pouco para garantir que o local foi selecionado
                     delay(100)
-
-                    // Aplica o filtro de nome se houver
                     args.filtroNomeCliente?.let { nome ->
                         binding.etBusca.setText(nome)
                         viewModel.buscarClientes(nome)
                     }
-
-                    // Carrega as vendas do cliente
                     viewModel.carregarVendasPorCliente(args.clienteId)
                 } catch (e: Exception) {
                     Log.e("ConsultasFragment", "Erro ao processar argumentos", e)
@@ -107,29 +93,18 @@ class ConsultasFragment : Fragment() {
     }
 
     private fun setupBackNavigation() {
-        // Implementação do callback de navegação
-        requireActivity().onBackPressedDispatcher.addCallback(
-            viewLifecycleOwner,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    try {
-                        // Tenta navegar de volta
-                        findNavController().navigateUp()
-                    } catch (e: Exception) {
-                        Log.e("ConsultasFragment", "Erro na navegação de volta", e)
-                        // Fallback: tenta navegar diretamente para VendasFragment
-                        findNavController().navigate(R.id.vendasFragment)
-                    }
+        val callback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    binding.drawerLayout.closeDrawer(GravityCompat.START)
+                } else {
+                    findNavController().navigateUp()
                 }
             }
-        )
-
-        // Configurar toolbar para suportar navegação
-        (requireActivity() as AppCompatActivity).apply {
-            supportActionBar?.setDisplayHomeAsUpEnabled(true)
-            supportActionBar?.setHomeButtonEnabled(true)
         }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, callback)
     }
+
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {

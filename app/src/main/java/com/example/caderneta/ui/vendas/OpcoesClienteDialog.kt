@@ -9,9 +9,11 @@ import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.caderneta.CadernetaApplication
+import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogOpcoesClienteBinding
+import com.example.caderneta.ui.consultas.ConsultasFragmentArgs
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 
@@ -21,50 +23,42 @@ class OpcoesClienteDialog(
     private val onExcluirClick: (Cliente) -> Unit
 ) : DialogFragment() {
 
+    companion object {
+        const val DIALOG_TAG = "OpcoesClienteDialog"
+    }
+
     private var _binding: DialogOpcoesClienteBinding? = null
     private val binding get() = _binding!!
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogOpcoesClienteBinding.inflate(LayoutInflater.from(context))
 
-        // Criar dialog com tema personalizado para garantir estilos corretos
-        return AlertDialog.Builder(requireContext(), com.google.android.material.R.style.ThemeOverlay_MaterialComponents_Dialog_Alert)
+        return AlertDialog.Builder(requireContext(),
+            com.google.android.material.R.style.ThemeOverlay_MaterialComponents_Dialog_Alert)
             .setTitle(cliente.nome)
             .setView(binding.root)
             .setNegativeButton("Fechar") { _, _ -> dismiss() }
             .create()
             .apply {
-                // Configurar botões assim que o dialog for criado
-                setOnShowListener {
-                    setupButtons()
-                }
+                setOnShowListener { setupButtons() }
             }
     }
 
     private suspend fun getLocalMaisEspecifico(): Local? {
         val localRepository = (requireActivity().application as CadernetaApplication).localRepository
 
-        // Buscar e validar cada nível da hierarquia
-        val local3 = cliente.sublocal3Id?.let { localRepository.getLocalById(it) }
-        val local2 = cliente.sublocal2Id?.let { localRepository.getLocalById(it) }
-        val local1 = cliente.sublocal1Id?.let { localRepository.getLocalById(it) }
-        val localPrincipal = localRepository.getLocalById(cliente.localId)
+        val locais = listOfNotNull(
+            localRepository.getLocalById(cliente.localId),
+            cliente.sublocal1Id?.let { localRepository.getLocalById(it) },
+            cliente.sublocal2Id?.let { localRepository.getLocalById(it) },
+            cliente.sublocal3Id?.let { localRepository.getLocalById(it) }
+        )
 
-        // Validar a hierarquia e retornar o local mais específico válido
-        return when {
-            local3 != null && validarHierarquia(localPrincipal, local1, local2, local3) -> local3
-            local2 != null && validarHierarquia(localPrincipal, local1, local2) -> local2
-            local1 != null && validarHierarquia(localPrincipal, local1) -> local1
-            localPrincipal != null -> localPrincipal
-            else -> null
+        return locais.lastOrNull { local ->
+            locais.takeWhile { it != local }.zipWithNext().all { (parent, child) ->
+                child.level > parent.level
+            }
         }
-    }
-
-    private fun validarHierarquia(vararg locais: Local?): Boolean {
-        // Verifica se a sequência de níveis é válida
-        return locais.filterNotNull()
-            .zipWithNext()
-            .all { (parent, child) -> child.level > parent.level }
     }
 
     private fun setupButtons() {
@@ -74,19 +68,16 @@ class OpcoesClienteDialog(
                     try {
                         val localMaisEspecifico = getLocalMaisEspecifico()
                         if (localMaisEspecifico != null) {
-                            Log.d("OpcoesClienteDialog",
-                                "Navegando para consultas com local: ${localMaisEspecifico.nome} (${localMaisEspecifico.id})")
-
-                            val action = VendasFragmentDirections.actionVendasFragmentToConsultasFragment(
-                                clienteId = cliente.id,
-                                localId = localMaisEspecifico.id,
-                                filtroNomeCliente = cliente.nome
+                            findNavController().navigate(
+                                R.id.global_action_to_consultasFragment,
+                                ConsultasFragmentArgs(
+                                    clienteId = cliente.id,
+                                    localId = localMaisEspecifico.id,
+                                    filtroNomeCliente = cliente.nome
+                                ).toBundle()
                             )
-                            findNavController().navigate(action)
                             dismiss()
                         } else {
-                            Log.e("OpcoesClienteDialog", "Local mais específico não encontrado")
-                            // Mostrar mensagem de erro
                             Snackbar.make(
                                 requireView(),
                                 "Não foi possível determinar o local do cliente",
@@ -95,7 +86,6 @@ class OpcoesClienteDialog(
                         }
                     } catch (e: Exception) {
                         Log.e("OpcoesClienteDialog", "Erro ao navegar", e)
-                        // Mostrar mensagem de erro
                         Snackbar.make(
                             requireView(),
                             "Erro ao abrir consulta: ${e.message}",
@@ -116,7 +106,6 @@ class OpcoesClienteDialog(
         }
     }
 
-
     private fun showConfirmacaoExclusao() {
         AlertDialog.Builder(requireContext())
             .setTitle("Excluir Cliente")
@@ -132,9 +121,5 @@ class OpcoesClienteDialog(
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
-    }
-
-    companion object {
-        const val TAG = "OpcoesClienteDialog"
     }
 }

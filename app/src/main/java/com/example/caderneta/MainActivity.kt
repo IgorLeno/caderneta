@@ -2,6 +2,7 @@ package com.example.caderneta
 
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.navigation.NavController
@@ -14,7 +15,6 @@ import androidx.navigation.ui.setupWithNavController
 import com.example.caderneta.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
-
     private lateinit var binding: ActivityMainBinding
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var navController: NavController
@@ -46,34 +46,26 @@ class MainActivity : AppCompatActivity() {
         setupActionBarWithNavController(navController, appBarConfiguration)
         binding.bottomNavigation.setupWithNavController(navController)
 
-        // Monitorar mudanças de destino
+        // Monitorar mudanças de destino e manter visibilidade do menu
         navController.addOnDestinationChangedListener { _, destination, _ ->
+            binding.bottomNavigation.visibility = when (destination.id) {
+                R.id.vendasFragment,
+                R.id.consultasFragment,
+                R.id.balancoCaixaFragment,
+                R.id.historicoVendasFragment,
+                R.id.configuracoesFragment -> View.VISIBLE
+                else -> View.GONE
+            }
             Log.d("Navigation", "Navigated to destination: ${destination.label}")
         }
 
-        // Listener para navegação do BottomNav
+        // Listener simplificado para navegação do BottomNav
         binding.bottomNavigation.setOnItemSelectedListener { item ->
-            val handled = NavigationUI.onNavDestinationSelected(item, navController)
-            if (!handled) {
-                Log.e("Navigation", "Failed to navigate to ${item.itemId}")
-            }
-            handled
+            NavigationUI.onNavDestinationSelected(item, navController)
         }
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        return when (navController.currentDestination?.id) {
-            R.id.consultasFragment -> {
-                // Se estiver nas consultas, tenta navegar para vendas
-                try {
-                    navController.navigate(R.id.vendasFragment)
-                    true
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Erro ao navegar para vendas", e)
-                    navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
-                }
-            }
-            else -> navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
-        }
+        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
     }
 }

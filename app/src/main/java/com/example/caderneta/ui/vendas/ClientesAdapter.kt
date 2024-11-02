@@ -402,7 +402,7 @@ class ClientesAdapter(
                     cliente = cliente,
                     onEditarClick = { onEditarCliente(it) },
                     onExcluirClick = { onExcluirCliente(it) }
-                ).show(fragmentManager, OpcoesClienteDialog.TAG)
+                ).show(fragmentManager, OpcoesClienteDialog.DIALOG_TAG)
                 true
             }
         }
