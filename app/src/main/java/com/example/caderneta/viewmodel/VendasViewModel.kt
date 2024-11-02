@@ -211,6 +211,81 @@ class VendasViewModel(
         }
     }
 
+    fun setInitialState(clienteId: Long, state: ClienteState) {
+        _clienteStates.update { currentStates ->
+            currentStates.toMutableMap().apply {
+                put(clienteId, state)
+            }
+        }
+    }
+
+    suspend fun confirmarEdicaoOperacao(vendaOriginal: Venda): Boolean {
+        val clienteState = _clienteStates.value[vendaOriginal.clienteId] ?: return false
+
+        try {
+            // Calcular saldo a ser ajustado
+            val ajusteSaldo = when {
+                // Se a operação original era a prazo e a nova não é, diminuir saldo antigo
+                vendaOriginal.transacao == "a_prazo" &&
+                        clienteState.tipoTransacao != TipoTransacao.A_PRAZO -> -vendaOriginal.valor
+
+                // Se a operação original não era a prazo e a nova é, aumentar com novo valor
+                vendaOriginal.transacao != "a_prazo" &&
+                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO -> clienteState.valorTotal
+
+                // Se ambas são a prazo, ajustar a diferença
+                vendaOriginal.transacao == "a_prazo" &&
+                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO ->
+                    clienteState.valorTotal - vendaOriginal.valor
+
+                else -> 0.0
+            }
+
+            // Criar nova venda baseada no estado atual
+            val novaVenda = vendaOriginal.copy(
+                transacao = when (clienteState.tipoTransacao) {
+                    TipoTransacao.A_VISTA -> "a_vista"
+                    TipoTransacao.A_PRAZO -> "a_prazo"
+                    null -> "pagamento"
+                },
+                quantidadeSalgados = clienteState.quantidadeSalgados,
+                quantidadeSucos = clienteState.quantidadeSucos,
+                isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
+                valor = clienteState.valorTotal
+            )
+
+            // Atualizar venda no banco de dados
+            vendaRepository.updateVenda(novaVenda)
+
+            // Atualizar operação correspondente
+            operacaoRepository.updateOperacao(
+                Operacao(
+                    id = vendaOriginal.operacaoId,
+                    clienteId = vendaOriginal.clienteId,
+                    tipoOperacao = when (clienteState.modoOperacao) {
+                        ModoOperacao.VENDA -> "Venda"
+                        ModoOperacao.PROMOCAO -> "Promo"
+                        ModoOperacao.PAGAMENTO -> "Pagamento"
+                        null -> throw IllegalStateException("Modo de operação inválido")
+                    },
+                    valor = clienteState.valorTotal,
+                    data = vendaOriginal.data
+                )
+            )
+
+            // Atualizar saldo se necessário
+            if (ajusteSaldo != 0.0) {
+                contaRepository.atualizarSaldo(vendaOriginal.clienteId, ajusteSaldo)
+                _saldoAtualizado.emit(vendaOriginal.clienteId)
+            }
+
+            return true
+        } catch (e: Exception) {
+            _error.value = "Erro ao atualizar operação: ${e.message}"
+            return false
+        }
+    }
+
     fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao?) {
         val currentState = _clienteStates.value[cliente.id]
         val newState = if (currentState == null || currentState.modoOperacao != modoOperacao) {

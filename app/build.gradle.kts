@@ -76,6 +76,7 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     implementation("androidx.room:room-paging:$roomVersion")
     implementation(libs.filament.android)
+    implementation(libs.firebase.vertexai)
 
     kapt("androidx.room:room-compiler:$roomVersion")
 

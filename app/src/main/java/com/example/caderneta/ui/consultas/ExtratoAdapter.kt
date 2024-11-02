@@ -14,9 +14,11 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class ExtratoAdapter : ListAdapter<Venda, ExtratoAdapter.ViewHolder>(ExtratoDiffCallback()) {
+class ExtratoAdapter(
+    private val onItemClick: (Venda) -> Unit
+) : ListAdapter<Venda, ExtratoAdapter.ViewHolder>(ExtratoDiffCallback()) {
 
-    private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    private val dateFormat = SimpleDateFormat("dd/MM/yy", Locale.getDefault())
     private val numberFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -36,6 +38,15 @@ class ExtratoAdapter : ListAdapter<Venda, ExtratoAdapter.ViewHolder>(ExtratoDiff
     inner class ViewHolder(
         private val binding: ItemExtratoBinding
     ) : RecyclerView.ViewHolder(binding.root) {
+
+        init {
+            itemView.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    onItemClick(getItem(position))
+                }
+            }
+        }
 
         @RequiresApi(Build.VERSION_CODES.M)
         fun bind(venda: Venda) {
@@ -81,7 +92,7 @@ class ExtratoAdapter : ListAdapter<Venda, ExtratoAdapter.ViewHolder>(ExtratoDiff
         }
     }
 
-    private class ExtratoDiffCallback : DiffUtil.ItemCallback<Venda>() {
+    class ExtratoDiffCallback : DiffUtil.ItemCallback<Venda>() {
         override fun areItemsTheSame(oldItem: Venda, newItem: Venda): Boolean {
             return oldItem.id == newItem.id
         }

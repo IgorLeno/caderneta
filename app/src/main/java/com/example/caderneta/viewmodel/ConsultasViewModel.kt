@@ -6,19 +6,26 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
+import com.example.caderneta.data.entity.ModoOperacao
+import com.example.caderneta.data.entity.Operacao
+import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
+import com.example.caderneta.repository.OperacaoRepository
 import com.example.caderneta.repository.VendaRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ConsultasViewModel(
     private val clienteRepository: ClienteRepository,
     private val vendaRepository: VendaRepository,
     private val localRepository: LocalRepository,
-    private val contaRepository: ContaRepository
+    private val contaRepository: ContaRepository,
+    private val operacaoRepository: OperacaoRepository
 ) : ViewModel() {
 
     private val _locais = MutableStateFlow<List<Local>>(emptyList())
@@ -39,6 +46,12 @@ class ConsultasViewModel(
     val clientesComSaldo: StateFlow<List<Pair<Cliente, Double>>> = _clientesComSaldo
 
     private val _searchQuery = MutableStateFlow("")
+
+    private val _saldoAtualizado = MutableSharedFlow<Long>()
+    val saldoAtualizado = _saldoAtualizado.asSharedFlow()
+
+    private val _clienteStateUpdates = MutableStateFlow<VendasViewModel.ClienteState?>(null)
+    val clienteStateUpdates: StateFlow<VendasViewModel.ClienteState?> = _clienteStateUpdates
 
     init {
         carregarLocais()
@@ -183,23 +196,123 @@ class ConsultasViewModel(
         }
     }
 
-    fun limparExtrato(clienteId: Long) {
-        _vendasPorCliente.value = _vendasPorCliente.value.toMutableMap().apply {
-            remove(clienteId)
+    suspend fun atualizarDataVenda(venda: Venda, novaData: java.util.Date): Boolean {
+        return try {
+            // Atualizar data da venda
+            val vendaAtualizada = venda.copy(data = novaData)
+            vendaRepository.updateVenda(vendaAtualizada)
+
+            // Atualizar data da operação correspondente
+            val operacao = operacaoRepository.getOperacaoById(venda.operacaoId)
+            operacao?.let {
+                val operacaoAtualizada = it.copy(data = novaData)
+                operacaoRepository.updateOperacao(operacaoAtualizada)
+            }
+
+            // Recarregar vendas do cliente
+            carregarVendasPorCliente(venda.clienteId)
+            true
+        } catch (e: Exception) {
+            _error.value = "Erro ao atualizar data: ${e.message}"
+            false
         }
     }
+
+    suspend fun excluirVenda(venda: Venda): Boolean {
+        return try {
+            // Verificar tipo da transação para ajustar saldo
+            when (venda.transacao) {
+                "a_prazo" -> {
+                    // Se for venda a prazo, diminuir o saldo
+                    contaRepository.atualizarSaldo(venda.clienteId, -venda.valor)
+                }
+                "pagamento" -> {
+                    // Se for pagamento, aumentar o saldo
+                    contaRepository.atualizarSaldo(venda.clienteId, venda.valor)
+                }
+            }
+
+            // Excluir venda e operação
+            vendaRepository.deleteVenda(venda)
+            operacaoRepository.deleteOperacaoById(venda.operacaoId)
+
+            // Recarregar vendas do cliente e emitir atualização de saldo
+            carregarVendasPorCliente(venda.clienteId)
+            _saldoAtualizado.emit(venda.clienteId)
+
+            true
+        } catch (e: Exception) {
+            _error.value = "Erro ao excluir operação: ${e.message}"
+            false
+        }
+    }
+
+    private suspend fun OperacaoRepository.getOperacaoById(id: Long): Operacao? {
+        return withContext(Dispatchers.IO) {
+            // Usar diretamente o DAO através do repository
+            operacaoDao.getOperacaoById(id)
+        }
+    }
+
+    private suspend fun OperacaoRepository.deleteOperacaoById(id: Long) {
+        withContext(Dispatchers.IO) {
+            getOperacaoById(id)?.let { operacao ->
+                // Usar diretamente o DAO através do repository
+                operacaoDao.deleteOperacao(operacao)
+            }
+        }
+    }
+
+    suspend fun abrirEdicaoOperacao(venda: Venda) {
+        try {
+            // Lógica para preparar edição da operação
+            val clienteState = VendasViewModel.ClienteState(
+                clienteId = venda.clienteId,
+                modoOperacao = when {
+                    venda.isPromocao -> ModoOperacao.PROMOCAO
+                    venda.transacao == "pagamento" -> ModoOperacao.PAGAMENTO
+                    else -> ModoOperacao.VENDA
+                },
+                tipoTransacao = when (venda.transacao) {
+                    "a_vista" -> TipoTransacao.A_VISTA
+                    "a_prazo" -> TipoTransacao.A_PRAZO
+                    else -> null
+                },
+                quantidadeSalgados = venda.quantidadeSalgados,
+                quantidadeSucos = venda.quantidadeSucos,
+                valorTotal = venda.valor
+            )
+
+            // Emitir estado para o cliente
+            _clienteStateUpdates.emit(clienteState)
+        } catch (e: Exception) {
+            _error.value = "Erro ao preparar edição: ${e.message}"
+        }
+    }
+
+    fun clearError() {
+        _error.value = null
+    }
+
 }
 
 class ConsultasViewModelFactory(
     private val clienteRepository: ClienteRepository,
     private val vendaRepository: VendaRepository,
     private val localRepository: LocalRepository,
-    private val contaRepository: ContaRepository
+    private val contaRepository: ContaRepository,
+    private val operacaoRepository: OperacaoRepository  // Nova dependência
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ConsultasViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ConsultasViewModel(clienteRepository, vendaRepository, localRepository, contaRepository) as T
+            return ConsultasViewModel(
+                clienteRepository,
+                vendaRepository,
+                localRepository,
+                contaRepository,
+                operacaoRepository
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

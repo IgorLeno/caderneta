@@ -17,13 +17,14 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.util.Log
+import com.example.caderneta.repository.LocalRepository
 import kotlinx.coroutines.launch
 
 class ResultadosConsultaAdapter(
     private val onLocalClick: (Long) -> Unit,
     private val onClienteClick: (Long) -> Unit,
-    private val onLimparExtratoClick: (Long) -> Unit,
-    private val localRepository: com.example.caderneta.repository.LocalRepository
+    private val onExtratoItemClick: (Venda, Cliente) -> Unit,
+    private val localRepository: LocalRepository
 ) : ListAdapter<ResultadoConsulta, RecyclerView.ViewHolder>(ResultadoConsultaDiffCallback()) {
 
     private var vendasPorCliente: Map<Long, List<Venda>> = emptyMap()
@@ -92,8 +93,10 @@ class ResultadosConsultaAdapter(
 
                 // Setup do RecyclerView do extrato
                 if (extratoAdapter == null) {
-                    extratoAdapter = ExtratoAdapter()
-                    rvExtrato.apply {
+                    extratoAdapter = ExtratoAdapter { venda ->
+                        onExtratoItemClick(venda, resultado.cliente)
+                    }
+                    binding.rvExtrato.apply {
                         layoutManager = LinearLayoutManager(context)
                         adapter = extratoAdapter
                     }

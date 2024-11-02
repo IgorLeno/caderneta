@@ -21,7 +21,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.R
+import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
+import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.FragmentConsultasBinding
 import com.example.caderneta.viewmodel.ConsultasViewModel
 import com.example.caderneta.viewmodel.ConsultasViewModelFactory
@@ -42,7 +44,8 @@ class ConsultasFragment : Fragment() {
             (requireActivity().application as CadernetaApplication).clienteRepository,
             (requireActivity().application as CadernetaApplication).vendaRepository,
             (requireActivity().application as CadernetaApplication).localRepository,
-            (requireActivity().application as CadernetaApplication).contaRepository
+            (requireActivity().application as CadernetaApplication).contaRepository,
+            (requireActivity().application as CadernetaApplication).operacaoRepository
         )
     }
 
@@ -151,9 +154,9 @@ class ConsultasFragment : Fragment() {
                 Log.d("ConsultasFragment", "Cliente selecionado: $clienteId")
                 viewModel.carregarVendasPorCliente(clienteId)
             },
-            onLimparExtratoClick = { clienteId ->
-                Log.d("ConsultasFragment", "Limpando extrato do cliente: $clienteId")
-                viewModel.limparExtrato(clienteId)
+            onExtratoItemClick = { venda, cliente ->
+                Log.d("ConsultasFragment", "Item do extrato selecionado: Venda ${venda.id}")
+                showOpcoesExtratoDialog(venda, cliente)
             },
             localRepository = (requireActivity().application as CadernetaApplication).localRepository
         )
@@ -161,8 +164,30 @@ class ConsultasFragment : Fragment() {
         binding.rvResultados.apply {
             layoutManager = LinearLayoutManager(context)
             adapter = resultadosAdapter
-            setHasFixedSize(true)
         }
+    }
+
+    private fun showOpcoesExtratoDialog(venda: Venda, cliente: Cliente) {
+        OpcoesExtratoDialog(
+            venda = venda,
+            cliente = cliente,
+            onEditarData = { vendaAtual, novaData ->
+                viewModel.atualizarDataVenda(vendaAtual, novaData)
+            },
+            onEditarOperacao = { vendaAtual ->
+                showEditarOperacaoDialog(vendaAtual, cliente)
+            },
+            onExcluir = { vendaAtual ->
+                viewModel.excluirVenda(vendaAtual)
+            }
+        ).show(childFragmentManager, OpcoesExtratoDialog.TAG)
+    }
+
+    private fun showEditarOperacaoDialog(venda: Venda, cliente: Cliente) {
+        EditarOperacaoDialog(
+            venda = venda,
+            cliente = cliente
+        ).show(childFragmentManager, EditarOperacaoDialog.TAG)
     }
 
     private fun setupNavDrawer() {
@@ -294,8 +319,28 @@ class ConsultasFragment : Fragment() {
                     }
                 }
             }
+
+            launch {
+                viewModel.saldoAtualizado.collectLatest { clienteId ->
+                    // Recarrega os dados do cliente e extrato
+                    viewModel.carregarVendasPorCliente(clienteId)
+                    // Atualiza a lista de resultados para refletir o novo saldo
+                    resultadosAdapter.notifyDataSetChanged()
+                }
+            }
+
+            // Observar erros
+            launch {
+                viewModel.error.collectLatest { errorMessage ->
+                    errorMessage?.let { message ->
+                        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+                        viewModel.clearError()
+                    }
+                }
+            }
         }
     }
+
 
     override fun onDestroyView() {
         super.onDestroyView()

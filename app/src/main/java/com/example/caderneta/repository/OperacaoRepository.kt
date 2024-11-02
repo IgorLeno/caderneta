@@ -2,10 +2,12 @@ package com.example.caderneta.repository
 
 import com.example.caderneta.data.dao.OperacaoDao
 import com.example.caderneta.data.entity.Operacao
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import java.util.Date
 
-class OperacaoRepository(private val operacaoDao: OperacaoDao) {
+class OperacaoRepository(val operacaoDao: OperacaoDao) {
 
     fun getAllOperacoes(): Flow<List<Operacao>> = operacaoDao.getAllOperacoes()
 
@@ -15,9 +17,19 @@ class OperacaoRepository(private val operacaoDao: OperacaoDao) {
     fun getOperacoesByDateRange(startDate: Date, endDate: Date): Flow<List<Operacao>> =
         operacaoDao.getOperacoesByDateRange(startDate, endDate)
 
-    suspend fun insertOperacao(operacao: Operacao): Long = operacaoDao.insertOperacao(operacao)
+    suspend fun getOperacaoById(id: Long): Operacao? = withContext(Dispatchers.IO) {
+        operacaoDao.getOperacaoById(id)
+    }
 
-    suspend fun updateOperacao(operacao: Operacao) = operacaoDao.updateOperacao(operacao)
+    suspend fun insertOperacao(operacao: Operacao): Long = withContext(Dispatchers.IO) {
+        operacaoDao.insertOperacao(operacao)
+    }
 
-    suspend fun deleteOperacao(operacao: Operacao) = operacaoDao.deleteOperacao(operacao)
+    suspend fun updateOperacao(operacao: Operacao) = withContext(Dispatchers.IO) {
+        operacaoDao.updateOperacao(operacao)
+    }
+
+    suspend fun deleteOperacao(operacao: Operacao) = withContext(Dispatchers.IO) {
+        operacaoDao.deleteOperacao(operacao)
+    }
 }

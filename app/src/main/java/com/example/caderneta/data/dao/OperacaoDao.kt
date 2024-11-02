@@ -10,6 +10,9 @@ interface OperacaoDao {
     @Query("SELECT * FROM operacoes")
     fun getAllOperacoes(): Flow<List<Operacao>>
 
+    @Query("SELECT * FROM operacoes WHERE id = :id")
+    suspend fun getOperacaoById(id: Long): Operacao?
+
     @Query("SELECT * FROM operacoes WHERE clienteId = :clienteId")
     fun getOperacoesByCliente(clienteId: Long): Flow<List<Operacao>>
 
