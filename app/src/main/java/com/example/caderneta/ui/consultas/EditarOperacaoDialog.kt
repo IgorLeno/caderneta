@@ -75,7 +75,8 @@ class EditarOperacaoDialog(
             (requireActivity().application as CadernetaApplication).vendaRepository,
             (requireActivity().application as CadernetaApplication).localRepository,
             (requireActivity().application as CadernetaApplication).contaRepository,
-            (requireActivity().application as CadernetaApplication).operacaoRepository
+            (requireActivity().application as CadernetaApplication).operacaoRepository,
+            (requireActivity().application as CadernetaApplication).configuracoesRepository
         )
     }
 

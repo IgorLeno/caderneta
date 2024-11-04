@@ -58,34 +58,31 @@ class ExtratoAdapter(
                 tvValor.text = numberFormat.format(venda.valor)
                 tvValor.setTextColor(getTransactionColor(venda.transacao))
 
-                // Handle quantities based on transaction type
+                // Reset visibilities
+                tvPagamento.visibility = View.GONE
+                tvTipoOperacao.visibility = View.GONE
+                tvQuantidadeSalgados.visibility = View.GONE
+                tvQuantidadeSucos.visibility = View.GONE
+
                 when (venda.transacao) {
                     "pagamento" -> {
                         tvPagamento.visibility = View.VISIBLE
-                        tvTipoOperacao.visibility = View.GONE
-                        tvQuantidadeSalgados.visibility = View.GONE
-                        tvQuantidadeSucos.visibility = View.GONE
                     }
                     else -> {
-                        tvPagamento.visibility = View.GONE
-
+                        // Handle promotion details
                         if (venda.isPromocao) {
                             tvTipoOperacao.apply {
                                 visibility = View.VISIBLE
                                 text = venda.promocaoDetalhes ?: "Promoção"
                             }
-                        } else {
-                            tvTipoOperacao.visibility = View.GONE
                         }
 
-                        // Show quantities if they exist
+                        // Always show quantities if they exist, regardless of promotion status
                         if (venda.quantidadeSalgados > 0) {
                             tvQuantidadeSalgados.apply {
                                 visibility = View.VISIBLE
                                 text = formatQuantity(venda.quantidadeSalgados, "salgado")
                             }
-                        } else {
-                            tvQuantidadeSalgados.visibility = View.GONE
                         }
 
                         if (venda.quantidadeSucos > 0) {
@@ -93,8 +90,6 @@ class ExtratoAdapter(
                                 visibility = View.VISIBLE
                                 text = formatQuantity(venda.quantidadeSucos, "suco")
                             }
-                        } else {
-                            tvQuantidadeSucos.visibility = View.GONE
                         }
                     }
                 }
@@ -114,7 +109,7 @@ class ExtratoAdapter(
             }
             return ContextCompat.getColor(itemView.context, colorResId)
         }
-    }
+    }   }
 
     class ExtratoDiffCallback : DiffUtil.ItemCallback<Venda>() {
         override fun areItemsTheSame(oldItem: Venda, newItem: Venda): Boolean {
@@ -125,4 +120,3 @@ class ExtratoAdapter(
             return oldItem == newItem
         }
     }
-}

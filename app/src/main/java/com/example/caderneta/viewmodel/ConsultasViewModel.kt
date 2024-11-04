@@ -5,12 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.caderneta.data.entity.Cliente
+import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.Operacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.repository.ClienteRepository
+import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.OperacaoRepository
@@ -25,8 +27,12 @@ class ConsultasViewModel(
     private val vendaRepository: VendaRepository,
     private val localRepository: LocalRepository,
     private val contaRepository: ContaRepository,
-    private val operacaoRepository: OperacaoRepository
+    private val operacaoRepository: OperacaoRepository,
+    private val configuracoesRepository: ConfiguracoesRepository // Adicionar
 ) : ViewModel() {
+
+    private val _configuracoes = MutableStateFlow<Configuracoes?>(null)
+    private val configuracoes: StateFlow<Configuracoes?> = _configuracoes
 
     private val _locais = MutableStateFlow<List<Local>>(emptyList())
     val locais: StateFlow<List<Local>> = _locais
@@ -56,8 +62,24 @@ class ConsultasViewModel(
     val clienteStateUpdates: StateFlow<VendasViewModel.ClienteState?> = _clienteStateUpdates
 
     init {
-        carregarLocais()
+        carregarDados()
     }
+
+    private fun carregarDados() {
+        viewModelScope.launch {
+            try {
+                launch {
+                    configuracoesRepository.getConfiguracoes().collect {
+                        _configuracoes.value = it
+                    }
+                }
+                carregarLocais()
+            } catch (e: Exception) {
+                handleError(e)
+            }
+        }
+    }
+
 
     private fun carregarLocais() {
         viewModelScope.launch {
@@ -198,37 +220,63 @@ class ConsultasViewModel(
         }
     }
 
-    suspend fun confirmarEdicaoOperacao(venda: Venda): Boolean {
-        return try {
-            // Obter o estado atual do cliente do VendasViewModel
-            val clienteState = _clienteStates.value[venda.clienteId]
-                ?: return false
 
+
+    suspend fun confirmarEdicaoOperacao(vendaOriginal: Venda): Boolean {
+        val clienteState = _clienteStates.value[vendaOriginal.clienteId] ?: return false
+        val config = _configuracoes.value ?: return false
+
+        try {
             // Calcular saldo a ser ajustado
             val ajusteSaldo = when {
-                // Se a operação original era a prazo e a nova não é, diminuir saldo antigo
-                venda.transacao == "a_prazo" &&
-                        clienteState.tipoTransacao != TipoTransacao.A_PRAZO -> -venda.valor
-                // Se a operação original não era a prazo e a nova é, aumentar com novo valor
-                venda.transacao != "a_prazo" &&
+                vendaOriginal.transacao == "a_prazo" &&
+                        clienteState.tipoTransacao != TipoTransacao.A_PRAZO -> -vendaOriginal.valor
+                vendaOriginal.transacao != "a_prazo" &&
                         clienteState.tipoTransacao == TipoTransacao.A_PRAZO -> clienteState.valorTotal
-                // Se ambas são a prazo, ajustar a diferença
-                venda.transacao == "a_prazo" &&
+                vendaOriginal.transacao == "a_prazo" &&
                         clienteState.tipoTransacao == TipoTransacao.A_PRAZO ->
-                    clienteState.valorTotal - venda.valor
+                    clienteState.valorTotal - vendaOriginal.valor
                 else -> 0.0
             }
 
-            // Criar nova venda baseada no estado atual
-            val novaVenda = venda.copy(
+            // Construir detalhes da promoção se aplicável
+            val (quantidadeSalgados, quantidadeSucos, promocaoDetalhes) = when {
+                clienteState.modoOperacao == ModoOperacao.PROMOCAO -> {
+                    val promoDetails = buildPromocaoDetalhes(clienteState, config)
+                    val totalSalgados = when {
+                        clienteState.quantidadePromo1 > 0 -> config.promo1Salgados * clienteState.quantidadePromo1
+                        else -> 0
+                    } + when {
+                        clienteState.quantidadePromo2 > 0 -> config.promo2Salgados * clienteState.quantidadePromo2
+                        else -> 0
+                    }
+                    val totalSucos = when {
+                        clienteState.quantidadePromo1 > 0 -> config.promo1Sucos * clienteState.quantidadePromo1
+                        else -> 0
+                    } + when {
+                        clienteState.quantidadePromo2 > 0 -> config.promo2Sucos * clienteState.quantidadePromo2
+                        else -> 0
+                    }
+                    Triple(totalSalgados, totalSucos, promoDetails)
+                }
+                else -> Triple(
+                    clienteState.quantidadeSalgados,
+                    clienteState.quantidadeSucos,
+                    null
+                )
+            }
+
+            // Criar nova venda mantendo os detalhes da promoção
+            val novaVenda = vendaOriginal.copy(
                 transacao = when (clienteState.tipoTransacao) {
                     TipoTransacao.A_VISTA -> "a_vista"
                     TipoTransacao.A_PRAZO -> "a_prazo"
-                    null -> venda.transacao // Mantém o original se não houver mudança
+                    null -> vendaOriginal.transacao
                 },
-                quantidadeSalgados = clienteState.quantidadeSalgados,
-                quantidadeSucos = clienteState.quantidadeSucos,
+                quantidadeSalgados = quantidadeSalgados,
+                quantidadeSucos = quantidadeSucos,
                 isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
+                promocaoDetalhes = promocaoDetalhes,
                 valor = clienteState.valorTotal
             )
 
@@ -238,34 +286,48 @@ class ConsultasViewModel(
             // Atualizar operação correspondente
             operacaoRepository.updateOperacao(
                 Operacao(
-                    id = venda.operacaoId,
-                    clienteId = venda.clienteId,
+                    id = vendaOriginal.operacaoId,
+                    clienteId = vendaOriginal.clienteId,
                     tipoOperacao = when (clienteState.modoOperacao) {
                         ModoOperacao.VENDA -> "Venda"
                         ModoOperacao.PROMOCAO -> "Promo"
                         ModoOperacao.PAGAMENTO -> "Pagamento"
-                        null -> "Venda" // Valor padrão
+                        null -> throw IllegalStateException("Modo de operação inválido")
                     },
                     valor = clienteState.valorTotal,
-                    data = venda.data
+                    data = vendaOriginal.data
                 )
             )
 
             // Atualizar saldo se necessário
             if (ajusteSaldo != 0.0) {
-                contaRepository.atualizarSaldo(venda.clienteId, ajusteSaldo)
-                _saldoAtualizado.emit(venda.clienteId)
+                contaRepository.atualizarSaldo(vendaOriginal.clienteId, ajusteSaldo)
+                _saldoAtualizado.emit(vendaOriginal.clienteId)
             }
 
             // Recarregar vendas do cliente
-            carregarVendasPorCliente(venda.clienteId)
+            carregarVendasPorCliente(vendaOriginal.clienteId)
 
-            true
+            return true
         } catch (e: Exception) {
             _error.value = "Erro ao atualizar operação: ${e.message}"
-            false
+            return false
         }
     }
+
+    private fun buildPromocaoDetalhes(state: VendasViewModel.ClienteState, config: Configuracoes): String {
+        val detalhes = mutableListOf<String>()
+
+        if (state.quantidadePromo1 > 0) {
+            detalhes.add("${state.quantidadePromo1}x ${config.promo1Nome}")
+        }
+        if (state.quantidadePromo2 > 0) {
+            detalhes.add("${state.quantidadePromo2}x ${config.promo2Nome}")
+        }
+
+        return detalhes.joinToString(", ")
+    }
+
 
     suspend fun atualizarDataVenda(venda: Venda, novaData: java.util.Date): Boolean {
         return try {
@@ -382,7 +444,8 @@ class ConsultasViewModelFactory(
     private val vendaRepository: VendaRepository,
     private val localRepository: LocalRepository,
     private val contaRepository: ContaRepository,
-    private val operacaoRepository: OperacaoRepository  // Nova dependência
+    private val operacaoRepository: OperacaoRepository,
+    private val configuracoesRepository: ConfiguracoesRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ConsultasViewModel::class.java)) {
@@ -392,7 +455,8 @@ class ConsultasViewModelFactory(
                 vendaRepository,
                 localRepository,
                 contaRepository,
-                operacaoRepository
+                operacaoRepository,
+                configuracoesRepository
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
