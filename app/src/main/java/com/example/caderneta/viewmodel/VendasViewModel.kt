@@ -347,7 +347,7 @@ class VendasViewModel(
         calcularValorTotal(clienteState)
     }
 
-    private fun calcularValorTotal(state: ClienteState) {
+    fun calcularValorTotal(state: ClienteState) {
         val config = _configuracoes.value ?: return
 
         val novoValor = when (state.modoOperacao) {
