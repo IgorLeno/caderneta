@@ -2,8 +2,10 @@ package com.example.caderneta.ui.consultas
 
 import android.os.Build
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -30,7 +32,6 @@ class ExtratoAdapter(
         return ViewHolder(binding)
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.bind(getItem(position))
     }
@@ -48,47 +49,70 @@ class ExtratoAdapter(
             }
         }
 
-        @RequiresApi(Build.VERSION_CODES.M)
         fun bind(venda: Venda) {
             binding.apply {
+                // Set date
                 tvData.text = dateFormat.format(venda.data)
-                tvQuantidade.text = formatarQuantidades(venda)
-                tvValor.text = formatarValor(venda)
-                tvValor.setTextColor(getCorTransacao(venda.transacao))
-            }
-        }
 
-        private fun formatarQuantidades(venda: Venda): String {
-            return when (venda.transacao) {
-                "pagamento" -> "Pagamento"
-                else -> buildString {
-                    if (venda.quantidadeSalgados > 0) {
-                        append("${venda.quantidadeSalgados} salgado")
-                        if (venda.quantidadeSalgados > 1) append("s")
+                // Set value and its color
+                tvValor.text = numberFormat.format(venda.valor)
+                tvValor.setTextColor(getTransactionColor(venda.transacao))
+
+                // Handle quantities based on transaction type
+                when (venda.transacao) {
+                    "pagamento" -> {
+                        tvPagamento.visibility = View.VISIBLE
+                        tvTipoOperacao.visibility = View.GONE
+                        tvQuantidadeSalgados.visibility = View.GONE
+                        tvQuantidadeSucos.visibility = View.GONE
                     }
-                    if (venda.quantidadeSucos > 0) {
-                        if (isNotEmpty()) append(", ")
-                        append("${venda.quantidadeSucos} suco")
-                        if (venda.quantidadeSucos > 1) append("s")
+                    else -> {
+                        tvPagamento.visibility = View.GONE
+
+                        if (venda.isPromocao) {
+                            tvTipoOperacao.apply {
+                                visibility = View.VISIBLE
+                                text = venda.promocaoDetalhes ?: "Promoção"
+                            }
+                        } else {
+                            tvTipoOperacao.visibility = View.GONE
+                        }
+
+                        // Show quantities if they exist
+                        if (venda.quantidadeSalgados > 0) {
+                            tvQuantidadeSalgados.apply {
+                                visibility = View.VISIBLE
+                                text = formatQuantity(venda.quantidadeSalgados, "salgado")
+                            }
+                        } else {
+                            tvQuantidadeSalgados.visibility = View.GONE
+                        }
+
+                        if (venda.quantidadeSucos > 0) {
+                            tvQuantidadeSucos.apply {
+                                visibility = View.VISIBLE
+                                text = formatQuantity(venda.quantidadeSucos, "suco")
+                            }
+                        } else {
+                            tvQuantidadeSucos.visibility = View.GONE
+                        }
                     }
                 }
             }
         }
 
-        private fun formatarValor(venda: Venda): String {
-            return numberFormat.format(venda.valor)
+        private fun formatQuantity(quantity: Int, item: String): String {
+            return "$quantity ${item}${if (quantity > 1) "s" else ""}"
         }
 
-        @RequiresApi(Build.VERSION_CODES.M)
-        private fun getCorTransacao(transacao: String): Int {
-            return itemView.context.getColor(
-                when (transacao) {
-                    "pagamento" -> R.color.green
-                    "a_vista" -> R.color.blue
-                    "a_prazo" -> R.color.red
-                    else -> R.color.on_surface
-                }
-            )
+        private fun getTransactionColor(transacao: String): Int {
+            val colorResId = when (transacao) {
+                "pagamento" -> R.color.green
+                "a_vista" -> R.color.blue
+                "a_prazo" -> R.color.red
+                else -> R.color.on_surface
+            }
+            return ContextCompat.getColor(itemView.context, colorResId)
         }
     }
 

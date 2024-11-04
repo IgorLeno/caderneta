@@ -1,32 +1,85 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="8dp">
+    android:layout_marginVertical="4dp"
+    app:cardCornerRadius="0dp">
 
-    <TextView
-        android:id="@+id/tv_data"
-        android:layout_width="0dp"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        tools:text="01/01/2023" />
+        android:padding="2dp">
 
-    <TextView
-        android:id="@+id/tv_quantidade"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        tools:text="5 salgados, 3 sucos" />
+        <TextView
+            android:id="@+id/tv_data"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="01/01/23"/>
 
-    <TextView
-        android:id="@+id/tv_valor"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:textAlignment="textEnd"
-        tools:text="R$ 50,00"
-        tools:textColor="@android:color/holo_red_dark" />
+        <LinearLayout
+            android:id="@+id/layout_quantidades"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical"
+            app:layout_constraintStart_toEndOf="@id/tv_data"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/tv_valor">
 
-</LinearLayout>
+            <TextView
+                android:id="@+id/tv_tipo_operacao"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:visibility="gone"
+                tools:text="Promo Kit 1"
+                tools:visibility="visible"/>
+
+            <TextView
+                android:id="@+id/tv_quantidade_salgados"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:visibility="gone"
+                tools:text="5 salgados"
+                tools:visibility="visible"/>
+
+            <TextView
+                android:id="@+id/tv_quantidade_sucos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:visibility="gone"
+                tools:text="2 sucos"
+                tools:visibility="visible"/>
+
+            <TextView
+                android:id="@+id/tv_pagamento"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:visibility="gone"
+                android:text="Pagamento"
+                tools:visibility="visible"/>
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_valor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="R$ 50,00"
+            tools:textColor="@color/red"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>

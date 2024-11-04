@@ -147,22 +147,21 @@ class ConsultasFragment : Fragment() {
     private fun setupRecyclerView() {
         resultadosAdapter = ResultadosConsultaAdapter(
             onLocalClick = { localId ->
-                Log.d("ConsultasFragment", "Local selecionado: $localId")
                 viewModel.selecionarLocal(localId)
+                binding.drawerLayout.closeDrawer(GravityCompat.START)
             },
             onClienteClick = { clienteId ->
-                Log.d("ConsultasFragment", "Cliente selecionado: $clienteId")
                 viewModel.carregarVendasPorCliente(clienteId)
             },
             onExtratoItemClick = { venda, cliente ->
-                Log.d("ConsultasFragment", "Item do extrato selecionado: Venda ${venda.id}")
                 showOpcoesExtratoDialog(venda, cliente)
             },
-            localRepository = (requireActivity().application as CadernetaApplication).localRepository
+            localRepository = (requireActivity().application as CadernetaApplication).localRepository,
+            coroutineScope = viewLifecycleOwner.lifecycleScope
         )
 
         binding.rvResultados.apply {
-            layoutManager = LinearLayoutManager(context)
+            layoutManager = LinearLayoutManager(requireContext())
             adapter = resultadosAdapter
         }
     }

@@ -26,58 +26,108 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
 
+                <!-- Nome do Cliente -->
                 <TextView
                     android:id="@+id/tv_nome_cliente"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="18sp"
                     android:textStyle="bold"
-                    tools:text="Nome do Cliente" />
+                    android:textColor="@color/on_surface"
+                    tools:text="Igor Silva" />
 
-                <TextView
-                    android:id="@+id/tv_telefone"
+                <!-- Telefone com rótulo -->
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textSize="14sp"
-                    android:textColor="?android:textColorSecondary"
-                    tools:text="(99) 99999-9999" />
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
 
-                <TextView
-                    android:id="@+id/tv_local_hierarquia"
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Telefone: "
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="?android:textColorSecondary"/>
+
+                    <TextView
+                        android:id="@+id/tv_telefone"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textColor="?android:textColorSecondary"
+                        tools:text="(99) 99999-9999" />
+                </LinearLayout>
+
+                <!-- Local com rótulo -->
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textSize="14sp"
-                    android:textColor="?android:textColorSecondary"
-                    tools:text="Prédio A > Andar 1 > Sala 101" />
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Local: "
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="?android:textColorSecondary"/>
+
+                    <TextView
+                        android:id="@+id/tv_local_hierarquia"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textColor="?android:textColorSecondary"
+                        android:maxLines="2"
+                        android:ellipsize="end"
+                        tools:text="Módulos > Módulo 1 > Obra 1" />
+                </LinearLayout>
 
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tv_valor_devido"
+            <!-- Valor Devido com rótulo -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:layout_marginStart="16dp"
-                tools:text="R$ 50,00"
-                tools:textColor="@color/red" />
+                android:orientation="vertical"
+                android:gravity="end">
+
+
+                <TextView
+                    android:id="@+id/tv_valor_devido"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="2dp"
+                    tools:text="R$ 50,00"
+                    tools:textColor="@color/red" />
+            </LinearLayout>
 
         </LinearLayout>
 
+        <!-- Extrato Section -->
         <LinearLayout
             android:id="@+id/layout_extrato"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:orientation="vertical"
-            android:visibility="gone">
+            android:orientation="vertical">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="8dp"
+                android:background="?android:dividerVertical" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Extrato"
+                android:textColor="@color/on_surface"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 

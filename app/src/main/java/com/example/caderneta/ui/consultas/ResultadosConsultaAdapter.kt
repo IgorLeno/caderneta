@@ -17,42 +17,25 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.util.Log
+import androidx.core.content.ContextCompat
+import com.example.caderneta.R
 import com.example.caderneta.repository.LocalRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ResultadosConsultaAdapter(
     private val onLocalClick: (Long) -> Unit,
     private val onClienteClick: (Long) -> Unit,
     private val onExtratoItemClick: (Venda, Cliente) -> Unit,
-    private val localRepository: LocalRepository
+    private val localRepository: LocalRepository,
+    private val coroutineScope: CoroutineScope // Add coroutine scope parameter
 ) : ListAdapter<ResultadoConsulta, RecyclerView.ViewHolder>(ResultadoConsultaDiffCallback()) {
 
     private var vendasPorCliente: Map<Long, List<Venda>> = emptyMap()
     private val expandedClientes = mutableSetOf<Long>()
     private val numberFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        return when (viewType) {
-            VIEW_TYPE_LOCAL -> LocalViewHolder(
-                ItemResultadoConsultaBinding.inflate(
-                    LayoutInflater.from(parent.context), parent, false
-                )
-            )
-            VIEW_TYPE_CLIENTE -> ClienteViewHolder(
-                ItemResultadoConsultaBinding.inflate(
-                    LayoutInflater.from(parent.context), parent, false
-                )
-            )
-            else -> throw IllegalArgumentException("Invalid view type")
-        }
-    }
-
-    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        when (holder) {
-            is LocalViewHolder -> holder.bind(getItem(position) as ResultadoConsulta.Local)
-            is ClienteViewHolder -> holder.bind(getItem(position) as ResultadoConsulta.Cliente)
-        }
-    }
 
     override fun getItemViewType(position: Int): Int {
         return when (getItem(position)) {
@@ -61,9 +44,24 @@ class ResultadosConsultaAdapter(
         }
     }
 
-    fun updateVendasPorCliente(vendasPorCliente: Map<Long, List<Venda>>) {
-        this.vendasPorCliente = vendasPorCliente
-        notifyDataSetChanged()
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val binding = ItemResultadoConsultaBinding.inflate(
+            LayoutInflater.from(parent.context),
+            parent,
+            false
+        )
+        return when (viewType) {
+            VIEW_TYPE_LOCAL -> LocalViewHolder(binding)
+            VIEW_TYPE_CLIENTE -> ClienteViewHolder(binding)
+            else -> throw IllegalArgumentException("Invalid view type")
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (val item = getItem(position)) {
+            is ResultadoConsulta.Local -> (holder as LocalViewHolder).bind(item)
+            is ResultadoConsulta.Cliente -> (holder as ClienteViewHolder).bind(item)
+        }
     }
 
     inner class ClienteViewHolder(private val binding: ItemResultadoConsultaBinding) :
@@ -75,42 +73,37 @@ class ResultadosConsultaAdapter(
             val cliente = resultado.cliente
 
             binding.apply {
-                // Informações básicas do cliente
                 tvNomeCliente.text = cliente.nome
-                tvTelefone.text = cliente.telefone ?: "-"
+                tvTelefone.text = cliente.telefone?.takeIf { it.isNotBlank() } ?: "Não informado"
 
-                // Valor devido
-                tvValorDevido.text = numberFormat.format(resultado.saldo)
-                tvValorDevido.setTextColor(
-                    if (resultado.saldo > 0) android.graphics.Color.RED
-                    else android.graphics.Color.GREEN
-                )
-
-                // Hierarquia de local
-                construirHierarquiaLocal(cliente) { hierarquia ->
-                    tvLocalHierarquia.text = hierarquia
+                tvValorDevido.apply {
+                    text = numberFormat.format(resultado.saldo)
+                    setTextColor(
+                        ContextCompat.getColor(
+                            context,
+                            if (resultado.saldo > 0) R.color.red else R.color.green
+                        )
+                    )
                 }
 
-                // Setup do RecyclerView do extrato
+                construirHierarquiaLocal(cliente)
+
                 if (extratoAdapter == null) {
                     extratoAdapter = ExtratoAdapter { venda ->
-                        onExtratoItemClick(venda, resultado.cliente)
+                        onExtratoItemClick(venda, cliente)
                     }
-                    binding.rvExtrato.apply {
+                    rvExtrato.apply {
                         layoutManager = LinearLayoutManager(context)
                         adapter = extratoAdapter
                     }
                 }
 
-                // Configurar o clique no card
                 root.setOnClickListener {
                     val clienteId = cliente.id
                     if (expandedClientes.contains(clienteId)) {
-                        // Recolher
                         collapseExtrato()
                         expandedClientes.remove(clienteId)
                     } else {
-                        // Expandir
                         onClienteClick(clienteId)
                         expandedClientes.add(clienteId)
                         vendasPorCliente[clienteId]?.let { vendas ->
@@ -120,14 +113,8 @@ class ResultadosConsultaAdapter(
                     }
                 }
 
-                // Atualizar visibilidade inicial do extrato
-                layoutExtrato.visibility = if (expandedClientes.contains(cliente.id)) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
+                layoutExtrato.visibility = if (expandedClientes.contains(cliente.id)) View.VISIBLE else View.GONE
 
-                // Atualizar dados do extrato se expandido
                 if (expandedClientes.contains(cliente.id)) {
                     vendasPorCliente[cliente.id]?.let { vendas ->
                         extratoAdapter?.submitList(vendas)
@@ -137,45 +124,34 @@ class ResultadosConsultaAdapter(
         }
 
         @SuppressLint("LongLogTag")
-        private fun construirHierarquiaLocal(cliente: Cliente, onComplete: (String) -> Unit) {
-            val locais = mutableListOf<String>()
-
-            // Buscar todos os locais necessários de forma assíncrona
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+        private fun construirHierarquiaLocal(cliente: Cliente) {
+            coroutineScope.launch {
                 try {
-                    // Local principal
-                    localRepository.getLocalById(cliente.localId)?.let {
-                        locais.add(it.nome)
+                    val locais = mutableListOf<String>()
+
+                    // Coletar locais de forma segura
+                    withContext(Dispatchers.IO) {
+                        val principal = localRepository.getLocalById(cliente.localId)
+                        val sub1 = cliente.sublocal1Id?.let { localRepository.getLocalById(it) }
+                        val sub2 = cliente.sublocal2Id?.let { localRepository.getLocalById(it) }
+                        val sub3 = cliente.sublocal3Id?.let { localRepository.getLocalById(it) }
+
+                        listOfNotNull(principal, sub1, sub2, sub3)
+                            .sortedBy { it.level }
+                            .forEach { local ->
+                                locais.add(local.nome)
+                            }
                     }
 
-                    // Sublocal nível 1
-                    cliente.sublocal1Id?.let { id ->
-                        localRepository.getLocalById(id)?.let {
-                            locais.add(it.nome)
-                        }
+                    // Atualizar UI no thread principal
+                    withContext(Dispatchers.Main) {
+                        binding.tvLocalHierarquia.text = locais.joinToString(" > ")
                     }
-
-                    // Sublocal nível 2
-                    cliente.sublocal2Id?.let { id ->
-                        localRepository.getLocalById(id)?.let {
-                            locais.add(it.nome)
-                        }
-                    }
-
-                    // Sublocal nível 3
-                    cliente.sublocal3Id?.let { id ->
-                        localRepository.getLocalById(id)?.let {
-                            locais.add(it.nome)
-                        }
-                    }
-
-                    // Montar hierarquia com separador
-                    val hierarquia = locais.joinToString(" > ")
-                    onComplete(hierarquia)
-
                 } catch (e: Exception) {
                     Log.e("ResultadosConsultaAdapter", "Erro ao buscar hierarquia: ${e.message}")
-                    onComplete(cliente.localId.toString())
+                    withContext(Dispatchers.Main) {
+                        binding.tvLocalHierarquia.text = "Local não disponível"
+                    }
                 }
             }
         }
@@ -184,30 +160,32 @@ class ResultadosConsultaAdapter(
             binding.layoutExtrato.apply {
                 visibility = View.VISIBLE
                 alpha = 0f
-                ValueAnimator.ofFloat(0f, 1f).apply {
-                    duration = 300
-                    interpolator = AccelerateDecelerateInterpolator()
-                    addUpdateListener { animator ->
-                        alpha = animator.animatedValue as Float
-                    }
-                    start()
-                }
+                animate()
+                    .alpha(1f)
+                    .setDuration(300)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .start()
             }
         }
 
         private fun collapseExtrato() {
-            binding.layoutExtrato.apply {
-                ValueAnimator.ofFloat(1f, 0f).apply {
-                    duration = 300
-                    interpolator = AccelerateDecelerateInterpolator()
-                    addUpdateListener { animator ->
-                        alpha = animator.animatedValue as Float
-                        if (animator.animatedValue as Float == 0f) {
-                            visibility = View.GONE
-                        }
-                    }
-                    start()
+            binding.layoutExtrato.animate()
+                .alpha(0f)
+                .setDuration(300)
+                .setInterpolator(AccelerateDecelerateInterpolator())
+                .withEndAction {
+                    binding.layoutExtrato.visibility = View.GONE
                 }
+                .start()
+        }
+    }
+
+    fun updateVendasPorCliente(novasVendas: Map<Long, List<Venda>>) {
+        vendasPorCliente = novasVendas
+        // Notificar apenas os itens que são clientes e estão expandidos
+        currentList.forEachIndexed { index, item ->
+            if (item is ResultadoConsulta.Cliente && expandedClientes.contains(item.cliente.id)) {
+                notifyItemChanged(index)
             }
         }
     }
