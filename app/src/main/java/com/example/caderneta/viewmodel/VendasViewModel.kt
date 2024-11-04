@@ -315,6 +315,8 @@ class VendasViewModel(
             tipoTransacao = newTipoTransacao,
             quantidadeSalgados = 0,
             quantidadeSucos = 0,
+            quantidadePromo1 = 0, // Adicionar esta linha
+            quantidadePromo2 = 0, // Adicionar esta linha
             valorTotal = 0.0
         )
         _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(cliente.id, newState) }
@@ -336,15 +338,17 @@ class VendasViewModel(
     }
 
     fun updateQuantidadePromo1(clienteId: Long, quantidade: Int) {
-        val clienteState = getClienteState(clienteId) ?: return
-        clienteState.quantidadePromo1 = quantidade
-        calcularValorTotal(clienteState)
+        val clienteState = _clienteStates.value[clienteId] ?: return
+        val newState = clienteState.copy(quantidadePromo1 = quantidade)
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, newState) }
+        calcularValorTotal(newState)
     }
 
     fun updateQuantidadePromo2(clienteId: Long, quantidade: Int) {
-        val clienteState = getClienteState(clienteId) ?: return
-        clienteState.quantidadePromo2 = quantidade
-        calcularValorTotal(clienteState)
+        val clienteState = _clienteStates.value[clienteId] ?: return
+        val newState = clienteState.copy(quantidadePromo2 = quantidade)
+        _clienteStates.value = _clienteStates.value.toMutableMap().apply { put(clienteId, newState) }
+        calcularValorTotal(newState)
     }
 
     fun calcularValorTotal(state: ClienteState) {
@@ -389,15 +393,56 @@ class VendasViewModel(
 
         val tipoTransacao = state.tipoTransacao ?: return 0.0
 
+        // Calcula valor da Promoção 1
         val valorPromo1 = if (state.quantidadePromo1 > 0) {
-            config.calcularValorPromocao(1, state.quantidadePromo1, tipoTransacao)
+            when (tipoTransacao) {
+                TipoTransacao.A_VISTA -> config.promo1Vista * state.quantidadePromo1
+                TipoTransacao.A_PRAZO -> config.promo1Prazo * state.quantidadePromo1
+            }
         } else 0.0
 
+        // Calcula valor da Promoção 2
         val valorPromo2 = if (state.quantidadePromo2 > 0) {
-            config.calcularValorPromocao(2, state.quantidadePromo2, tipoTransacao)
+            when (tipoTransacao) {
+                TipoTransacao.A_VISTA -> config.promo2Vista * state.quantidadePromo2
+                TipoTransacao.A_PRAZO -> config.promo2Prazo * state.quantidadePromo2
+            }
         } else 0.0
 
         return valorPromo1 + valorPromo2
+    }
+
+    fun resetQuantidades(clienteId: Long) {
+        _clienteStates.update { currentStates ->
+            val currentState = currentStates[clienteId]
+            if (currentState != null) {
+                currentStates + (clienteId to currentState.copy(
+                    quantidadeSalgados = 0,
+                    quantidadeSucos = 0,
+                    quantidadePromo1 = 0,
+                    quantidadePromo2 = 0,
+                    valorTotal = 0.0
+                ))
+            } else {
+                currentStates
+            }
+        }
+    }
+
+    fun atualizarModoOperacao(clienteId: Long, modoOperacao: ModoOperacao?) {
+        _clienteStates.update { currentStates ->
+            val currentState = currentStates[clienteId]
+            if (currentState != null) {
+                val newState = currentState.copy(
+                    modoOperacao = modoOperacao,
+                    tipoTransacao = null
+                )
+                resetQuantidades(clienteId)
+                currentStates + (clienteId to newState)
+            } else {
+                currentStates
+            }
+        }
     }
 
     fun confirmarOperacao(clienteId: Long) {

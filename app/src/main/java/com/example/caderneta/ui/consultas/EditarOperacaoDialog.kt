@@ -246,19 +246,15 @@ class EditarOperacaoDialog(
     private fun setupPromoContadores() {
         contadorPromo1Helper = ContadorHelper(binding.contadorPromo1.root).apply {
             setOnQuantidadeChangedListener { quantidade ->
-                if (quantidade != getQuantidade()) { // Evitar recálculo se valor não mudou
-                    vendasViewModel.updateQuantidadePromo1(cliente.id, quantidade)
-                    recalcularValorTotal()
-                }
+                vendasViewModel.updateQuantidadePromo1(cliente.id, quantidade)
+                recalcularValorTotal() // Adicionar esta linha
             }
         }
 
         contadorPromo2Helper = ContadorHelper(binding.contadorPromo2.root).apply {
             setOnQuantidadeChangedListener { quantidade ->
-                if (quantidade != getQuantidade()) { // Evitar recálculo se valor não mudou
-                    vendasViewModel.updateQuantidadePromo2(cliente.id, quantidade)
-                    recalcularValorTotal()
-                }
+                vendasViewModel.updateQuantidadePromo2(cliente.id, quantidade)
+                recalcularValorTotal() // Adicionar esta linha
             }
         }
     }
@@ -366,27 +362,16 @@ class EditarOperacaoDialog(
             },
             quantidadeSalgados = if (!venda.isPromocao) venda.quantidadeSalgados else 0,
             quantidadeSucos = if (!venda.isPromocao) venda.quantidadeSucos else 0,
-            quantidadePromo1 = if (venda.isPromocao) {
-                when {
-                    venda.promocaoDetalhes?.contains("1x") == true -> 1
-                    venda.promocaoDetalhes?.contains("2x") == true -> 2
-                    else -> 0
-                }
+            quantidadePromo1 = if (venda.isPromocao && venda.promocaoDetalhes?.contains("Promo 1") == true) {
+                venda.quantidadeSalgados // ou extrair do promocaoDetalhes
             } else 0,
-            quantidadePromo2 = if (venda.isPromocao) {
-                when {
-                    venda.promocaoDetalhes?.contains("1x Promo 2") == true -> 1
-                    venda.promocaoDetalhes?.contains("2x Promo 2") == true -> 2
-                    else -> 0
-                }
+            quantidadePromo2 = if (venda.isPromocao && venda.promocaoDetalhes?.contains("Promo 2") == true) {
+                venda.quantidadeSucos // ou extrair do promocaoDetalhes
             } else 0,
             valorTotal = venda.valor
         )
 
         vendasViewModel.setInitialState(cliente.id, initialState)
-        viewLifecycleOwner.lifecycleScope.launch {
-            consultasViewModel.abrirEdicaoOperacao(venda)
-        }
     }
 
     private fun observeViewModels() {
@@ -468,15 +453,14 @@ class EditarOperacaoDialog(
             // Atualizar visibilidade dos layouts de acordo com o modo
             when (state.modoOperacao) {
                 ModoOperacao.VENDA -> {
-                    layoutVendaNormal.visibility =
-                        if (state.tipoTransacao != null) View.VISIBLE else View.GONE
+                    layoutVendaNormal.visibility = if (state.tipoTransacao != null) View.VISIBLE else View.GONE
                     layoutVendaPromocao.visibility = View.GONE
+                    resetPromoContadores()
                 }
                 ModoOperacao.PROMOCAO -> {
                     layoutVendaNormal.visibility = View.GONE
-                    layoutVendaPromocao.visibility =
-                        if (state.tipoTransacao != null) View.VISIBLE else View.GONE
-                    // Aqui removemos o reset dos contadores pois já é feito no resetContadores()
+                    layoutVendaPromocao.visibility = if (state.tipoTransacao != null) View.VISIBLE else View.GONE
+                    resetVendaContadores()
                 }
                 else -> {
                     layoutVendaNormal.visibility = View.GONE
@@ -488,6 +472,16 @@ class EditarOperacaoDialog(
             updateQuantidades(state)
             updateValores(state)
         }
+    }
+
+    private fun resetVendaContadores() {
+        contadorSalgadosHelper?.setQuantidade(0)
+        contadorSucosHelper?.setQuantidade(0)
+    }
+
+    private fun resetPromoContadores() {
+        contadorPromo1Helper?.setQuantidade(0)
+        contadorPromo2Helper?.setQuantidade(0)
     }
 
     private fun recalcularValorTotal() {
