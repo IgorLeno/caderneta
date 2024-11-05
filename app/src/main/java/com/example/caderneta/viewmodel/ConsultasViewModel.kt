@@ -22,7 +22,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Date
 
 class ConsultasViewModel(
     private val clienteRepository: ClienteRepository,
@@ -311,16 +310,13 @@ class ConsultasViewModel(
 
         return try {
             withContext(Dispatchers.IO) {
-                // 1. Criar nova venda mantendo a data original
-                val novaVenda = criarVendaAtualizada(
-                    dataOriginal = vendaOriginal.data,
-                    clienteId = vendaOriginal.clienteId,
-                    localId = vendaOriginal.localId,
-                    clienteState = clienteState,
-                    config = config
-                )
+                // 1. Excluir operação e venda antigas
+                vendaRepository.deleteVenda(vendaOriginal)
+                operacaoRepository.getOperacaoById(vendaOriginal.operacaoId)?.let {
+                    operacaoRepository.deleteOperacao(it)
+                }
 
-                // 2. Criar nova operação correspondente
+                // 2. Criar nova operação
                 val novaOperacao = Operacao(
                     clienteId = vendaOriginal.clienteId,
                     tipoOperacao = when (clienteState.modoOperacao) {
@@ -330,23 +326,35 @@ class ConsultasViewModel(
                         null -> throw IllegalStateException("Modo de operação inválido")
                     },
                     valor = clienteState.valorTotal,
-                    data = vendaOriginal.data
+                    data = vendaOriginal.data // Mantém a data original
                 )
+                val novaOperacaoId = operacaoRepository.insertOperacao(novaOperacao)
 
-                // 3. Excluir operação e venda antigas
-                vendaRepository.deleteVenda(vendaOriginal)
-                operacaoRepository.getOperacaoById(vendaOriginal.operacaoId)?.let {
-                    operacaoRepository.deleteOperacao(it)
-                }
+                // 3. Criar nova venda com os valores atualizados
+                val novaVenda = Venda(
+                    operacaoId = novaOperacaoId,
+                    clienteId = vendaOriginal.clienteId,
+                    localId = vendaOriginal.localId,
+                    data = vendaOriginal.data, // Mantém a data original
+                    transacao = when (clienteState.tipoTransacao) {
+                        TipoTransacao.A_VISTA -> "a_vista"
+                        TipoTransacao.A_PRAZO -> "a_prazo"
+                        null -> "pagamento"
+                    },
+                    quantidadeSalgados = clienteState.quantidadeSalgados,
+                    quantidadeSucos = clienteState.quantidadeSucos,
+                    isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
+                    promocaoDetalhes = if (clienteState.modoOperacao == ModoOperacao.PROMOCAO) {
+                        buildPromocaoDetalhes(clienteState, config)
+                    } else null,
+                    valor = clienteState.valorTotal
+                )
+                vendaRepository.insertVenda(novaVenda)
 
-                // 4. Inserir nova operação e venda
-                val novoOperacaoId = operacaoRepository.insertOperacao(novaOperacao)
-                vendaRepository.insertVenda(novaVenda.copy(operacaoId = novoOperacaoId))
-
-                // 5. Recalcular saldo do cliente
+                // 4. Recalcular completamente o saldo do cliente
                 recalcularSaldoCompleto(vendaOriginal.clienteId)
 
-                // 6. Recarregar vendas do cliente
+                // 5. Recarregar vendas do cliente
                 carregarVendasPorCliente(vendaOriginal.clienteId)
 
                 true
@@ -358,51 +366,56 @@ class ConsultasViewModel(
     }
 
     private suspend fun recalcularSaldoCompleto(clienteId: Long) {
-        var novoSaldo = 0.0
+        withContext(Dispatchers.IO) {
+            try {
+                var novoSaldo = 0.0
 
-        // Recalcular todo o saldo do cliente baseado em suas vendas
-        vendaRepository.getVendasByCliente(clienteId).first().forEach { venda ->
-            when (venda.transacao) {
-                "a_prazo" -> novoSaldo += venda.valor
-                "pagamento" -> novoSaldo -= venda.valor
+                // Pegar todas as vendas do cliente
+                vendaRepository.getVendasByCliente(clienteId).first().forEach { venda ->
+                    when (venda.transacao) {
+                        "a_prazo" -> novoSaldo += venda.valor
+                        "pagamento" -> novoSaldo -= venda.valor
+                    }
+                }
+
+                // Atualizar conta com novo saldo
+                val contaExistente = contaRepository.getContaByCliente(clienteId)
+                if (contaExistente == null) {
+                    contaRepository.insertConta(Conta(clienteId = clienteId, saldo = novoSaldo))
+                } else {
+                    contaRepository.updateConta(contaExistente.copy(saldo = novoSaldo))
+                }
+
+                // Emitir evento de saldo atualizado
+                _saldoAtualizado.emit(clienteId)
+
+                // Atualizar mapa de saldos
+                _saldosAtualizados.update { currentMap ->
+                    currentMap + (clienteId to novoSaldo)
+                }
+
+                // Forçar atualização da lista de clientes
+                atualizarListaClientes()
+            } catch (e: Exception) {
+                _error.value = "Erro ao recalcular saldo: ${e.message}"
+                throw e
             }
         }
-
-        // Atualizar saldo no banco de dados
-        val conta = contaRepository.getContaByCliente(clienteId)
-        if (conta == null) {
-            contaRepository.insertConta(Conta(clienteId = clienteId, saldo = novoSaldo))
-        } else {
-            contaRepository.updateConta(conta.copy(saldo = novoSaldo))
-        }
-
-        // Atualizar mapa de saldos
-        _saldosAtualizados.update { currentMap ->
-            currentMap + (clienteId to novoSaldo)
-        }
-
-        // Emitir evento de atualização
-        _saldoAtualizado.emit(clienteId)
     }
 
+
     private fun criarVendaAtualizada(
-        dataOriginal: Date,
-        clienteId: Long,
-        localId: Long,
+        vendaOriginal: Venda,
         clienteState: VendasViewModel.ClienteState,
         config: Configuracoes
     ): Venda {
         val (quantidadeSalgados, quantidadeSucos, promocaoDetalhes) = calcularQuantidades(clienteState, config)
 
-        return Venda(
-            operacaoId = 0, // Será atualizado após inserir a operação
-            clienteId = clienteId,
-            localId = localId,
-            data = dataOriginal,
+        return vendaOriginal.copy(
             transacao = when (clienteState.tipoTransacao) {
                 TipoTransacao.A_VISTA -> "a_vista"
                 TipoTransacao.A_PRAZO -> "a_prazo"
-                null -> "pagamento"
+                null -> vendaOriginal.transacao
             },
             quantidadeSalgados = quantidadeSalgados,
             quantidadeSucos = quantidadeSucos,

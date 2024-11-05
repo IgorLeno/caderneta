@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.ActionBarDrawerToggle
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class ConsultasFragment : Fragment() {
+
     private var _binding: FragmentConsultasBinding? = null
     private val binding get() = _binding!!
 
@@ -67,7 +69,52 @@ class ConsultasFragment : Fragment() {
         setupBackNavigation()
         observeViewModel()
         handleNavigationArgs()
+
+
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.saldosAtualizados.collectLatest { saldos ->
+                Log.d("SaldoDebug", "Recebendo saldos atualizados: $saldos")
+                if (saldos.isNotEmpty()) {
+                    val currentList = resultadosAdapter.currentList.toMutableList()
+                    var hasChanges = false
+
+                    saldos.forEach { (clienteId, novoSaldo) ->
+                        Log.d(
+                            "SaldoDebug",
+                            "Processando cliente $clienteId - Novo saldo: $novoSaldo"
+                        )
+                        val index = currentList.indexOfFirst {
+                            (it is ResultadoConsulta.Cliente && it.cliente.id == clienteId)
+                        }
+
+                        if (index != -1) {
+                            val item = currentList[index]
+                            if (item is ResultadoConsulta.Cliente) {
+                                Log.d(
+                                    "SaldoDebug",
+                                    "Cliente encontrado na posição $index - Saldo anterior: ${item.saldo}"
+                                )
+                                currentList[index] = ResultadoConsulta.Cliente(
+                                    item.cliente,
+                                    novoSaldo
+                                )
+                                hasChanges = true
+                            }
+                        }
+                    }
+
+                    if (hasChanges) {
+                        Log.d("SaldoDebug", "Submitting nova lista com saldos atualizados")
+                        resultadosAdapter.submitList(null)
+                        resultadosAdapter.submitList(currentList)
+                    }
+                }
+            }
+        }
     }
+
+
 
     private fun handleNavigationArgs() {
         val args = ConsultasFragmentArgs.fromBundle(requireArguments())
@@ -82,7 +129,7 @@ class ConsultasFragment : Fragment() {
                     }
                     viewModel.carregarVendasPorCliente(args.clienteId)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Erro ao processar argumentos", e)
+                    Log.e("ConsultasFragment", "Erro ao processar argumentos", e)
                 }
             }
         }
@@ -106,14 +153,16 @@ class ConsultasFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, callback)
     }
 
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             android.R.id.home -> {
+                // Tenta navegar de volta quando o botão da toolbar é clicado
                 try {
                     findNavController().navigateUp()
                     true
                 } catch (e: Exception) {
-                    Log.e(TAG, "Erro na navegação pela toolbar", e)
+                    Log.e("ConsultasFragment", "Erro na navegação pela toolbar", e)
                     findNavController().navigate(R.id.vendasFragment)
                     true
                 }
@@ -128,6 +177,8 @@ class ConsultasFragment : Fragment() {
         setupNavDrawer()
         setupLocalRecyclerView()
         setupSearchListeners()
+
+        // Inicializar estado do drawer
         initializeDrawerState()
     }
 
@@ -202,13 +253,16 @@ class ConsultasFragment : Fragment() {
 
     private fun createDrawerListener() = object : androidx.drawerlayout.widget.DrawerLayout.DrawerListener {
         override fun onDrawerSlide(drawerView: View, slideOffset: Float) {}
+
         override fun onDrawerOpened(drawerView: View) {
-            Log.d(TAG, "Menu lateral aberto")
+            Log.d("ConsultasFragment", "Menu lateral aberto")
         }
+
         override fun onDrawerClosed(drawerView: View) {
             binding.navView.findViewById<TextInputEditText>(R.id.et_pesquisar_local).text?.clear()
-            Log.d(TAG, "Menu lateral fechado")
+            Log.d("ConsultasFragment", "Menu lateral fechado")
         }
+
         override fun onDrawerStateChanged(newState: Int) {}
     }
 
@@ -242,9 +296,9 @@ class ConsultasFragment : Fragment() {
             override fun afterTextChanged(s: Editable?) {
                 searchDebounceJob?.cancel()
                 searchDebounceJob = lifecycleScope.launch {
-                    delay(300)
+                    kotlinx.coroutines.delay(300)
                     val query = s.toString().trim()
-                    Log.d(TAG, "Buscando clientes: '$query'")
+                    Log.d("ConsultasFragment", "Buscando clientes: '$query'")
                     viewModel.buscarClientes(query)
                 }
             }
@@ -258,7 +312,7 @@ class ConsultasFragment : Fragment() {
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
                 override fun afterTextChanged(s: Editable?) {
                     val query = s.toString().trim()
-                    Log.d(TAG, "Buscando locais: '$query'")
+                    Log.d("ConsultasFragment", "Buscando locais: '$query'")
                     viewModel.buscarLocais(query)
                 }
             })
@@ -272,7 +326,7 @@ class ConsultasFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.apply {
             launch {
                 viewModel.locais.collectLatest { locais ->
-                    Log.d(TAG, "Atualizando lista de locais: ${locais.size} locais")
+                    Log.d("ConsultasFragment", "Atualizando lista de locais: ${locais.size} locais")
                     localAdapter.updateLocais(locais)
                 }
             }
@@ -280,13 +334,17 @@ class ConsultasFragment : Fragment() {
             launch {
                 viewModel.localSelecionado.collectLatest { local ->
                     binding.tvLocalSelecionado.text = local?.nome ?: getString(R.string.todos_locais)
-                    Log.d(TAG, "Local selecionado atualizado: ${local?.nome}")
+                    Log.d("ConsultasFragment", "Local selecionado atualizado: ${local?.nome}")
                 }
             }
 
             launch {
                 viewModel.clientesComSaldo.collectLatest { clientesComSaldo ->
-                    Log.d(TAG, "Nova lista de clientes recebida")
+                    Log.d("SaldoDebug", "Nova lista de clientes recebida: ${
+                        clientesComSaldo.map { (cliente, saldo) ->
+                            "${cliente.id}: $saldo"
+                        }
+                    }")
                     resultadosAdapter.submitList(clientesComSaldo.map { (cliente, saldo) ->
                         ResultadoConsulta.Cliente(cliente, saldo)
                     })
@@ -294,36 +352,50 @@ class ConsultasFragment : Fragment() {
             }
 
             launch {
-                viewModel.saldosAtualizados.collectLatest { saldos ->
-                    Log.d(TAG, "Recebendo saldos atualizados: $saldos")
-                    if (saldos.isNotEmpty()) {
-                        val currentList = resultadosAdapter.currentList.map { resultado ->
-                            when (resultado) {
-                                is ResultadoConsulta.Cliente -> {
-                                    val novoSaldo = saldos[resultado.cliente.id] ?: resultado.saldo
-                                    ResultadoConsulta.Cliente(resultado.cliente, novoSaldo)
-                                }
-                                else -> resultado
-                            }
-                        }
+                viewModel.vendasPorCliente.collectLatest { vendasPorCliente ->
+                    Log.d("ConsultasFragment",
+                        "Atualizando vendas por cliente: ${vendasPorCliente.size} clientes com vendas")
+                    resultadosAdapter.updateVendasPorCliente(vendasPorCliente)
+                }
+            }
 
-                        resultadosAdapter.submitList(null)
-                        resultadosAdapter.submitList(currentList)
-
-                        saldos.keys.forEach { clienteId ->
-                            viewModel.carregarVendasPorCliente(clienteId)
-                        }
+            launch {
+                viewModel.error.collectLatest { errorMessage ->
+                    errorMessage?.let { message ->
+                        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
                     }
                 }
             }
 
             launch {
-                viewModel.vendasPorCliente.collectLatest { vendasPorCliente ->
-                    Log.d(TAG, "Atualizando vendas por cliente: ${vendasPorCliente.size} clientes com vendas")
-                    resultadosAdapter.updateVendasPorCliente(vendasPorCliente)
+                viewModel.saldoAtualizado.collectLatest { clienteId ->
+                    // Força uma atualização imediata do adapter
+                    val currentList = resultadosAdapter.currentList.toMutableList()
+                    val index = currentList.indexOfFirst {
+                        (it is ResultadoConsulta.Cliente && it.cliente.id == clienteId)
+                    }
+
+                    if (index != -1) {
+                        val item = currentList[index]
+                        if (item is ResultadoConsulta.Cliente) {
+                            val novoSaldo = viewModel.getSaldoCliente(clienteId)
+                            Log.d(TAG, "Atualizando UI para cliente $clienteId - Novo saldo: $novoSaldo")
+
+                            // Criar novo item com saldo atualizado
+                            currentList[index] = ResultadoConsulta.Cliente(item.cliente, novoSaldo)
+
+                            // Força atualização da RecyclerView
+                            resultadosAdapter.submitList(null)
+                            resultadosAdapter.submitList(currentList)
+                        }
+                    }
+
+                    // Recarrega as vendas
+                    viewModel.carregarVendasPorCliente(clienteId)
                 }
             }
 
+            // Observar erros
             launch {
                 viewModel.error.collectLatest { errorMessage ->
                     errorMessage?.let { message ->
@@ -335,6 +407,7 @@ class ConsultasFragment : Fragment() {
         }
     }
 
+
     override fun onDestroyView() {
         super.onDestroyView()
         searchDebounceJob?.cancel()
@@ -343,6 +416,7 @@ class ConsultasFragment : Fragment() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Limpar quaisquer recursos persistentes
         viewModel.clearSearch()
     }
 
