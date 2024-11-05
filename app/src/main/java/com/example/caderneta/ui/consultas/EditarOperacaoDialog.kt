@@ -36,6 +36,7 @@ import com.example.caderneta.viewmodel.ConsultasViewModelFactory
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -567,6 +568,7 @@ class EditarOperacaoDialog(
         (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
+                    // Atualizar valor se necessário
                     when (venda.transacao) {
                         "pagamento" -> {
                             val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull()
@@ -574,12 +576,18 @@ class EditarOperacaoDialog(
                                 vendasViewModel.updateValorTotal(cliente.id, valorPagamento)
                             }
                         }
-                        else -> {
-                            // Valores já atualizados pelos contadores e estado
-                        }
                     }
 
                     if (consultasViewModel.confirmarEdicaoOperacao(venda)) {
+                        // Aguardar atualização do saldo
+                        delay(100) // Pequeno delay para garantir processamento
+
+                        // Forçar atualização da UI
+                        val localAtual = consultasViewModel.localSelecionado.value
+                        if (localAtual != null) {
+                            consultasViewModel.selecionarLocal(localAtual.id)
+                        }
+
                         requireContext().showSuccessToast(
                             when (venda.transacao) {
                                 "pagamento" -> "Pagamento atualizado com sucesso"
@@ -593,13 +601,9 @@ class EditarOperacaoDialog(
                 }
             }
         }
-
-        // Configurar tamanho do dialog
-        dialog?.window?.setLayout(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
     }
+
+
 
     override fun onDestroyView() {
         super.onDestroyView()

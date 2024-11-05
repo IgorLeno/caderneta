@@ -71,13 +71,16 @@ class ResultadosConsultaAdapter(
 
         fun bind(resultado: ResultadoConsulta.Cliente) {
             val cliente = resultado.cliente
+            Log.d("SaldoDebug", "Binding cliente ${cliente.id} - Saldo: ${resultado.saldo}")
 
             binding.apply {
                 tvNomeCliente.text = cliente.nome
                 tvTelefone.text = cliente.telefone?.takeIf { it.isNotBlank() } ?: "Não informado"
 
                 tvValorDevido.apply {
-                    text = numberFormat.format(resultado.saldo)
+                    val saldoFormatado = numberFormat.format(resultado.saldo)
+                    text = saldoFormatado
+                    Log.d("SaldoDebug", "Atualizando UI do cliente ${cliente.id} - Saldo formatado: $saldoFormatado")
                     setTextColor(
                         ContextCompat.getColor(
                             context,
@@ -208,25 +211,40 @@ class ResultadosConsultaAdapter(
 
     private class ResultadoConsultaDiffCallback : DiffUtil.ItemCallback<ResultadoConsulta>() {
         override fun areItemsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
-            return when {
+            val result = when {
                 oldItem is ResultadoConsulta.Local && newItem is ResultadoConsulta.Local ->
                     oldItem.local.id == newItem.local.id
                 oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente ->
                     oldItem.cliente.id == newItem.cliente.id
                 else -> false
             }
+            Log.d("SaldoDebug", "DiffUtil - areItemsTheSame: $result")
+            return result
         }
 
         override fun areContentsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
-            return when {
+            val result = when {
                 oldItem is ResultadoConsulta.Local && newItem is ResultadoConsulta.Local ->
                     oldItem == newItem
-                oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente ->
-                    oldItem.cliente == newItem.cliente && oldItem.saldo == newItem.saldo
+                oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente -> {
+                    val sameClient = oldItem.cliente == newItem.cliente
+                    val sameSaldo = kotlin.math.abs(oldItem.saldo - newItem.saldo) < 0.001
+                    Log.d("SaldoDebug", """
+                    DiffUtil - areContentsTheSame:
+                    Cliente ID: ${oldItem.cliente.id}
+                    Saldo Anterior: ${oldItem.saldo}
+                    Novo Saldo: ${newItem.saldo}
+                    Mesmo Cliente: $sameClient
+                    Mesmo Saldo: $sameSaldo
+                    """.trimIndent())
+                    sameClient && sameSaldo
+                }
                 else -> false
             }
+            return result
         }
     }
+
 
     companion object {
         private const val VIEW_TYPE_LOCAL = 0

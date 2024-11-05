@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Configuracoes
+import com.example.caderneta.data.entity.Conta
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.Operacao
@@ -33,6 +34,9 @@ class ConsultasViewModel(
 
     private val _configuracoes = MutableStateFlow<Configuracoes?>(null)
     private val configuracoes: StateFlow<Configuracoes?> = _configuracoes
+
+    private val _saldosAtualizados = MutableStateFlow<Map<Long, Double>>(emptyMap())
+    val saldosAtualizados: StateFlow<Map<Long, Double>> = _saldosAtualizados.asStateFlow()
 
     private val _locais = MutableStateFlow<List<Local>>(emptyList())
     val locais: StateFlow<List<Local>> = _locais
@@ -123,6 +127,84 @@ class ConsultasViewModel(
             }
         }
     }
+
+    private suspend fun recalcularSaldoCliente(clienteId: Long) {
+        withContext(Dispatchers.IO) {
+            try {
+                var novoSaldo = 0.0
+                vendaRepository.getVendasByCliente(clienteId).first().forEach { venda ->
+                    when (venda.transacao) {
+                        "a_prazo" -> {
+                            novoSaldo += venda.valor
+                            Log.d("SaldoDebug", "Venda a prazo: +${venda.valor} = $novoSaldo")
+                        }
+                        "pagamento" -> {
+                            novoSaldo -= venda.valor
+                            Log.d("SaldoDebug", "Pagamento: -${venda.valor} = $novoSaldo")
+                        }
+                    }
+                }
+
+                Log.d("SaldoDebug", "Saldo final calculado para cliente $clienteId: $novoSaldo")
+
+                // 1. Primeiro atualizar o mapa de saldos
+                _saldosAtualizados.update { currentMap ->
+                    Log.d("SaldoDebug", "Atualizando mapa de saldos: $clienteId -> $novoSaldo")
+                    currentMap + (clienteId to novoSaldo)
+                }
+
+                // 2. Depois atualizar o banco de dados
+                withContext(Dispatchers.IO) {
+                    val conta = contaRepository.getContaByCliente(clienteId)
+                    if (conta == null) {
+                        contaRepository.insertConta(Conta(clienteId = clienteId, saldo = novoSaldo))
+                        Log.d("SaldoDebug", "Nova conta criada com saldo $novoSaldo")
+                    } else {
+                        contaRepository.updateConta(conta.copy(saldo = novoSaldo))
+                        Log.d("SaldoDebug", "Conta existente atualizada com saldo $novoSaldo")
+                    }
+                }
+
+                // 3. Por fim, atualizar a lista de clientes
+                atualizarListaClientes()
+
+                // 4. Emitir evento de atualização
+                _saldoAtualizado.emit(clienteId)
+
+                Log.d("SaldoDebug", "Fluxo de atualização completo para cliente $clienteId")
+            } catch (e: Exception) {
+                Log.e("SaldoDebug", "Erro ao recalcular saldo", e)
+                _error.value = "Erro ao recalcular saldo: ${e.message}"
+            }
+        }
+    }
+
+    private suspend fun atualizarListaClientes() {
+        val localAtual = _localSelecionado.value
+        val query = _searchQuery.value
+
+        val clientes = when {
+            localAtual != null -> clienteRepository.getClientesByLocalHierarchy(localAtual.id).first()
+            query.isNotEmpty() -> clienteRepository.buscarClientes(query)
+            else -> clienteRepository.getAllClientes().first()
+        }
+
+        // Importante: Usar withContext(Dispatchers.IO) para operações de banco
+        val clientesComSaldoAtualizado = withContext(Dispatchers.IO) {
+            clientes.map { cliente ->
+                // Primeiro tentar pegar do mapa de saldos atualizados
+                val saldo = _saldosAtualizados.value[cliente.id]
+                    ?: contaRepository.getContaByCliente(cliente.id)?.saldo
+                    ?: 0.0
+                Log.d("SaldoDebug", "atualizarListaClientes: Cliente ${cliente.id} - Saldo: $saldo")
+                cliente to saldo
+            }
+        }
+
+        // Emitir a nova lista
+        _clientesComSaldo.emit(clientesComSaldoAtualizado)
+    }
+
 
 
     fun buscarClientes(query: String) {
@@ -226,94 +308,111 @@ class ConsultasViewModel(
         val clienteState = _clienteStates.value[vendaOriginal.clienteId] ?: return false
         val config = _configuracoes.value ?: return false
 
-        try {
-            // Calcular saldo a ser ajustado
-            val ajusteSaldo = when {
-                vendaOriginal.transacao == "a_prazo" &&
-                        clienteState.tipoTransacao != TipoTransacao.A_PRAZO -> -vendaOriginal.valor
-                vendaOriginal.transacao != "a_prazo" &&
-                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO -> clienteState.valorTotal
-                vendaOriginal.transacao == "a_prazo" &&
-                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO ->
-                    clienteState.valorTotal - vendaOriginal.valor
-                else -> 0.0
-            }
+        return try {
+            withContext(Dispatchers.IO) {
+                // 1. Atualizar a venda
+                val novaVenda = criarVendaAtualizada(vendaOriginal, clienteState, config)
+                vendaRepository.updateVenda(novaVenda)
 
-            // Construir detalhes da promoção se aplicável
-            val (quantidadeSalgados, quantidadeSucos, promocaoDetalhes) = when {
-                clienteState.modoOperacao == ModoOperacao.PROMOCAO -> {
-                    val promoDetails = buildPromocaoDetalhes(clienteState, config)
-                    val totalSalgados = when {
-                        clienteState.quantidadePromo1 > 0 -> config.promo1Salgados * clienteState.quantidadePromo1
-                        else -> 0
-                    } + when {
-                        clienteState.quantidadePromo2 > 0 -> config.promo2Salgados * clienteState.quantidadePromo2
-                        else -> 0
-                    }
-                    val totalSucos = when {
-                        clienteState.quantidadePromo1 > 0 -> config.promo1Sucos * clienteState.quantidadePromo1
-                        else -> 0
-                    } + when {
-                        clienteState.quantidadePromo2 > 0 -> config.promo2Sucos * clienteState.quantidadePromo2
-                        else -> 0
-                    }
-                    Triple(totalSalgados, totalSucos, promoDetails)
+                // 2. Atualizar a operação correspondente
+                atualizarOperacao(vendaOriginal.operacaoId, novaVenda, clienteState)
+
+                // 3. Recalcular saldo completo
+                recalcularSaldoCliente(vendaOriginal.clienteId)
+
+                // 4. Recarregar vendas do cliente
+                carregarVendasPorCliente(vendaOriginal.clienteId)
+
+                true
+            }
+        } catch (e: Exception) {
+            _error.value = "Erro ao atualizar operação: ${e.message}"
+            false
+        }
+    }
+
+    private fun criarVendaAtualizada(
+        vendaOriginal: Venda,
+        clienteState: VendasViewModel.ClienteState,
+        config: Configuracoes
+    ): Venda {
+        val (quantidadeSalgados, quantidadeSucos, promocaoDetalhes) = calcularQuantidades(clienteState, config)
+
+        return vendaOriginal.copy(
+            transacao = when (clienteState.tipoTransacao) {
+                TipoTransacao.A_VISTA -> "a_vista"
+                TipoTransacao.A_PRAZO -> "a_prazo"
+                null -> vendaOriginal.transacao
+            },
+            quantidadeSalgados = quantidadeSalgados,
+            quantidadeSucos = quantidadeSucos,
+            isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
+            promocaoDetalhes = promocaoDetalhes,
+            valor = clienteState.valorTotal
+        )
+    }
+
+    private fun calcularQuantidades(
+        clienteState: VendasViewModel.ClienteState,
+        config: Configuracoes
+    ): Triple<Int, Int, String?> {
+        return when (clienteState.modoOperacao) {
+            ModoOperacao.PROMOCAO -> {
+                // Calcular quantidades para promoções
+                var totalSalgados = 0
+                var totalSucos = 0
+
+                if (clienteState.quantidadePromo1 > 0) {
+                    totalSalgados += config.promo1Salgados * clienteState.quantidadePromo1
+                    totalSucos += config.promo1Sucos * clienteState.quantidadePromo1
                 }
-                else -> Triple(
+
+                if (clienteState.quantidadePromo2 > 0) {
+                    totalSalgados += config.promo2Salgados * clienteState.quantidadePromo2
+                    totalSucos += config.promo2Sucos * clienteState.quantidadePromo2
+                }
+
+                Triple(
+                    totalSalgados,
+                    totalSucos,
+                    buildPromocaoDetalhes(clienteState, config)
+                )
+            }
+            ModoOperacao.VENDA -> {
+                // Para vendas normais, usar as quantidades diretamente
+                Triple(
                     clienteState.quantidadeSalgados,
                     clienteState.quantidadeSucos,
                     null
                 )
             }
-
-            // Criar nova venda mantendo os detalhes da promoção
-            val novaVenda = vendaOriginal.copy(
-                transacao = when (clienteState.tipoTransacao) {
-                    TipoTransacao.A_VISTA -> "a_vista"
-                    TipoTransacao.A_PRAZO -> "a_prazo"
-                    null -> vendaOriginal.transacao
-                },
-                quantidadeSalgados = quantidadeSalgados,
-                quantidadeSucos = quantidadeSucos,
-                isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
-                promocaoDetalhes = promocaoDetalhes,
-                valor = clienteState.valorTotal
-            )
-
-            // Atualizar venda no banco de dados
-            vendaRepository.updateVenda(novaVenda)
-
-            // Atualizar operação correspondente
-            operacaoRepository.updateOperacao(
-                Operacao(
-                    id = vendaOriginal.operacaoId,
-                    clienteId = vendaOriginal.clienteId,
-                    tipoOperacao = when (clienteState.modoOperacao) {
-                        ModoOperacao.VENDA -> "Venda"
-                        ModoOperacao.PROMOCAO -> "Promo"
-                        ModoOperacao.PAGAMENTO -> "Pagamento"
-                        null -> throw IllegalStateException("Modo de operação inválido")
-                    },
-                    valor = clienteState.valorTotal,
-                    data = vendaOriginal.data
-                )
-            )
-
-            // Atualizar saldo se necessário
-            if (ajusteSaldo != 0.0) {
-                contaRepository.atualizarSaldo(vendaOriginal.clienteId, ajusteSaldo)
-                _saldoAtualizado.emit(vendaOriginal.clienteId)
-            }
-
-            // Recarregar vendas do cliente
-            carregarVendasPorCliente(vendaOriginal.clienteId)
-
-            return true
-        } catch (e: Exception) {
-            _error.value = "Erro ao atualizar operação: ${e.message}"
-            return false
+            else -> Triple(0, 0, null) // Para outros modos (pagamento)
         }
     }
+
+    private suspend fun atualizarOperacao(
+        operacaoId: Long,
+        venda: Venda,
+        clienteState: VendasViewModel.ClienteState
+    ) {
+        operacaoRepository.updateOperacao(
+            Operacao(
+                id = operacaoId,
+                clienteId = venda.clienteId,
+                tipoOperacao = when (clienteState.modoOperacao) {
+                    ModoOperacao.VENDA -> "Venda"
+                    ModoOperacao.PROMOCAO -> "Promo"
+                    ModoOperacao.PAGAMENTO -> "Pagamento"
+                    null -> throw IllegalStateException("Modo de operação inválido")
+                },
+                valor = clienteState.valorTotal,
+                data = venda.data
+            )
+        )
+    }
+
+
+
 
     private fun buildPromocaoDetalhes(state: VendasViewModel.ClienteState, config: Configuracoes): String {
         val detalhes = mutableListOf<String>()

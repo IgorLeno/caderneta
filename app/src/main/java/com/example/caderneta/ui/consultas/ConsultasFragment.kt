@@ -69,7 +69,51 @@ class ConsultasFragment : Fragment() {
         setupBackNavigation()
         observeViewModel()
         handleNavigationArgs()
+
+
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.saldosAtualizados.collectLatest { saldos ->
+                Log.d("SaldoDebug", "Recebendo saldos atualizados: $saldos")
+                if (saldos.isNotEmpty()) {
+                    val currentList = resultadosAdapter.currentList.toMutableList()
+                    var hasChanges = false
+
+                    saldos.forEach { (clienteId, novoSaldo) ->
+                        Log.d(
+                            "SaldoDebug",
+                            "Processando cliente $clienteId - Novo saldo: $novoSaldo"
+                        )
+                        val index = currentList.indexOfFirst {
+                            (it is ResultadoConsulta.Cliente && it.cliente.id == clienteId)
+                        }
+
+                        if (index != -1) {
+                            val item = currentList[index]
+                            if (item is ResultadoConsulta.Cliente) {
+                                Log.d(
+                                    "SaldoDebug",
+                                    "Cliente encontrado na posição $index - Saldo anterior: ${item.saldo}"
+                                )
+                                currentList[index] = ResultadoConsulta.Cliente(
+                                    item.cliente,
+                                    novoSaldo
+                                )
+                                hasChanges = true
+                            }
+                        }
+                    }
+
+                    if (hasChanges) {
+                        Log.d("SaldoDebug", "Submitting nova lista com saldos atualizados")
+                        resultadosAdapter.submitList(null)
+                        resultadosAdapter.submitList(currentList)
+                    }
+                }
+            }
+        }
     }
+
 
 
     private fun handleNavigationArgs() {
@@ -296,8 +340,11 @@ class ConsultasFragment : Fragment() {
 
             launch {
                 viewModel.clientesComSaldo.collectLatest { clientesComSaldo ->
-                    Log.d("ConsultasFragment",
-                        "Atualizando lista de clientes: ${clientesComSaldo.size} clientes")
+                    Log.d("SaldoDebug", "Nova lista de clientes recebida: ${
+                        clientesComSaldo.map { (cliente, saldo) ->
+                            "${cliente.id}: $saldo"
+                        }
+                    }")
                     resultadosAdapter.submitList(clientesComSaldo.map { (cliente, saldo) ->
                         ResultadoConsulta.Cliente(cliente, saldo)
                     })
@@ -322,10 +369,29 @@ class ConsultasFragment : Fragment() {
 
             launch {
                 viewModel.saldoAtualizado.collectLatest { clienteId ->
-                    // Recarrega os dados do cliente e extrato
+                    // Força uma atualização imediata do adapter
+                    val currentList = resultadosAdapter.currentList.toMutableList()
+                    val index = currentList.indexOfFirst {
+                        (it is ResultadoConsulta.Cliente && it.cliente.id == clienteId)
+                    }
+
+                    if (index != -1) {
+                        val item = currentList[index]
+                        if (item is ResultadoConsulta.Cliente) {
+                            val novoSaldo = viewModel.getSaldoCliente(clienteId)
+                            Log.d(TAG, "Atualizando UI para cliente $clienteId - Novo saldo: $novoSaldo")
+
+                            // Criar novo item com saldo atualizado
+                            currentList[index] = ResultadoConsulta.Cliente(item.cliente, novoSaldo)
+
+                            // Força atualização da RecyclerView
+                            resultadosAdapter.submitList(null)
+                            resultadosAdapter.submitList(currentList)
+                        }
+                    }
+
+                    // Recarrega as vendas
                     viewModel.carregarVendasPorCliente(clienteId)
-                    // Atualiza a lista de resultados para refletir o novo saldo
-                    resultadosAdapter.notifyDataSetChanged()
                 }
             }
 
