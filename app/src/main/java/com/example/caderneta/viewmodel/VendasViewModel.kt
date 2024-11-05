@@ -222,74 +222,32 @@ class VendasViewModel(
     }
 
 
+    private fun criarVendaAtualizada(
+        dataOriginal: Date,
+        clienteId: Long,
+        localId: Long,
+        clienteState: ClienteState,
+        config: Configuracoes
+    ): Venda {
+        val (quantidadeSalgados, quantidadeSucos, promocaoDetalhes) = calcularQuantidades(clienteState, config)
 
-    suspend fun confirmarEdicaoOperacao(vendaOriginal: Venda): Boolean {
-        val clienteState = _clienteStates.value[vendaOriginal.clienteId] ?: return false
-
-        try {
-            // Calcular saldo a ser ajustado
-            val ajusteSaldo = when {
-                // Se a operação original era a prazo e a nova não é, diminuir saldo antigo
-                vendaOriginal.transacao == "a_prazo" &&
-                        clienteState.tipoTransacao != TipoTransacao.A_PRAZO -> -vendaOriginal.valor
-
-                // Se a operação original não era a prazo e a nova é, aumentar com novo valor
-                vendaOriginal.transacao != "a_prazo" &&
-                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO -> clienteState.valorTotal
-
-                // Se ambas são a prazo, ajustar a diferença
-                vendaOriginal.transacao == "a_prazo" &&
-                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO ->
-                    clienteState.valorTotal - vendaOriginal.valor
-
-                else -> 0.0
-            }
-
-            // Criar nova venda baseada no estado atual
-            val novaVenda = vendaOriginal.copy(
-                transacao = when (clienteState.tipoTransacao) {
-                    TipoTransacao.A_VISTA -> "a_vista"
-                    TipoTransacao.A_PRAZO -> "a_prazo"
-                    null -> "pagamento"
-                },
-                quantidadeSalgados = clienteState.quantidadeSalgados,
-                quantidadeSucos = clienteState.quantidadeSucos,
-                isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
-                valor = clienteState.valorTotal
-            )
-
-            // Atualizar venda no banco de dados
-            vendaRepository.updateVenda(novaVenda)
-
-            // Atualizar operação correspondente
-            operacaoRepository.updateOperacao(
-                Operacao(
-                    id = vendaOriginal.operacaoId,
-                    clienteId = vendaOriginal.clienteId,
-                    tipoOperacao = when (clienteState.modoOperacao) {
-                        ModoOperacao.VENDA -> "Venda"
-                        ModoOperacao.PROMOCAO -> "Promo"
-                        ModoOperacao.PAGAMENTO -> "Pagamento"
-                        null -> throw IllegalStateException("Modo de operação inválido")
-                    },
-                    valor = clienteState.valorTotal,
-                    data = vendaOriginal.data
-                )
-            )
-
-            // Atualizar saldo se necessário
-            if (ajusteSaldo != 0.0) {
-                contaRepository.atualizarSaldo(vendaOriginal.clienteId, ajusteSaldo)
-                _saldoAtualizado.emit(vendaOriginal.clienteId)
-            }
-
-            return true
-        } catch (e: Exception) {
-            _error.value = "Erro ao atualizar operação: ${e.message}"
-            return false
-        }
+        return Venda(
+            operacaoId = 0, // Será atualizado após inserir a operação
+            clienteId = clienteId,
+            localId = localId,
+            data = dataOriginal,
+            transacao = when (clienteState.tipoTransacao) {
+                TipoTransacao.A_VISTA -> "a_vista"
+                TipoTransacao.A_PRAZO -> "a_prazo"
+                null -> "pagamento"
+            },
+            quantidadeSalgados = quantidadeSalgados,
+            quantidadeSucos = quantidadeSucos,
+            isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
+            promocaoDetalhes = promocaoDetalhes,
+            valor = clienteState.valorTotal
+        )
     }
-
 
     fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao?) {
         val currentState = _clienteStates.value[cliente.id]
@@ -506,16 +464,17 @@ class VendasViewModel(
     private fun calcularQuantidades(
         clienteState: ClienteState,
         config: Configuracoes
-    ): Pair<Int, Int> {
+    ): Triple<Int, Int, String?> {
         return if (clienteState.isPromocao()) {
             val quant1 = config.calcularQuantidadesPromocao(1, clienteState.quantidadePromo1)
             val quant2 = config.calcularQuantidadesPromocao(2, clienteState.quantidadePromo2)
-            Pair(
+            Triple(
                 quant1.salgados + quant2.salgados,
-                quant1.sucos + quant2.sucos
+                quant1.sucos + quant2.sucos,
+                buildPromocaoDetalhes(clienteState, config)
             )
         } else {
-            Pair(clienteState.quantidadeSalgados, clienteState.quantidadeSucos)
+            Triple(clienteState.quantidadeSalgados, clienteState.quantidadeSucos, null)
         }
     }
 
@@ -529,6 +488,8 @@ class VendasViewModel(
         config: Configuracoes,
         tipoTransacao: TipoTransacao
     ) {
+        val (salgados, sucos, promocaoDetalhes) = calcularQuantidades(clienteState, config)
+
         val operacao = Operacao(
             clienteId = clienteId,
             tipoOperacao = if (clienteState.isPromocao()) "Promo" else "Venda",
@@ -546,13 +507,11 @@ class VendasViewModel(
                 TipoTransacao.A_VISTA -> "a_vista"
                 TipoTransacao.A_PRAZO -> "a_prazo"
             },
-            quantidadeSalgados = quantidadeSalgados,
-            quantidadeSucos = quantidadeSucos,
+            quantidadeSalgados = salgados,
+            quantidadeSucos = sucos,
             valor = valorTotal,
             isPromocao = clienteState.isPromocao(),
-            promocaoDetalhes = if (clienteState.isPromocao()) {
-                buildPromocaoDetalhes(clienteState, config)
-            } else null
+            promocaoDetalhes = promocaoDetalhes
         )
         vendaRepository.insertVenda(venda)
     }

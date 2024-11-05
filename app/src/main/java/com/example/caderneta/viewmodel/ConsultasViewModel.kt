@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Date
 
 class ConsultasViewModel(
     private val clienteRepository: ClienteRepository,
@@ -310,17 +311,42 @@ class ConsultasViewModel(
 
         return try {
             withContext(Dispatchers.IO) {
-                // 1. Atualizar a venda
-                val novaVenda = criarVendaAtualizada(vendaOriginal, clienteState, config)
-                vendaRepository.updateVenda(novaVenda)
+                // 1. Criar nova venda mantendo a data original
+                val novaVenda = criarVendaAtualizada(
+                    dataOriginal = vendaOriginal.data,
+                    clienteId = vendaOriginal.clienteId,
+                    localId = vendaOriginal.localId,
+                    clienteState = clienteState,
+                    config = config
+                )
 
-                // 2. Atualizar a operação correspondente
-                atualizarOperacao(vendaOriginal.operacaoId, novaVenda, clienteState)
+                // 2. Criar nova operação correspondente
+                val novaOperacao = Operacao(
+                    clienteId = vendaOriginal.clienteId,
+                    tipoOperacao = when (clienteState.modoOperacao) {
+                        ModoOperacao.VENDA -> "Venda"
+                        ModoOperacao.PROMOCAO -> "Promo"
+                        ModoOperacao.PAGAMENTO -> "Pagamento"
+                        null -> throw IllegalStateException("Modo de operação inválido")
+                    },
+                    valor = clienteState.valorTotal,
+                    data = vendaOriginal.data
+                )
 
-                // 3. Recalcular saldo completo
-                recalcularSaldoCliente(vendaOriginal.clienteId)
+                // 3. Excluir operação e venda antigas
+                vendaRepository.deleteVenda(vendaOriginal)
+                operacaoRepository.getOperacaoById(vendaOriginal.operacaoId)?.let {
+                    operacaoRepository.deleteOperacao(it)
+                }
 
-                // 4. Recarregar vendas do cliente
+                // 4. Inserir nova operação e venda
+                val novoOperacaoId = operacaoRepository.insertOperacao(novaOperacao)
+                vendaRepository.insertVenda(novaVenda.copy(operacaoId = novoOperacaoId))
+
+                // 5. Recalcular saldo do cliente
+                recalcularSaldoCompleto(vendaOriginal.clienteId)
+
+                // 6. Recarregar vendas do cliente
                 carregarVendasPorCliente(vendaOriginal.clienteId)
 
                 true
@@ -331,18 +357,52 @@ class ConsultasViewModel(
         }
     }
 
+    private suspend fun recalcularSaldoCompleto(clienteId: Long) {
+        var novoSaldo = 0.0
+
+        // Recalcular todo o saldo do cliente baseado em suas vendas
+        vendaRepository.getVendasByCliente(clienteId).first().forEach { venda ->
+            when (venda.transacao) {
+                "a_prazo" -> novoSaldo += venda.valor
+                "pagamento" -> novoSaldo -= venda.valor
+            }
+        }
+
+        // Atualizar saldo no banco de dados
+        val conta = contaRepository.getContaByCliente(clienteId)
+        if (conta == null) {
+            contaRepository.insertConta(Conta(clienteId = clienteId, saldo = novoSaldo))
+        } else {
+            contaRepository.updateConta(conta.copy(saldo = novoSaldo))
+        }
+
+        // Atualizar mapa de saldos
+        _saldosAtualizados.update { currentMap ->
+            currentMap + (clienteId to novoSaldo)
+        }
+
+        // Emitir evento de atualização
+        _saldoAtualizado.emit(clienteId)
+    }
+
     private fun criarVendaAtualizada(
-        vendaOriginal: Venda,
+        dataOriginal: Date,
+        clienteId: Long,
+        localId: Long,
         clienteState: VendasViewModel.ClienteState,
         config: Configuracoes
     ): Venda {
         val (quantidadeSalgados, quantidadeSucos, promocaoDetalhes) = calcularQuantidades(clienteState, config)
 
-        return vendaOriginal.copy(
+        return Venda(
+            operacaoId = 0, // Será atualizado após inserir a operação
+            clienteId = clienteId,
+            localId = localId,
+            data = dataOriginal,
             transacao = when (clienteState.tipoTransacao) {
                 TipoTransacao.A_VISTA -> "a_vista"
                 TipoTransacao.A_PRAZO -> "a_prazo"
-                null -> vendaOriginal.transacao
+                null -> "pagamento"
             },
             quantidadeSalgados = quantidadeSalgados,
             quantidadeSucos = quantidadeSucos,
