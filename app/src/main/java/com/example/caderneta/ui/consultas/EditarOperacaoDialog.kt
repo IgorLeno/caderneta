@@ -169,13 +169,16 @@ class EditarOperacaoDialog(
 
             // Setup do botão Tudo
             viewLifecycleOwner.lifecycleScope.launch {
-                val saldo = consultasViewModel.getSaldoCliente(cliente.id)
+                val saldoAtual = consultasViewModel.getSaldoCliente(cliente.id)
+                // Soma o valor do pagamento sendo editado ao saldo atual
+                val saldoTotal = saldoAtual + venda.valor
+
                 btnTudo.apply {
                     visibility = View.VISIBLE
-                    isEnabled = saldo > 0
+                    isEnabled = saldoTotal > 0
                     setOnClickListener {
-                        etValorPagamento.setText(String.format("%.2f", saldo))
-                        vendasViewModel.updateValorTotal(cliente.id, saldo)
+                        etValorPagamento.setText(String.format("%.2f", saldoTotal))
+                        vendasViewModel.updateValorTotal(cliente.id, saldoTotal)
                     }
                 }
             }
@@ -265,38 +268,62 @@ class EditarOperacaoDialog(
     private fun setupButtons() {
         binding.apply {
             btnVenda.setOnClickListener {
-                vendasViewModel.selecionarModoOperacao(cliente, ModoOperacao.VENDA)
-                updateDialogTitle(ModoOperacao.VENDA)
+                val novoModo = if (vendasViewModel.getClienteState(cliente.id)?.modoOperacao == ModoOperacao.VENDA)
+                    null else ModoOperacao.VENDA
+                vendasViewModel.selecionarModoOperacao(cliente, novoModo)
+                resetContadores()
+                updateDialogTitle(novoModo)
             }
 
             btnPromocao.setOnClickListener {
-                vendasViewModel.selecionarModoOperacao(cliente, ModoOperacao.PROMOCAO)
-                updateDialogTitle(ModoOperacao.PROMOCAO)
+                val novoModo = if (vendasViewModel.getClienteState(cliente.id)?.modoOperacao == ModoOperacao.PROMOCAO)
+                    null else ModoOperacao.PROMOCAO
+                vendasViewModel.selecionarModoOperacao(cliente, novoModo)
+                resetContadores()
+                updateDialogTitle(novoModo)
             }
 
             btnAVista.setOnClickListener {
-                vendasViewModel.selecionarTipoTransacao(cliente, TipoTransacao.A_VISTA)
+                val novoTipo = if (vendasViewModel.getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_VISTA)
+                    null else TipoTransacao.A_VISTA
+                vendasViewModel.selecionarTipoTransacao(cliente, novoTipo)
+                if (novoTipo == null) resetContadores()
             }
 
             btnAPrazo.setOnClickListener {
-                vendasViewModel.selecionarTipoTransacao(cliente, TipoTransacao.A_PRAZO)
+                val novoTipo = if (vendasViewModel.getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_PRAZO)
+                    null else TipoTransacao.A_PRAZO
+                vendasViewModel.selecionarTipoTransacao(cliente, novoTipo)
+                if (novoTipo == null) resetContadores()
             }
         }
     }
 
     private fun resetContadores() {
-        when (vendasViewModel.clienteStates.value[cliente.id]?.modoOperacao) {
+        when (vendasViewModel.getClienteState(cliente.id)?.modoOperacao) {
             ModoOperacao.VENDA -> {
                 contadorSalgadosHelper?.setQuantidade(0)
                 contadorSucosHelper?.setQuantidade(0)
+                binding.etValorTotal.setText("0.00")
             }
             ModoOperacao.PROMOCAO -> {
                 contadorPromo1Helper?.setQuantidade(0)
                 contadorPromo2Helper?.setQuantidade(0)
+                binding.etValorTotalPromocao.setText("0.00")
             }
-            else -> {}
+            else -> {
+                // Reset todos os contadores
+                contadorSalgadosHelper?.setQuantidade(0)
+                contadorSucosHelper?.setQuantidade(0)
+                contadorPromo1Helper?.setQuantidade(0)
+                contadorPromo2Helper?.setQuantidade(0)
+                binding.etValorTotal.setText("0.00")
+                binding.etValorTotalPromocao.setText("0.00")
+            }
         }
-        recalcularValorTotal()
+
+        // Força recálculo do valor total
+        vendasViewModel.updateValorTotal(cliente.id, 0.0)
     }
 
 
@@ -364,16 +391,23 @@ class EditarOperacaoDialog(
             },
             quantidadeSalgados = if (!venda.isPromocao) venda.quantidadeSalgados else 0,
             quantidadeSucos = if (!venda.isPromocao) venda.quantidadeSucos else 0,
-            quantidadePromo1 = if (venda.isPromocao && venda.promocaoDetalhes?.contains("Promo 1") == true) {
-                venda.quantidadeSalgados // ou extrair do promocaoDetalhes
+            quantidadePromo1 = if (venda.isPromocao) {
+                extrairQuantidadePromocao(venda.promocaoDetalhes, "Promo 1")
             } else 0,
-            quantidadePromo2 = if (venda.isPromocao && venda.promocaoDetalhes?.contains("Promo 2") == true) {
-                venda.quantidadeSucos // ou extrair do promocaoDetalhes
+            quantidadePromo2 = if (venda.isPromocao) {
+                extrairQuantidadePromocao(venda.promocaoDetalhes, "Promo 2")
             } else 0,
             valorTotal = venda.valor
         )
 
         vendasViewModel.setInitialState(cliente.id, initialState)
+    }
+
+    private fun extrairQuantidadePromocao(promocaoDetalhes: String?, promoNome: String): Int {
+        return promocaoDetalhes?.let { detalhes ->
+            val regex = "(\\d+)x\\s*$promoNome".toRegex()
+            regex.find(detalhes)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        } ?: 0
     }
 
     private fun observeViewModels() {
@@ -457,24 +491,29 @@ class EditarOperacaoDialog(
                 ModoOperacao.VENDA -> {
                     layoutVendaNormal.visibility = if (state.tipoTransacao != null) View.VISIBLE else View.GONE
                     layoutVendaPromocao.visibility = View.GONE
-                    resetPromoContadores()
+                    if (state.tipoTransacao == null) {
+                        resetContadores()
+                    }
                 }
                 ModoOperacao.PROMOCAO -> {
                     layoutVendaNormal.visibility = View.GONE
                     layoutVendaPromocao.visibility = if (state.tipoTransacao != null) View.VISIBLE else View.GONE
-                    resetVendaContadores()
+                    if (state.tipoTransacao == null) {
+                        resetContadores()
+                    }
                 }
                 else -> {
                     layoutVendaNormal.visibility = View.GONE
                     layoutVendaPromocao.visibility = View.GONE
+                    resetContadores()
                 }
             }
 
-            Log.d(TAG, "UpdateUI: Modo=${state.modoOperacao}, Tipo=${state.tipoTransacao}")
             updateQuantidades(state)
             updateValores(state)
         }
     }
+
 
     private fun resetVendaContadores() {
         contadorSalgadosHelper?.setQuantidade(0)
@@ -523,17 +562,22 @@ class EditarOperacaoDialog(
     private fun updateQuantidades(state: VendasViewModel.ClienteState) {
         if (venda.transacao == "pagamento") return
 
-        // Sempre atualizar de acordo com o estado atual
         when (state.modoOperacao) {
             ModoOperacao.VENDA -> {
-                contadorSalgadosHelper?.setQuantidade(state.quantidadeSalgados)
-                contadorSucosHelper?.setQuantidade(state.quantidadeSucos)
+                if (state.tipoTransacao != null) {
+                    contadorSalgadosHelper?.setQuantidade(state.quantidadeSalgados)
+                    contadorSucosHelper?.setQuantidade(state.quantidadeSucos)
+                }
             }
             ModoOperacao.PROMOCAO -> {
-                contadorPromo1Helper?.setQuantidade(state.quantidadePromo1)
-                contadorPromo2Helper?.setQuantidade(state.quantidadePromo2)
+                if (state.tipoTransacao != null) {
+                    contadorPromo1Helper?.setQuantidade(state.quantidadePromo1)
+                    contadorPromo2Helper?.setQuantidade(state.quantidadePromo2)
+                }
             }
-            else -> {}
+            else -> {
+                resetContadores()
+            }
         }
     }
 
