@@ -19,6 +19,7 @@ import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.OperacaoRepository
 import com.example.caderneta.repository.VendaRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -131,51 +132,55 @@ class ConsultasViewModel(
     private suspend fun recalcularSaldoCliente(clienteId: Long) {
         withContext(Dispatchers.IO) {
             try {
+                val cliente = clienteRepository.getClienteById(clienteId)
                 var novoSaldo = 0.0
                 vendaRepository.getVendasByCliente(clienteId).first().forEach { venda ->
                     when (venda.transacao) {
-                        "a_prazo" -> {
-                            novoSaldo += venda.valor
-                            Log.d("SaldoDebug", "Venda a prazo: +${venda.valor} = $novoSaldo")
-                        }
-                        "pagamento" -> {
-                            novoSaldo -= venda.valor
-                            Log.d("SaldoDebug", "Pagamento: -${venda.valor} = $novoSaldo")
-                        }
+                        "a_prazo" -> novoSaldo += venda.valor
+                        "pagamento" -> novoSaldo -= venda.valor
                     }
                 }
 
-                Log.d("SaldoDebug", "Saldo final calculado para cliente $clienteId: $novoSaldo")
+                Log.d("SaldoDebug", "Recálculo: Cliente=${cliente?.nome}, Saldo=$novoSaldo")
 
-                // Atualizar mapa de saldos
-                _saldosAtualizados.update { currentMap ->
-                    Log.d("SaldoDebug", "Atualizando mapa de saldos: $clienteId -> $novoSaldo")
-                    currentMap + (clienteId to novoSaldo)
+                // Atualizar o saldo no banco de dados
+                val conta = contaRepository.getContaByCliente(clienteId)
+                if (conta == null) {
+                    contaRepository.insertConta(Conta(clienteId = clienteId, saldo = novoSaldo))
+                } else {
+                    contaRepository.updateConta(conta.copy(saldo = novoSaldo))
                 }
 
-                // Atualizar banco de dados
-                withContext(Dispatchers.IO) {
-                    val conta = contaRepository.getContaByCliente(clienteId)
-                    if (conta == null) {
-                        contaRepository.insertConta(Conta(clienteId = clienteId, saldo = novoSaldo))
-                        Log.d("SaldoDebug", "Nova conta criada com saldo $novoSaldo")
+                // IMPORTANTE: Forçar atualização imediata da lista de clientes com o novo saldo
+                val clientesAtuais = _clientesComSaldo.value
+                val novaLista = clientesAtuais.map { (clienteAtual, _) ->
+                    if (clienteAtual.id == clienteId) {
+                        Log.d("SaldoDebug", "Atualizando saldo do cliente ${clienteAtual.nome} de ${_clientesComSaldo.value.find { it.first.id == clienteId }?.second} para $novoSaldo")
+                        clienteAtual to novoSaldo
                     } else {
-                        contaRepository.updateConta(conta.copy(saldo = novoSaldo))
-                        Log.d("SaldoDebug", "Conta existente atualizada com saldo $novoSaldo")
+                        clienteAtual to (contaRepository.getContaByCliente(clienteAtual.id)?.saldo ?: 0.0)
                     }
                 }
 
-                // Atualizar lista de clientes
-                atualizarListaClientes()
+                // Emitir a nova lista antes da atualização de vendas
+                withContext(Dispatchers.Main) {
+                    _clientesComSaldo.value = novaLista
 
-                // Emitir evento de atualização
-                _saldoAtualizado.emit(clienteId)
+                    // Aguardar um momento para a UI atualizar
+                    delay(100)
+
+                    // Recarregar vendas do cliente e emitir evento de atualização
+                    carregarVendasPorCliente(clienteId)
+                    _saldoAtualizado.emit(clienteId)
+                }
             } catch (e: Exception) {
-                Log.e("SaldoDebug", "Erro ao recalcular saldo", e)
+                Log.e("SaldoDebug", "Erro ao recalcular saldo do cliente $clienteId", e)
                 _error.value = "Erro ao recalcular saldo: ${e.message}"
             }
         }
     }
+
+
     private suspend fun atualizarListaClientes() {
         val localAtual = _localSelecionado.value
         val query = _searchQuery.value
@@ -319,18 +324,15 @@ class ConsultasViewModel(
 
         return try {
             withContext(Dispatchers.IO) {
-                // Criar nova venda baseada no estado atual
                 val novaVenda = criarVendaAtualizada(vendaOriginal, clienteState, config)
-
-                // Atualizar venda no banco de dados
                 vendaRepository.updateVenda(novaVenda)
-
-                // Atualizar operação correspondente
                 atualizarOperacao(vendaOriginal.operacaoId, novaVenda, clienteState)
 
-                // Recalcular saldo e recarregar dados
-                recalcularSaldoCliente(vendaOriginal.clienteId)
-                carregarVendasPorCliente(vendaOriginal.clienteId)
+                // Forçar recálculo completo do saldo
+                withContext(Dispatchers.Main) {
+                    // Recalcular saldo antes de recarregar vendas
+                    recalcularSaldoCliente(vendaOriginal.clienteId)
+                }
 
                 true
             }

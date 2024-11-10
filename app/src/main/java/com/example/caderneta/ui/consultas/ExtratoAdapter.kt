@@ -111,12 +111,12 @@ class ExtratoAdapter(
         }
     }   }
 
-    class ExtratoDiffCallback : DiffUtil.ItemCallback<Venda>() {
-        override fun areItemsTheSame(oldItem: Venda, newItem: Venda): Boolean {
-            return oldItem.id == newItem.id
-        }
-
-        override fun areContentsTheSame(oldItem: Venda, newItem: Venda): Boolean {
-            return oldItem == newItem
-        }
+class ExtratoDiffCallback : DiffUtil.ItemCallback<Venda>() {
+    override fun areItemsTheSame(oldItem: Venda, newItem: Venda): Boolean {
+        return oldItem.id == newItem.id
     }
+
+    override fun areContentsTheSame(oldItem: Venda, newItem: Venda): Boolean {
+        return oldItem == newItem
+    }
+}
