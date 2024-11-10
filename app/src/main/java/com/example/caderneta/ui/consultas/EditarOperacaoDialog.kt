@@ -354,6 +354,16 @@ class EditarOperacaoDialog(
                 etValorPagamento.apply {
                     setText(String.format("%.2f", venda.valor))
                     isEnabled = true
+
+                    // Adicionar listener para atualizar o valor em tempo real
+                    addTextChangedListener(object : android.text.TextWatcher {
+                        override fun afterTextChanged(s: android.text.Editable?) {
+                            val valor = s.toString().toDoubleOrNull() ?: 0.0
+                            vendasViewModel.updateValorTotal(cliente.id, valor)
+                        }
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    })
                 }
             } else {
                 etValorTotal.isEnabled = false

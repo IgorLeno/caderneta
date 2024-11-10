@@ -134,7 +134,12 @@ class ConsultasViewModel(
             try {
                 val cliente = clienteRepository.getClienteById(clienteId)
                 var novoSaldo = 0.0
-                vendaRepository.getVendasByCliente(clienteId).first().forEach { venda ->
+
+                // Obter todas as vendas do cliente
+                val vendas = vendaRepository.getVendasByCliente(clienteId).first()
+
+                // Calcular o saldo baseado nas transações
+                vendas.forEach { venda ->
                     when (venda.transacao) {
                         "a_prazo" -> novoSaldo += venda.valor
                         "pagamento" -> novoSaldo -= venda.valor
@@ -151,27 +156,17 @@ class ConsultasViewModel(
                     contaRepository.updateConta(conta.copy(saldo = novoSaldo))
                 }
 
-                // IMPORTANTE: Forçar atualização imediata da lista de clientes com o novo saldo
-                val clientesAtuais = _clientesComSaldo.value
-                val novaLista = clientesAtuais.map { (clienteAtual, _) ->
-                    if (clienteAtual.id == clienteId) {
-                        Log.d("SaldoDebug", "Atualizando saldo do cliente ${clienteAtual.nome} de ${_clientesComSaldo.value.find { it.first.id == clienteId }?.second} para $novoSaldo")
-                        clienteAtual to novoSaldo
-                    } else {
-                        clienteAtual to (contaRepository.getContaByCliente(clienteAtual.id)?.saldo ?: 0.0)
-                    }
-                }
-
-                // Emitir a nova lista antes da atualização de vendas
+                // Atualizar o mapa de saldos
                 withContext(Dispatchers.Main) {
-                    _clientesComSaldo.value = novaLista
+                    _saldosAtualizados.value = _saldosAtualizados.value.toMutableMap().apply {
+                        put(clienteId, novoSaldo)
+                    }
 
-                    // Aguardar um momento para a UI atualizar
-                    delay(100)
-
-                    // Recarregar vendas do cliente e emitir evento de atualização
-                    carregarVendasPorCliente(clienteId)
+                    // Emitir evento de atualização
                     _saldoAtualizado.emit(clienteId)
+
+                    // Recarregar vendas para atualizar extrato
+                    carregarVendasPorCliente(clienteId)
                 }
             } catch (e: Exception) {
                 Log.e("SaldoDebug", "Erro ao recalcular saldo do cliente $clienteId", e)
@@ -179,8 +174,6 @@ class ConsultasViewModel(
             }
         }
     }
-
-
     private suspend fun atualizarListaClientes() {
         val localAtual = _localSelecionado.value
         val query = _searchQuery.value
@@ -284,7 +277,22 @@ class ConsultasViewModel(
     }
 
     suspend fun getSaldoCliente(clienteId: Long): Double {
-        return contaRepository.getContaByCliente(clienteId)?.saldo ?: 0.0
+        // Primeiro tentar pegar do mapa de saldos atualizados
+        return _saldosAtualizados.value[clienteId] ?: run {
+            // Se não encontrar no mapa, recalcular o saldo
+            var saldo = 0.0
+            vendaRepository.getVendasByCliente(clienteId).first().forEach { venda ->
+                when (venda.transacao) {
+                    "a_prazo" -> saldo += venda.valor
+                    "pagamento" -> saldo -= venda.valor
+                }
+            }
+            // Atualizar o mapa de saldos
+            _saldosAtualizados.value = _saldosAtualizados.value.toMutableMap().apply {
+                put(clienteId, saldo)
+            }
+            saldo
+        }
     }
 
     fun toggleLocalExpansion(local: Local) {
@@ -308,14 +316,47 @@ class ConsultasViewModel(
 
     fun carregarVendasPorCliente(clienteId: Long) {
         viewModelScope.launch {
-            vendaRepository.getVendasByCliente(clienteId).collect { vendas ->
+            try {
+                val vendas = vendaRepository.getVendasByCliente(clienteId).first()
+
+                // 1. Atualizar vendas
                 _vendasPorCliente.value = _vendasPorCliente.value.toMutableMap().apply {
                     put(clienteId, vendas)
                 }
+
+                // 2. Calcular saldo uma única vez
+                var novoSaldo = 0.0
+                vendas.forEach { venda ->
+                    when (venda.transacao) {
+                        "a_prazo" -> novoSaldo += venda.valor
+                        "pagamento" -> novoSaldo -= venda.valor
+                    }
+                }
+
+                // 3. Atualizar banco de dados em uma única operação
+                withContext(Dispatchers.IO) {
+                    val conta = contaRepository.getContaByCliente(clienteId)
+                    if (conta == null) {
+                        contaRepository.insertConta(Conta(clienteId = clienteId, saldo = novoSaldo))
+                    } else if (conta.saldo != novoSaldo) {
+                        contaRepository.updateConta(conta.copy(saldo = novoSaldo))
+                    }
+                }
+
+                // 4. Atualizar estado em uma única operação
+                val oldSaldo = _saldosAtualizados.value[clienteId]
+                if (oldSaldo != novoSaldo) {
+                    _saldosAtualizados.value = _saldosAtualizados.value.toMutableMap().apply {
+                        put(clienteId, novoSaldo)
+                    }
+                    _saldoAtualizado.emit(clienteId)
+                }
+
+            } catch (e: Exception) {
+                _error.value = "Erro ao carregar vendas: ${e.message}"
             }
         }
     }
-
 
 
     suspend fun confirmarEdicaoOperacao(vendaOriginal: Venda): Boolean {
@@ -325,13 +366,18 @@ class ConsultasViewModel(
         return try {
             withContext(Dispatchers.IO) {
                 val novaVenda = criarVendaAtualizada(vendaOriginal, clienteState, config)
+
+                // Salvar alterações
                 vendaRepository.updateVenda(novaVenda)
                 atualizarOperacao(vendaOriginal.operacaoId, novaVenda, clienteState)
 
-                // Forçar recálculo completo do saldo
+                // Recalcular saldo
+                recalcularSaldoCliente(vendaOriginal.clienteId)
+
+                // Recarregar vendas para atualizar o extrato
                 withContext(Dispatchers.Main) {
-                    // Recalcular saldo antes de recarregar vendas
-                    recalcularSaldoCliente(vendaOriginal.clienteId)
+                    carregarVendasPorCliente(vendaOriginal.clienteId)
+                    _saldoAtualizado.emit(vendaOriginal.clienteId)
                 }
 
                 true
@@ -512,6 +558,11 @@ class ConsultasViewModel(
                 currentStates.toMutableMap().apply {
                     put(state.clienteId, state)
                 }
+            }
+
+            // Importante: Ao atualizar o estado, também devemos atualizar o valor total
+            if (state.modoOperacao == ModoOperacao.PAGAMENTO) {
+                state.valorTotal = state.valorTotal.coerceAtLeast(0.0)  // Garante valor não negativo
             }
         }
     }

@@ -83,41 +83,66 @@ class ResultadosConsultaAdapter(
 
         private var extratoAdapter: ExtratoAdapter? = null
         private var currentSaldo: Double = 0.0
+        private var currentClienteId: Long = -1L
 
         fun bind(resultado: ResultadoConsulta.Cliente) {
             val cliente = resultado.cliente
+
+            // Atualizar ID apenas se mudou
+            if (currentClienteId != cliente.id) {
+                currentClienteId = cliente.id
+                configureExtratoAdapter(cliente)
+            }
+
+            // Configurar dados básicos
             binding.apply {
                 tvNomeCliente.text = cliente.nome
                 tvTelefone.text = cliente.telefone?.takeIf { it.isNotBlank() } ?: "Não informado"
                 tvTelefone.visibility = View.VISIBLE
                 tvLocalHierarquia.visibility = View.VISIBLE
 
-                construirHierarquiaLocal(cliente)
-                atualizarSaldo(resultado.saldo)
+                // Atualizar saldo apenas se mudou
+                if (currentSaldo != resultado.saldo) {
+                    atualizarSaldo(resultado.saldo)
+                }
 
-                configureExtratoAdapter(cliente)
-                setupClickListeners(cliente)
                 updateExtratoVisibility(cliente)
+            }
+
+            // Setup de click apenas se não estiver configurado
+            if (!binding.root.hasOnClickListeners()) {
+                setupClickListeners(cliente)
+            }
+
+            // Carregar hierarquia local apenas se necessário
+            if (binding.tvLocalHierarquia.text.isNullOrEmpty()) {
+                construirHierarquiaLocal(cliente)
             }
         }
 
         fun atualizarSaldo(novoSaldo: Double) {
-            Log.d("SaldoDebug", """
-        Atualizando saldo na UI:
-        Saldo atual: $currentSaldo
-        Novo saldo: $novoSaldo
-    """.trimIndent())
+            if (currentSaldo != novoSaldo) {
+                // Animar mudança do saldo
+                val valorAntigo = currentSaldo
+                currentSaldo = novoSaldo
 
-            binding.tvValorDevido.apply {
-                // Sempre atualizar, não verificar diferença
-                animateValue(currentSaldo, novoSaldo)
-                setTextColor(ContextCompat.getColor(
-                    context,
-                    if (novoSaldo > 0) R.color.red else R.color.green
-                ))
+                binding.tvValorDevido.animateValue(valorAntigo, novoSaldo)
+                binding.tvValorDevido.setTextColor(
+                    ContextCompat.getColor(
+                        binding.root.context,
+                        if (novoSaldo > 0) R.color.red else R.color.green
+                    )
+                )
+
+                // Se o extrato estiver expandido, forçar atualização
+                if (expandedClientes.contains(currentClienteId)) {
+                    vendasPorCliente[currentClienteId]?.let { vendas ->
+                        extratoAdapter?.submitList(vendas)
+                    }
+                }
             }
-            currentSaldo = novoSaldo
         }
+
 
         private fun configureExtratoAdapter(cliente: Cliente) {
             if (extratoAdapter == null) {
@@ -148,7 +173,9 @@ class ResultadosConsultaAdapter(
         }
 
         private fun updateExtratoVisibility(cliente: Cliente) {
-            binding.layoutExtrato.visibility = if (expandedClientes.contains(cliente.id)) View.VISIBLE else View.GONE
+            binding.layoutExtrato.visibility =
+                if (expandedClientes.contains(cliente.id)) View.VISIBLE else View.GONE
+
             if (expandedClientes.contains(cliente.id)) {
                 vendasPorCliente[cliente.id]?.let { vendas ->
                     extratoAdapter?.submitList(vendas)
@@ -208,28 +235,20 @@ class ResultadosConsultaAdapter(
                 }
                 .start()
         }
-    }
 
-    fun TextView.animateValue(startValue: Double, endValue: Double, duration: Long = 500L) {
-        val valueAnimator = ValueAnimator.ofFloat(startValue.toFloat(), endValue.toFloat())
-        valueAnimator.duration = duration
-        valueAnimator.interpolator = AccelerateDecelerateInterpolator()
+        private fun TextView.animateValue(startValue: Double, endValue: Double, duration: Long = 500L) {
+            if (startValue == endValue) return  // Evita animação desnecessária
 
-        valueAnimator.addUpdateListener { animator ->
-            val animatedValue = (animator.animatedValue as Float).toDouble()
-            text = numberFormat.format(animatedValue)
-        }
+            val valueAnimator = ValueAnimator.ofFloat(startValue.toFloat(), endValue.toFloat())
+            valueAnimator.duration = duration
+            valueAnimator.interpolator = AccelerateDecelerateInterpolator()
 
-        valueAnimator.start()
-    }
-
-    fun updateVendasPorCliente(novasVendas: Map<Long, List<Venda>>) {
-        vendasPorCliente = novasVendas
-        // Notificar apenas os itens que são clientes e estão expandidos
-        currentList.forEachIndexed { index, item ->
-            if (item is ResultadoConsulta.Cliente && expandedClientes.contains(item.cliente.id)) {
-                notifyItemChanged(index)
+            valueAnimator.addUpdateListener { animator ->
+                val animatedValue = (animator.animatedValue as Float).toDouble()
+                text = numberFormat.format(animatedValue)
             }
+
+            valueAnimator.start()
         }
     }
 
@@ -249,6 +268,16 @@ class ResultadosConsultaAdapter(
         }
     }
 
+    fun updateVendasPorCliente(novasVendas: Map<Long, List<Venda>>) {
+        vendasPorCliente = novasVendas
+        // Notificar apenas os itens que são clientes e estão expandidos
+        currentList.forEachIndexed { index, item ->
+            if (item is ResultadoConsulta.Cliente && expandedClientes.contains(item.cliente.id)) {
+                notifyItemChanged(index)
+            }
+        }
+    }
+
     class ResultadoConsultaDiffCallback : DiffUtil.ItemCallback<ResultadoConsulta>() {
         override fun areItemsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
             return when {
@@ -265,8 +294,7 @@ class ResultadosConsultaAdapter(
                 oldItem is ResultadoConsulta.Local && newItem is ResultadoConsulta.Local ->
                     oldItem == newItem
                 oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente -> {
-                    // IMPORTANTE: Sempre forçar atualização quando houver novo saldo
-                    false
+                    oldItem.cliente == newItem.cliente && oldItem.saldo == newItem.saldo
                 }
                 else -> false
             }
@@ -274,14 +302,16 @@ class ResultadosConsultaAdapter(
 
         override fun getChangePayload(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Any? {
             if (oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente) {
-                // IMPORTANTE: Sempre criar um payload para forçar atualização
-                return Bundle().apply {
-                    putDouble("saldo", newItem.saldo)
+                if (oldItem.cliente == newItem.cliente && oldItem.saldo != newItem.saldo) {
+                    return Bundle().apply {
+                        putDouble("saldo", newItem.saldo)
+                    }
                 }
             }
             return null
         }
     }
+
     companion object {
         private const val VIEW_TYPE_LOCAL = 0
         private const val VIEW_TYPE_CLIENTE = 1
