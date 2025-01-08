@@ -19,7 +19,6 @@ import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.OperacaoRepository
 import com.example.caderneta.repository.VendaRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

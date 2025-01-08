@@ -1,10 +1,7 @@
 package com.example.caderneta.ui.consultas
 
-import android.animation.ObjectAnimator
-import android.animation.StateListAnimator
 import android.app.Dialog
 import android.content.res.ColorStateList
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
@@ -12,8 +9,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
-import android.widget.TextView
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
@@ -70,16 +65,10 @@ class EditarOperacaoDialog(
         )
     }
 
-    private val consultasViewModel: ConsultasViewModel by viewModels {
-        ConsultasViewModelFactory(
-            (requireActivity().application as CadernetaApplication).clienteRepository,
-            (requireActivity().application as CadernetaApplication).vendaRepository,
-            (requireActivity().application as CadernetaApplication).localRepository,
-            (requireActivity().application as CadernetaApplication).contaRepository,
-            (requireActivity().application as CadernetaApplication).operacaoRepository,
-            (requireActivity().application as CadernetaApplication).configuracoesRepository
-        )
-    }
+    private val consultasViewModel: ConsultasViewModel by viewModels(
+        ownerProducer = { requireParentFragment() }
+    )
+
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = ItemClienteBinding.inflate(LayoutInflater.from(context))

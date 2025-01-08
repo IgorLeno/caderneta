@@ -1,0 +1,99 @@
+C:\Users\ildsf\Projects\Kotlin_Projects\app_caderneta
+├── .gradle
+├── .idea
+├── app
+│   ├── build
+│   ├── src
+│   │   ├── androidTest
+│   │   ├── main
+│   │   │   ├── AndroidManifest.xml
+│   │   │   ├── java
+│   │   │   │   └── com
+│   │   │   │       └── example
+│   │   │   │           └── caderneta
+│   │   │   │               ├── CadernetaApplication.kt
+│   │   │   │               ├── MainActivity.kt
+│   │   │   │               ├── data
+│   │   │   │               │   ├── dao
+│   │   │   │               │   ├── entity
+│   │   │   │               │   └── AppDatabase.kt
+│   │   │   │               ├── repository
+│   │   │   │               │   ├── ClienteRepository.kt
+│   │   │   │               │   ├── ConfiguracoesRepository.kt
+│   │   │   │               │   ├── ContaRepository.kt
+│   │   │   │               │   ├── ItemVendaRepository.kt
+│   │   │   │               │   ├── LocalRepository.kt
+│   │   │   │               │   ├── OperacaoRepository.kt
+│   │   │   │               │   ├── ProdutoRepository.kt
+│   │   │   │               │   └── VendaRepository.kt
+│   │   │   │               ├── ui
+│   │   │   │               │   ├── balanco
+│   │   │   │               │   ├── components
+│   │   │   │               │   ├── configuracoes
+│   │   │   │               │   ├── consultas
+│   │   │   │               │   ├── historico
+│   │   │   │               │   ├── theme
+│   │   │   │               │   └── vendas
+│   │   │   │               ├── util
+│   │   │   │               │   ├── ContadorHelper.kt
+│   │   │   │               │   ├── DateConverter.kt
+│   │   │   │               │   └── Extensions.kt
+│   │   │   │               └── viewmodel
+│   │   │   └── res
+│   │   │       ├── anim
+│   │   │       ├── drawable
+│   │   │       ├── drawable-hdpi
+│   │   │       ├── drawable-mdpi
+│   │   │       ├── drawable-xhdpi
+│   │   │       ├── drawable-xxhdpi
+│   │   │       ├── drawable-xxxhdpi
+│   │   │       ├── layout
+│   │   │       │   ├── activity_main.xml
+│   │   │       │   ├── contador_oval.xml
+│   │   │       │   ├── dialog_add_sublocal.xml
+│   │   │       │   ├── dialog_adicionar_produto.xml
+│   │   │       │   ├── dialog_edit_local.xml
+│   │   │       │   ├── dialog_novo_cliente.xml
+│   │   │       │   ├── dialog_opcoes_cliente.xml
+│   │   │       │   ├── dialog_opcoes_extrato.xml
+│   │   │       │   ├── dialog_registrar_pagamento.xml
+│   │   │       │   ├── dialog_venda_personalizada.xml
+│   │   │       │   ├── fragment_balanco_caixa.xml
+│   │   │       │   ├── fragment_configuracoes.xml
+│   │   │       │   ├── fragment_consultas.xml
+│   │   │       │   ├── fragment_historico_vendas.xml
+│   │   │       │   ├── fragment_vendas.xml
+│   │   │       │   ├── item_cliente.xml
+│   │   │       │   ├── item_detalhe_venda.xml
+│   │   │       │   ├── item_extrato.xml
+│   │   │       │   └── item_local.xml
+│   │   │       ├── menu
+│   │   │       │   ├── bottom_navigation_menu.xml
+│   │   │       │   └── menu_locais.xml
+│   │   │       ├── mipmap-anydpi-v26
+│   │   │       ├── mipmap-hdpi
+│   │   │       ├── mipmap-mdpi
+│   │   │       ├── mipmap-xhdpi
+│   │   │       ├── mipmap-xxhdpi
+│   │   │       ├── mipmap-xxxhdpi
+│   │   │       ├── navigation
+│   │   │       │   └── nav_graph.xml
+│   │   │       ├── values
+│   │   │       │   ├── arrays.xml
+│   │   │       │   ├── colors.xml
+│   │   │       │   ├── strings.xml
+│   │   │       │   └── themes.xml
+│   │   │       └── xml
+│   │   └── test
+│   ├── .gitignore
+│   ├── build.gradle.kts
+│   ├── proguard-rules.pro
+│   └── settings.gradle.kts
+├── gradle
+├── .gitignore
+├── build.gradle.kts
+├── gradle.properties
+├── gradlew
+├── gradlew.bat
+├── local.properties
+└── settings.gradle.kts

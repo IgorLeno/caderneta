@@ -20,10 +20,14 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.util.Log
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentManager
+import androidx.navigation.NavOptions
+import androidx.navigation.Navigation.findNavController
 import com.example.caderneta.R
 import com.example.caderneta.repository.LocalRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -32,7 +36,10 @@ class ResultadosConsultaAdapter(
     private val onClienteClick: (Long) -> Unit,
     private val onExtratoItemClick: (Venda, Cliente) -> Unit,
     private val localRepository: LocalRepository,
-    private val coroutineScope: CoroutineScope
+    private val coroutineScope: CoroutineScope,
+    private val fragmentManager: FragmentManager,
+    private val onEditarCliente: (Cliente) -> Unit,
+    private val onExcluirCliente: (Cliente) -> Unit
 ) : ListAdapter<ResultadoConsulta, RecyclerView.ViewHolder>(ResultadoConsultaDiffCallback()) {
 
     private var vendasPorCliente: Map<Long, List<Venda>> = emptyMap()
@@ -85,6 +92,8 @@ class ResultadosConsultaAdapter(
         private var currentSaldo: Double = 0.0
         private var currentClienteId: Long = -1L
 
+
+        @SuppressLint("LongLogTag")
         fun bind(resultado: ResultadoConsulta.Cliente) {
             val cliente = resultado.cliente
 
@@ -112,6 +121,45 @@ class ResultadosConsultaAdapter(
             // Setup de click apenas se não estiver configurado
             if (!binding.root.hasOnClickListeners()) {
                 setupClickListeners(cliente)
+            }
+
+            // Setup do long click listener
+            binding.root.setOnLongClickListener {
+                OpcoesConsultaClienteDialog(
+                    cliente = cliente,
+                    onVenderClick = { clienteSelecionado ->
+                        coroutineScope.launch {
+                            try {
+                                val localMaisEspecifico = withContext(Dispatchers.IO) {
+                                    listOfNotNull(
+                                        localRepository.getLocalById(clienteSelecionado.localId),
+                                        clienteSelecionado.sublocal1Id?.let { localRepository.getLocalById(it) },
+                                        clienteSelecionado.sublocal2Id?.let { localRepository.getLocalById(it) },
+                                        clienteSelecionado.sublocal3Id?.let { localRepository.getLocalById(it) }
+                                    ).lastOrNull()
+                                }
+
+                                findNavController(binding.root).navigate(
+                                    R.id.vendasFragment,
+                                    null,
+                                    NavOptions.Builder()
+                                        .setPopUpTo(R.id.consultasFragment, true)
+                                        .build()
+                                )
+
+                                delay(100) // Pequeno delay para garantir a navegação
+                                localMaisEspecifico?.let { local ->
+                                    onLocalClick(local.id)
+                                }
+                            } catch (e: Exception) {
+                                Log.e("ResultadosConsultaAdapter", "Erro ao navegar para vendas", e)
+                            }
+                        }
+                    },
+                    onEditarClick = { onEditarCliente(it) },
+                    onExcluirClick = { onExcluirCliente(it) }
+                ).show(fragmentManager, OpcoesConsultaClienteDialog.TAG)
+                true
             }
 
             // Carregar hierarquia local apenas se necessário

@@ -10,7 +10,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.ActionBarDrawerToggle
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
@@ -25,6 +24,7 @@ import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.FragmentConsultasBinding
+import com.example.caderneta.ui.vendas.NovoClienteDialog
 import com.example.caderneta.viewmodel.ConsultasViewModel
 import com.example.caderneta.viewmodel.ConsultasViewModelFactory
 import com.google.android.material.snackbar.Snackbar
@@ -33,6 +33,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import com.example.caderneta.viewmodel.VendasViewModel
+import com.example.caderneta.viewmodel.VendasViewModelFactory
 
 class ConsultasFragment : Fragment() {
 
@@ -47,6 +49,19 @@ class ConsultasFragment : Fragment() {
             (requireActivity().application as CadernetaApplication).contaRepository,
             (requireActivity().application as CadernetaApplication).operacaoRepository,
             (requireActivity().application as CadernetaApplication).configuracoesRepository
+        )
+    }
+
+    private val vendasViewModel: VendasViewModel by viewModels {
+        VendasViewModelFactory(
+            (requireActivity().application as CadernetaApplication).clienteRepository,
+            (requireActivity().application as CadernetaApplication).localRepository,
+            (requireActivity().application as CadernetaApplication).produtoRepository,
+            (requireActivity().application as CadernetaApplication).vendaRepository,
+            (requireActivity().application as CadernetaApplication).itemVendaRepository,
+            (requireActivity().application as CadernetaApplication).configuracoesRepository,
+            (requireActivity().application as CadernetaApplication).operacaoRepository,
+            (requireActivity().application as CadernetaApplication).contaRepository
         )
     }
 
@@ -190,6 +205,7 @@ class ConsultasFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
+// Dentro da setupRecyclerView()
         resultadosAdapter = ResultadosConsultaAdapter(
             onLocalClick = { localId ->
                 viewModel.selecionarLocal(localId)
@@ -201,14 +217,40 @@ class ConsultasFragment : Fragment() {
             onExtratoItemClick = { venda, cliente ->
                 showOpcoesExtratoDialog(venda, cliente)
             },
+            onEditarCliente = { cliente ->
+                showEditClienteDialog(cliente)
+            },
+            onExcluirCliente = { cliente ->
+                vendasViewModel.excluirCliente(cliente)
+            },
             localRepository = (requireActivity().application as CadernetaApplication).localRepository,
-            coroutineScope = viewLifecycleOwner.lifecycleScope
+            coroutineScope = viewLifecycleOwner.lifecycleScope,
+            fragmentManager = childFragmentManager
         )
 
         binding.rvResultados.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = resultadosAdapter
         }
+    }
+
+    private fun showEditClienteDialog(cliente: Cliente) {
+        vendasViewModel.reloadLocais()
+        val dialog = NovoClienteDialog(vendasViewModel).apply {
+            setClienteExistente(cliente)
+            onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
+                vendasViewModel.editarCliente(
+                    cliente = cliente,
+                    novoNome = nome,
+                    novoTelefone = telefone,
+                    novoLocalId = localId,
+                    novoSublocal1Id = sublocal1Id,
+                    novoSublocal2Id = sublocal2Id,
+                    novoSublocal3Id = sublocal3Id
+                )
+            }
+        }
+        dialog.show(childFragmentManager, "EditClienteDialog")
     }
 
     private fun showOpcoesExtratoDialog(venda: Venda, cliente: Cliente) {

@@ -38,7 +38,7 @@ class VendasFragment : Fragment() {
     private var _binding: FragmentVendasBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: VendasViewModel by viewModels {
+    private val vendasViewModel: VendasViewModel by viewModels {
         VendasViewModelFactory(
             (requireActivity().application as CadernetaApplication).clienteRepository,
             (requireActivity().application as CadernetaApplication).localRepository,
@@ -77,38 +77,38 @@ class VendasFragment : Fragment() {
             contaRepository = (requireActivity().application as CadernetaApplication).contaRepository,
             lifecycleScope = viewLifecycleOwner.lifecycleScope,
             fragmentManager = childFragmentManager,  // Passando o FragmentManager
-            getClienteState = { clienteId -> viewModel.getClienteState(clienteId) },
-            getConfiguracoes = { viewModel.configuracoes.value },
+            getClienteState = { clienteId -> vendasViewModel.getClienteState(clienteId) },
+            getConfiguracoes = { vendasViewModel.configuracoes.value },
             onModoOperacaoSelected = { cliente, modoOperacao ->
-                viewModel.selecionarModoOperacao(cliente, modoOperacao)
+                vendasViewModel.selecionarModoOperacao(cliente, modoOperacao)
             },
             onTipoTransacaoSelected = { cliente, tipoTransacao ->
-                viewModel.selecionarTipoTransacao(cliente, tipoTransacao)
+                vendasViewModel.selecionarTipoTransacao(cliente, tipoTransacao)
             },
             onQuantidadeChanged = { clienteId, tipo, quantidade ->
                 when (tipo) {
                     ClientesAdapter.TipoQuantidade.SALGADO ->
-                        viewModel.updateQuantidadeSalgados(clienteId, quantidade)
+                        vendasViewModel.updateQuantidadeSalgados(clienteId, quantidade)
                     ClientesAdapter.TipoQuantidade.SUCO ->
-                        viewModel.updateQuantidadeSucos(clienteId, quantidade)
+                        vendasViewModel.updateQuantidadeSucos(clienteId, quantidade)
                     ClientesAdapter.TipoQuantidade.PROMO1 ->
-                        viewModel.updateQuantidadePromo1(clienteId, quantidade)
+                        vendasViewModel.updateQuantidadePromo1(clienteId, quantidade)
                     ClientesAdapter.TipoQuantidade.PROMO2 ->
-                        viewModel.updateQuantidadePromo2(clienteId, quantidade)
+                        vendasViewModel.updateQuantidadePromo2(clienteId, quantidade)
                 }
             },
             onConfirmarOperacao = { clienteId ->
-                viewModel.confirmarOperacao(clienteId)
+                vendasViewModel.confirmarOperacao(clienteId)
             },
             onCancelarOperacao = { clienteId ->
-                viewModel.cancelarOperacao(clienteId)
+                vendasViewModel.cancelarOperacao(clienteId)
             },
             onUpdateValorTotal = { clienteId, valorTotal ->
-                viewModel.updateValorTotal(clienteId, valorTotal)
+                vendasViewModel.updateValorTotal(clienteId, valorTotal)
             },
             observeSaldoAtualizado = { observer ->
                 viewLifecycleOwner.lifecycleScope.launch {
-                    viewModel.saldoAtualizado.collect { clienteId ->
+                    vendasViewModel.saldoAtualizado.collect { clienteId ->
                         observer(clienteId)
                     }
                 }
@@ -117,7 +117,7 @@ class VendasFragment : Fragment() {
                 showEditClienteDialog(cliente)
             },
             onExcluirCliente = { cliente ->
-                viewModel.excluirCliente(cliente)
+                vendasViewModel.excluirCliente(cliente)
             }
         )
 
@@ -139,11 +139,11 @@ class VendasFragment : Fragment() {
     }
 
     private fun showEditClienteDialog(cliente: Cliente) {
-        viewModel.reloadLocais()
-        val dialog = NovoClienteDialog(viewModel).apply {
+        vendasViewModel.reloadLocais()
+        val dialog = NovoClienteDialog(vendasViewModel).apply {
             setClienteExistente(cliente)
             onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
-                viewModel.editarCliente(
+                vendasViewModel.editarCliente(
                     cliente = cliente,
                     novoNome = nome,
                     novoTelefone = telefone,
@@ -160,13 +160,13 @@ class VendasFragment : Fragment() {
     private fun setupLocalRecyclerView() {
         localAdapter = LocalAdapter(
             onLocalClick = { local ->
-                viewModel.selecionarLocal(local.id)
+                vendasViewModel.selecionarLocal(local.id)
                 binding.drawerLayout.closeDrawer(GravityCompat.START)
             },
             onAddSubLocal = { local -> showAddSubLocalDialog(local) },
             onEditLocal = { local -> showEditLocalDialog(local) },
             onDeleteLocal = { local -> showDeleteLocalConfirmation(local) },
-            onToggleExpand = { local -> viewModel.toggleLocalExpansion(local) }
+            onToggleExpand = { local -> vendasViewModel.toggleLocalExpansion(local) }
         )
         binding.navView.findViewById<RecyclerView>(R.id.rv_locais).apply {
             layoutManager = LinearLayoutManager(context)
@@ -182,38 +182,38 @@ class VendasFragment : Fragment() {
         binding.navView.findViewById<TextInputLayout>(R.id.til_novo_local).setEndIconOnClickListener {
             val novoLocal = binding.navView.findViewById<TextInputEditText>(R.id.et_novo_local).text.toString()
             if (novoLocal.isNotBlank()) {
-                viewModel.addLocal(novoLocal)
+                vendasViewModel.addLocal(novoLocal)
                 binding.navView.findViewById<TextInputEditText>(R.id.et_novo_local).text?.clear()
             }
         }
 
         binding.navView.findViewById<TextInputLayout>(R.id.til_pesquisar_local).setEndIconOnClickListener {
             val query = binding.navView.findViewById<TextInputEditText>(R.id.et_pesquisar_local).text.toString()
-            viewModel.searchLocais(query)
+            vendasViewModel.searchLocais(query)
         }
     }
 
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.clientes.collectLatest { clientes ->
+            vendasViewModel.clientes.collectLatest { clientes ->
                 clientesAdapter.submitList(clientes)
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.configuracoes.collectLatest { configuracoes ->
+            vendasViewModel.configuracoes.collectLatest { configuracoes ->
                 Log.d("VendasFragment", "Configurações atualizadas: $configuracoes")
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.localSelecionado.collectLatest { local ->
+            vendasViewModel.localSelecionado.collectLatest { local ->
                 binding.tvLocalSelecionado.text = local?.nome ?: "Selecione um local"
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.locais.collectLatest { locais ->
+            vendasViewModel.locais.collectLatest { locais ->
                 Log.d("VendasFragment", "Locais atualizados: ${locais.size}")
                 Log.d(
                     "VendasFragment",
@@ -225,17 +225,17 @@ class VendasFragment : Fragment() {
 
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.error.collectLatest { errorMessage ->
+            vendasViewModel.error.collectLatest { errorMessage ->
                 errorMessage?.let {
                     Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
-                    viewModel.clearError()
+                    vendasViewModel.clearError()
                 }
             }
         }
 
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.clienteStateUpdates.collect { clienteId ->
+            vendasViewModel.clienteStateUpdates.collect { clienteId ->
                 val position = clientesAdapter.currentList.indexOfFirst { it.id == clienteId }
                 if (position != -1) {
                     clientesAdapter.notifyItemChanged(position)
@@ -245,7 +245,7 @@ class VendasFragment : Fragment() {
 
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.valorTotal.collectLatest { (clienteId, valor) ->
+            vendasViewModel.valorTotal.collectLatest { (clienteId, valor) ->
                 // Em vez de chamar updateValorTotal diretamente, vamos usar o correto payload
                 clientesAdapter.notifyItemChanged(
                     clientesAdapter.currentList.indexOfFirst { it.id == clienteId },
@@ -260,16 +260,16 @@ class VendasFragment : Fragment() {
 
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.operacaoConfirmada.collectLatest { operacao ->
+            vendasViewModel.operacaoConfirmada.collectLatest { operacao ->
                 when (operacao) {
                     is VendasViewModel.OperacaoConfirmada.Venda -> {
                         requireContext().showSuccessToast("Venda registrada com sucesso!")
-                        viewModel.resetOperacaoConfirmada()
+                        vendasViewModel.resetOperacaoConfirmada()
                     }
 
                     is VendasViewModel.OperacaoConfirmada.Pagamento -> {
                         requireContext().showSuccessToast("Pagamento registrado com sucesso!")
-                        viewModel.resetOperacaoConfirmada()
+                        vendasViewModel.resetOperacaoConfirmada()
                     }
 
                     null -> {} // No operation confirmed
@@ -278,10 +278,10 @@ class VendasFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.error.collectLatest { errorMessage ->
+            vendasViewModel.error.collectLatest { errorMessage ->
                 errorMessage?.let {
                     requireContext().showErrorToast(it)
-                    viewModel.clearError()
+                    vendasViewModel.clearError()
                 }
             }
         }
@@ -289,10 +289,10 @@ class VendasFragment : Fragment() {
 
 
     private fun showAddClienteDialog() {
-        viewModel.reloadLocais()
-        val dialog = NovoClienteDialog(viewModel)
+        vendasViewModel.reloadLocais()
+        val dialog = NovoClienteDialog(vendasViewModel)
         dialog.onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
-            viewModel.addCliente(nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id)
+            vendasViewModel.addCliente(nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id)
         }
         dialog.show(childFragmentManager, "NovoClienteDialog")
     }
@@ -300,7 +300,7 @@ class VendasFragment : Fragment() {
     private fun showAddSubLocalDialog(parentLocal: Local) {
         val dialog = AddSubLocalDialog(parentLocal)
         dialog.onSubLocalAdicionado = { nome: String, parentId: Long ->
-            viewModel.addLocal(nome, parentId)
+            vendasViewModel.addLocal(nome, parentId)
         }
         dialog.show(childFragmentManager, "AddSubLocalDialog")
     }
@@ -308,7 +308,7 @@ class VendasFragment : Fragment() {
     private fun showEditLocalDialog(local: Local) {
         val dialog = EditLocalDialog(local)
         dialog.onLocalEditado = { localEditado ->
-            viewModel.editLocal(localEditado)
+            vendasViewModel.editLocal(localEditado)
         }
         dialog.show(childFragmentManager, "EditLocalDialog")
     }
@@ -317,7 +317,7 @@ class VendasFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle("Excluir Local")
             .setMessage("Tem certeza que deseja excluir ${local.nome}?")
-            .setPositiveButton("Sim") { _, _ -> viewModel.deleteLocal(local) }
+            .setPositiveButton("Sim") { _, _ -> vendasViewModel.deleteLocal(local) }
             .setNegativeButton("Não", null)
             .show()
     }
