@@ -3,6 +3,8 @@ package com.example.caderneta.ui.vendas
 import android.app.Dialog
 import android.content.res.ColorStateList
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -30,8 +32,11 @@ import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+
 
 class VendasFragment : Fragment() {
 
@@ -54,6 +59,8 @@ class VendasFragment : Fragment() {
     private lateinit var clientesAdapter: ClientesAdapter
     private lateinit var localAdapter: LocalAdapter
 
+    private var searchDebounceJob: Job? = null
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentVendasBinding.inflate(inflater, container, false)
         return binding.root
@@ -69,6 +76,7 @@ class VendasFragment : Fragment() {
         setupNavDrawer()
         setupLocalRecyclerView()
         setupListeners()
+        setupSearchListeners()
         observeViewModel()
     }
 
@@ -191,6 +199,21 @@ class VendasFragment : Fragment() {
             val query = binding.navView.findViewById<TextInputEditText>(R.id.et_pesquisar_local).text.toString()
             vendasViewModel.searchLocais(query)
         }
+    }
+
+    private fun setupSearchListeners() {
+        binding.etBusca.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                searchDebounceJob?.cancel()
+                searchDebounceJob = lifecycleScope.launch {
+                    delay(300) // Debounce de 300ms
+                    val query = s?.toString()?.trim() ?: ""
+                    vendasViewModel.buscarClientes(query)
+                }
+            }
+        })
     }
 
     private fun observeViewModel() {
@@ -324,6 +347,7 @@ class VendasFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        searchDebounceJob?.cancel()
         _binding = null
     }
 }

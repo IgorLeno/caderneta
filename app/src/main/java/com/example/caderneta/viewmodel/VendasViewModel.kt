@@ -57,6 +57,8 @@ class VendasViewModel(
     private val _operacaoConfirmada = MutableStateFlow<OperacaoConfirmada?>(null)
     val operacaoConfirmada: StateFlow<OperacaoConfirmada?> = _operacaoConfirmada.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow("")
+
     init {
         carregarDados()
     }
@@ -884,6 +886,38 @@ class VendasViewModel(
                     ---------------------
                 """.trimIndent())
                 }
+            }
+        }
+    }
+
+    fun buscarClientes(query: String) {
+        viewModelScope.launch {
+            _searchQuery.value = query
+            try {
+                when (val localAtual = _localSelecionado.value) {
+                    null -> {
+                        val clientes = if (query.isEmpty()) {
+                            clienteRepository.getAllClientes().first()
+                        } else {
+                            clienteRepository.buscarClientes("%$query%")
+                        }
+                        _clientes.value = clientes
+                    }
+                    else -> {
+                        clienteRepository.getClientesByLocalHierarchy(localAtual.id).collect { clientes ->
+                            val clientesFiltrados = if (query.isEmpty()) {
+                                clientes
+                            } else {
+                                clientes.filter {
+                                    it.nome.contains(query, ignoreCase = true)
+                                }
+                            }
+                            _clientes.value = clientesFiltrados
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = "Erro ao buscar clientes: ${e.message}"
             }
         }
     }
