@@ -73,11 +73,10 @@ class ConsultasViewModel(
         viewModelScope.launch {
             try {
                 launch {
-                    configuracoesRepository.getConfiguracoes().collect {
-                        _configuracoes.value = it
+                    clienteRepository.getAllClientes().collect { clientes ->
+                        atualizarClientesComSaldo(clientes, _searchQuery.value)
                     }
                 }
-                carregarLocais()
             } catch (e: Exception) {
                 handleError(e)
             }
@@ -104,23 +103,22 @@ class ConsultasViewModel(
     }
 
 
-    fun selecionarLocal(localId: Long) {
+    fun selecionarLocal(localId: Long?) {
         viewModelScope.launch {
             try {
-                val local = localRepository.getLocalById(localId)
-                if (local != null) {
-                    // Emitir o local selecionado
+                if (localId == null) {
+                    _localSelecionado.value = null
+                    // Carregar todos os clientes quando nenhum local selecionado
+                    clienteRepository.getAllClientes().collect { clientes ->
+                        atualizarClientesComSaldo(clientes, _searchQuery.value)
+                    }
+                } else {
+                    val local = localRepository.getLocalById(localId)
                     _localSelecionado.value = local
 
-                    // Buscar clientes considerando a hierarquia
-                    clienteRepository.getClientesByLocalHierarchy(localId)
-                        .collect { clientes ->
-                            // Atualizar a lista de clientes
-                            _clientesComSaldo.value = clientes.map { cliente ->
-                                val saldo = contaRepository.getContaByCliente(cliente.id)?.saldo ?: 0.0
-                                cliente to saldo
-                            }
-                        }
+                    clienteRepository.getClientesByLocalHierarchy(localId).collect { clientes ->
+                        atualizarClientesComSaldo(clientes, _searchQuery.value)
+                    }
                 }
             } catch (e: Exception) {
                 _error.value = "Erro ao selecionar local: ${e.message}"
@@ -219,22 +217,22 @@ class ConsultasViewModel(
             try {
                 when (val localAtual = _localSelecionado.value) {
                     null -> {
-                        // Busca global em todos os clientes
+                        // Busca em toda base quando nenhum local selecionado
                         val clientes = if (query.isEmpty()) {
                             clienteRepository.getAllClientes().first()
                         } else {
-                            clienteRepository.buscarClientes(query)
+                            clienteRepository.buscarClientes("%$query%")
                         }
                         atualizarClientesComSaldo(clientes, query)
                     }
                     else -> {
-                        // Busca dentro do local selecionado
+                        // Busca filtrada por local
                         clienteRepository.getClientesByLocalHierarchy(localAtual.id).collect { clientes ->
                             val clientesFiltrados = if (query.isEmpty()) {
                                 clientes
                             } else {
                                 clientes.filter {
-                                    it.nome.contains(query, ignoreCase = true)
+                                    it.nome.startsWith(query, ignoreCase = true)
                                 }
                             }
                             atualizarClientesComSaldo(clientesFiltrados, query)
@@ -242,7 +240,7 @@ class ConsultasViewModel(
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ConsultasViewModel", "Erro ao buscar clientes", e)
+                _error.value = "Erro ao buscar clientes: ${e.message}"
             }
         }
     }

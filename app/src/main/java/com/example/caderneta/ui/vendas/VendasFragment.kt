@@ -71,6 +71,7 @@ class VendasFragment : Fragment() {
 
         binding.fabNovoCliente.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.primary_color))
         binding.fabNovoCliente.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.on_primary))
+        binding.tvLocalSelecionado.text = getString(R.string.todos_locais)
 
         setupRecyclerView()
         setupNavDrawer()
@@ -231,7 +232,7 @@ class VendasFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             vendasViewModel.localSelecionado.collectLatest { local ->
-                binding.tvLocalSelecionado.text = local?.nome ?: "Selecione um local"
+                binding.tvLocalSelecionado.text = local?.nome ?: "Todos os locais"
             }
         }
 
