@@ -69,20 +69,36 @@ class ConsultasViewModel(
         carregarDados()
     }
 
-    private fun carregarDados() {
+    fun carregarDados() {
         viewModelScope.launch {
             try {
+                // Garante que os locais sejam carregados primeiro
+                launch {
+                    localRepository.getAllLocais()
+                        .onStart {
+                            Log.d("ConsultasViewModel", "Iniciando carregamento de locais")
+                        }
+                        .catch { e ->
+                            Log.e("ConsultasViewModel", "Erro ao carregar locais", e)
+                            _error.value = "Erro ao carregar locais: ${e.message}"
+                        }
+                        .collect { locaisList ->
+                            Log.d("ConsultasViewModel", "Locais carregados com sucesso: ${locaisList.size}")
+                            _locais.value = locaisList
+                        }
+                }
+
+                // Depois carrega os clientes
                 launch {
                     clienteRepository.getAllClientes().collect { clientes ->
                         atualizarClientesComSaldo(clientes, _searchQuery.value)
                     }
                 }
             } catch (e: Exception) {
-                handleError(e)
+                _error.value = "Erro ao carregar dados: ${e.message}"
             }
         }
     }
-
 
     private fun carregarLocais() {
         viewModelScope.launch {
@@ -110,16 +126,18 @@ class ConsultasViewModel(
                     _localSelecionado.value = null
                     // Carregar todos os clientes quando nenhum local selecionado
                     clienteRepository.getAllClientes().collect { clientes ->
-                        atualizarClientesComSaldo(clientes, _searchQuery.value)
+                        atualizarClientesComSaldo(clientes, "")
                     }
                 } else {
                     val local = localRepository.getLocalById(localId)
                     _localSelecionado.value = local
 
                     clienteRepository.getClientesByLocalHierarchy(localId).collect { clientes ->
-                        atualizarClientesComSaldo(clientes, _searchQuery.value)
+                        atualizarClientesComSaldo(clientes, "")
                     }
                 }
+                // Reset search query when changing location
+                _searchQuery.value = ""
             } catch (e: Exception) {
                 _error.value = "Erro ao selecionar local: ${e.message}"
             }

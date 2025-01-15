@@ -170,6 +170,7 @@ class VendasFragment : Fragment() {
         localAdapter = LocalAdapter(
             onLocalClick = { local ->
                 vendasViewModel.selecionarLocal(local.id)
+                binding.etBusca.text?.clear()  // Clear search field
                 binding.drawerLayout.closeDrawer(GravityCompat.START)
             },
             onAddSubLocal = { local -> showAddSubLocalDialog(local) },

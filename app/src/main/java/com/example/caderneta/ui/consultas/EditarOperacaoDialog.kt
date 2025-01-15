@@ -76,12 +76,52 @@ class EditarOperacaoDialog(
         return AlertDialog.Builder(requireContext())
             .setTitle(getTitleForOperation())
             .setView(binding.root)
-            .setPositiveButton("Salvar", null)
+            .setPositiveButton("Salvar", null)  // O listener será configurado no setOnShowListener
             .setNegativeButton("Cancelar", null)
             .create()
             .apply {
                 alertDialog = this
                 setCanceledOnTouchOutside(false)
+
+                // Configurar o listener quando o diálogo é mostrado
+                setOnShowListener { dialog ->
+                    (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            try {
+                                // Atualizar valor se necessário
+                                when (venda.transacao) {
+                                    "pagamento" -> {
+                                        val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull()
+                                        if (valorPagamento != null && valorPagamento > 0) {
+                                            vendasViewModel.updateValorTotal(cliente.id, valorPagamento)
+                                        }
+                                    }
+                                }
+
+                                if (consultasViewModel.confirmarEdicaoOperacao(venda)) {
+                                    // Aguardar atualização do saldo
+                                    delay(100) // Pequeno delay para garantir processamento
+
+                                    // Forçar atualização da UI
+                                    val localAtual = consultasViewModel.localSelecionado.value
+                                    if (localAtual != null) {
+                                        consultasViewModel.selecionarLocal(localAtual.id)
+                                    }
+
+                                    requireContext().showSuccessToast(
+                                        when (venda.transacao) {
+                                            "pagamento" -> "Pagamento atualizado com sucesso"
+                                            else -> "Operação atualizada com sucesso"
+                                        }
+                                    )
+                                    dismiss()
+                                }
+                            } catch (e: Exception) {
+                                requireContext().showErrorToast("Erro ao atualizar operação: ${e.message}")
+                            }
+                        }
+                    }
+                }
             }
     }
 
@@ -605,47 +645,6 @@ class EditarOperacaoDialog(
             }
         }
     }
-
-    override fun onStart() {
-        super.onStart()
-        (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            viewLifecycleOwner.lifecycleScope.launch {
-                try {
-                    // Atualizar valor se necessário
-                    when (venda.transacao) {
-                        "pagamento" -> {
-                            val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull()
-                            if (valorPagamento != null && valorPagamento > 0) {
-                                vendasViewModel.updateValorTotal(cliente.id, valorPagamento)
-                            }
-                        }
-                    }
-
-                    if (consultasViewModel.confirmarEdicaoOperacao(venda)) {
-                        // Aguardar atualização do saldo
-                        delay(100) // Pequeno delay para garantir processamento
-
-                        // Forçar atualização da UI
-                        val localAtual = consultasViewModel.localSelecionado.value
-                        if (localAtual != null) {
-                            consultasViewModel.selecionarLocal(localAtual.id)
-                        }
-
-                        requireContext().showSuccessToast(
-                            when (venda.transacao) {
-                                "pagamento" -> "Pagamento atualizado com sucesso"
-                                else -> "Operação atualizada com sucesso"
-                            }
-                        )
-                        dismiss()
-                    }
-                } catch (e: Exception) {
-                    requireContext().showErrorToast("Erro ao atualizar operação: ${e.message}")
-                }
-            }
-        }
-    }
-
 
 
     override fun onDestroyView() {

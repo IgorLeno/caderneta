@@ -80,12 +80,18 @@ class ConsultasFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Forçar carregamento inicial dos locais
+        viewLifecycleOwner.lifecycleScope.launch {
+            // Pequeno delay para garantir que o ViewModel esteja pronto
+            delay(100)
+            viewModel.carregarDados()
+        }
+
         setupUI()
         setupBackNavigation()
         observeViewModel()
         handleNavigationArgs()
-
-
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.saldosAtualizados.collectLatest { saldos ->
@@ -310,11 +316,12 @@ class ConsultasFragment : Fragment() {
 
     private fun setupLocalRecyclerView() {
         localAdapter = LocalConsultaAdapter(
-            onLocalClick = { local: Local ->
+            onLocalClick = { local ->
                 viewModel.selecionarLocal(local.id)
+                binding.etBusca.text?.clear()  // Clear search field
                 binding.drawerLayout.closeDrawer(GravityCompat.START)
             },
-            onToggleExpand = { local: Local ->
+            onToggleExpand = { local ->
                 viewModel.toggleLocalExpansion(local)
             }
         )

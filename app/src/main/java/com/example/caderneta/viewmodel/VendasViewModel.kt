@@ -136,12 +136,13 @@ class VendasViewModel(
                             _clientes.value = clientesFiltrados
                         }
                 }
+                // Reset search query when changing location
+                _searchQuery.value = ""
             } catch (e: Exception) {
                 _error.value = "Erro ao selecionar local: ${e.message}"
             }
         }
     }
-
 
     fun getClienteState(clienteId: Long): ClienteState? {
         return _clienteStates.value[clienteId]
