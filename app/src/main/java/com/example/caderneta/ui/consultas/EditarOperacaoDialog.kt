@@ -31,9 +31,11 @@ import com.example.caderneta.viewmodel.ConsultasViewModelFactory
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class EditarOperacaoDialog(
     private val venda: Venda,
@@ -76,7 +78,7 @@ class EditarOperacaoDialog(
         return AlertDialog.Builder(requireContext())
             .setTitle(getTitleForOperation())
             .setView(binding.root)
-            .setPositiveButton("Salvar", null)  // O listener será configurado no setOnShowListener
+            .setPositiveButton("Salvar") { _, _ -> }  // Criamos um listener vazio inicialmente
             .setNegativeButton("Cancelar", null)
             .create()
             .apply {
@@ -85,7 +87,9 @@ class EditarOperacaoDialog(
 
                 // Configurar o listener quando o diálogo é mostrado
                 setOnShowListener { dialog ->
-                    (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                    val positiveButton = (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE)
+
+                    positiveButton.setOnClickListener {
                         viewLifecycleOwner.lifecycleScope.launch {
                             try {
                                 // Atualizar valor se necessário
@@ -94,18 +98,18 @@ class EditarOperacaoDialog(
                                         val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull()
                                         if (valorPagamento != null && valorPagamento > 0) {
                                             vendasViewModel.updateValorTotal(cliente.id, valorPagamento)
+                                            delay(100) // Pequeno delay para garantir atualização
                                         }
                                     }
                                 }
 
                                 if (consultasViewModel.confirmarEdicaoOperacao(venda)) {
-                                    // Aguardar atualização do saldo
-                                    delay(100) // Pequeno delay para garantir processamento
-
                                     // Forçar atualização da UI
                                     val localAtual = consultasViewModel.localSelecionado.value
                                     if (localAtual != null) {
-                                        consultasViewModel.selecionarLocal(localAtual.id)
+                                        withContext(Dispatchers.Main) {
+                                            consultasViewModel.selecionarLocal(localAtual.id)
+                                        }
                                     }
 
                                     requireContext().showSuccessToast(
@@ -114,7 +118,7 @@ class EditarOperacaoDialog(
                                             else -> "Operação atualizada com sucesso"
                                         }
                                     )
-                                    dismiss()
+                                    dialog.dismiss()
                                 }
                             } catch (e: Exception) {
                                 requireContext().showErrorToast("Erro ao atualizar operação: ${e.message}")
@@ -124,7 +128,6 @@ class EditarOperacaoDialog(
                 }
             }
     }
-
 
     private fun getTitleForOperation(): String {
         return when {
