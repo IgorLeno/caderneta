@@ -108,7 +108,7 @@ dependencies {
 
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4") // Ou 2.1.5 se for a mais recente que você encontrou
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") // Ou 2.1.5 se for a mais recente que você encontrou
 
     testImplementation("androidx.arch.core:core-testing:2.2.0")
     testImplementation("junit:junit:4.13.2")
