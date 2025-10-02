@@ -1,0 +1,333 @@
+name: PR Validation
+
+# Executa apenas em pull requests
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [ master ]
+
+# Cancela execuções anteriores do mesmo PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Job 1: Validação de mensagens de commit (Conventional Commits)
+  commit-lint:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      # Checkout com histórico completo para análise de commits
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Necessário para acessar todos os commits do PR
+
+      # Setup Node.js para commitlint
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Instala commitlint e configuração conventional
+      - name: Install commitlint
+        run: |
+          npm install --save-dev @commitlint/cli@18 @commitlint/config-conventional@18
+
+      # Cria arquivo de configuração do commitlint
+      - name: Create commitlint config
+        run: |
+          cat > commitlint.config.js << 'EOF'
+          module.exports = {
+            extends: ['@commitlint/config-conventional'],
+            rules: {
+              'type-enum': [
+                2,
+                'always',
+                [
+                  'feat',     // Nova funcionalidade
+                  'fix',      // Correção de bug
+                  'docs',     // Apenas documentação
+                  'style',    // Mudanças de formatação
+                  'refactor', // Refatoração de código
+                  'perf',     // Melhoria de performance
+                  'test',     // Adição/correção de testes
+                  'build',    // Mudanças no build
+                  'ci',       // Mudanças em CI/CD
+                  'chore',    // Outras mudanças
+                  'revert'    // Reversão de commit
+                ]
+              ],
+              'subject-case': [0],  // Permite qualquer case no subject
+              'body-max-line-length': [0],  // Sem limite de linha no body
+              'header-max-length': [2, 'always', 100]
+            }
+          };
+          EOF
+
+      # Valida mensagens de commit do PR
+      - name: Validate commits
+        run: |
+          echo "Validating commits in PR #${{ github.event.pull_request.number }}"
+
+          # Lista commits do PR
+          git log --pretty=format:"%h - %s" \
+            origin/${{ github.base_ref }}..${{ github.event.pull_request.head.sha }}
+
+          # Valida cada commit
+          npx commitlint \
+            --from origin/${{ github.base_ref }} \
+            --to ${{ github.event.pull_request.head.sha }} \
+            --verbose
+
+      # Adiciona comentário no PR se houver erro
+      - name: Comment on PR if validation fails
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ❌ Commit Message Validation Failed
+
+            Please ensure your commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+            \`\`\`
+            <type>(<scope>): <subject>
+
+            <body>
+
+            <footer>
+            \`\`\`
+
+            **Valid types:** feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+
+            **Examples:**
+            - \`feat: add user authentication\`
+            - \`fix: resolve null pointer in payment module\`
+            - \`docs: update README with setup instructions\`
+            `
+            })
+
+  # Job 2: Validação de título do PR
+  pr-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: write
+
+    steps:
+      # Valida que o título do PR segue padrão Conventional Commits
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v5
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false  # Scope é opcional
+          subjectPattern: ^(?![A-Z]).+$  # Subject não deve começar com maiúscula
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            doesn't start with an uppercase character.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 3: Validação de tamanho do PR
+  pr-size:
+    name: Check PR Size
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: write
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Adiciona label baseado no tamanho do PR
+      - name: Label PR by size
+        uses: codelytv/pr-size-labeler@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          xs_label: 'size/xs'
+          xs_max_size: 10
+          s_label: 'size/s'
+          s_max_size: 100
+          m_label: 'size/m'
+          m_max_size: 500
+          l_label: 'size/l'
+          l_max_size: 1000
+          xl_label: 'size/xl'
+          fail_if_xl: false  # Não falha se PR for muito grande, apenas avisa
+
+      # Comenta se PR for muito grande (mais de 1000 linhas)
+      - name: Check PR size
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const additions = pr.additions;
+            const deletions = pr.deletions;
+            const totalChanges = additions + deletions;
+
+            console.log(`PR changes: +${additions} -${deletions} (total: ${totalChanges})`);
+
+            if (totalChanges > 1000) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## ⚠️ Large Pull Request Detected
+
+            This PR contains **${totalChanges}** lines of changes (+${additions} -${deletions}).
+
+            Large PRs are harder to review and more likely to introduce bugs. Consider:
+            - Breaking this PR into smaller, focused changes
+            - Reviewing the scope of changes
+            - Ensuring all changes are necessary
+
+            If this is intentional (e.g., generated code, refactoring), please add a note in the PR description.
+            `
+              });
+            }
+
+  # Job 4: Validação de descrição do PR
+  pr-description:
+    name: Validate PR Description
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: write
+
+    steps:
+      # Verifica se PR tem descrição adequada
+      - name: Check PR description
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const minLength = 50;
+
+            if (body.length < minLength) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## ⚠️ PR Description Required
+
+            This PR needs a proper description. Please add:
+
+            - **What** changes were made
+            - **Why** these changes were necessary
+            - **How** to test these changes
+            - Any **breaking changes** or **migration notes**
+
+            A good PR description helps reviewers understand your changes and speeds up the review process.
+            `
+              });
+              core.setFailed('PR description is too short or missing');
+            }
+
+  # Job 5: Verificação de conflitos de merge
+  merge-conflict:
+    name: Check Merge Conflicts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Verifica conflitos com branch base
+      - name: Check for merge conflicts
+        run: |
+          git fetch origin ${{ github.base_ref }}
+
+          if ! git merge-tree \
+            $(git merge-base origin/${{ github.base_ref }} ${{ github.event.pull_request.head.sha }}) \
+            origin/${{ github.base_ref }} \
+            ${{ github.event.pull_request.head.sha }} \
+            | grep -q "^changed in both"; then
+            echo "✅ No merge conflicts detected"
+          else
+            echo "❌ Merge conflicts detected"
+            echo "Please resolve conflicts with base branch before merging"
+            exit 1
+          fi
+
+  # Job 6: Resumo de validação do PR
+  validation-summary:
+    name: PR Validation Summary
+    runs-on: ubuntu-latest
+    needs: [commit-lint, pr-title, pr-size, pr-description, merge-conflict]
+    if: always()
+
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Generate validation summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              'Commit Messages': '${{ needs.commit-lint.result }}',
+              'PR Title': '${{ needs.pr-title.result }}',
+              'PR Size': '${{ needs.pr-size.result }}',
+              'PR Description': '${{ needs.pr-description.result }}',
+              'Merge Conflicts': '${{ needs.merge-conflict.result }}'
+            };
+
+            let summary = '## PR Validation Summary\n\n';
+            summary += '| Check | Status |\n';
+            summary += '|-------|--------|\n';
+
+            let allPassed = true;
+            for (const [check, status] of Object.entries(results)) {
+              const icon = status === 'success' ? '✅' : '❌';
+              summary += `| ${check} | ${icon} ${status} |\n`;
+              if (status !== 'success') allPassed = false;
+            }
+
+            // Adiciona comentário ao PR
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+            // Falha se alguma validação falhou
+            if (!allPassed) {
+              core.setFailed('Some PR validations failed');
+            }

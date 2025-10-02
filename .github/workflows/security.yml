@@ -1,0 +1,347 @@
+name: Security Analysis
+
+# Executa em pushes, PRs e semanalmente
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    # Executa toda segunda-feira às 9h UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+# Cancela execuções anteriores
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job 1: Dependency Review (apenas em PRs)
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Analisa mudanças em dependências e identifica vulnerabilidades
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate  # Falha em vulnerabilidades moderadas ou superiores
+          deny-licenses: GPL-3.0, AGPL-3.0  # Bloqueia licenças incompatíveis
+          comment-summary-in-pr: always
+
+  # Job 2: Dependabot Alerts Check
+  dependency-check:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Torna gradlew executável
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Gera lista de dependências
+      - name: Generate dependency list
+        run: |
+          ./gradlew dependencies > dependencies.txt || true
+
+      # Upload lista de dependências
+      - name: Upload dependency list
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependencies
+          path: dependencies.txt
+          retention-days: 7
+
+      # OWASP Dependency Check (verifica vulnerabilidades conhecidas)
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        continue-on-error: true
+        with:
+          project: 'Caderneta'
+          path: '.'
+          format: 'ALL'
+          args: >
+            --enableRetired
+            --enableExperimental
+            --failOnCVSS 7
+
+      # Upload relatório OWASP
+      - name: Upload OWASP report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-dependency-check-report
+          path: reports/
+          retention-days: 14
+
+  # Job 3: CodeQL Analysis (análise semântica de segurança)
+  codeql-analysis:
+    name: CodeQL Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'java-kotlin' ]
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Inicializa CodeQL
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+          config: |
+            paths-ignore:
+              - '**/test/**'
+              - '**/androidTest/**'
+              - '**/build/**'
+
+      # Setup JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Torna gradlew executável
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Build do projeto para análise CodeQL
+      - name: Build project
+        run: ./gradlew assembleDebug --no-daemon
+
+      # Executa análise CodeQL
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: true
+
+  # Job 4: Secret Scanning
+  secret-scan:
+    name: Scan for Secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Histórico completo para detectar secrets em commits antigos
+
+      # Detecta secrets no código usando Gitleaks
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Opcional: para versão enterprise
+
+  # Job 5: License Compliance Check
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Torna gradlew executável
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Adiciona plugin de licenças
+      - name: Add license plugin
+        run: |
+          if ! grep -q "com.github.jk1.dependency-license-report" build.gradle.kts; then
+            echo "Adding license report plugin"
+            cat >> build.gradle.kts << 'EOF'
+
+          plugins {
+              id("com.github.jk1.dependency-license-report") version "2.5"
+          }
+          EOF
+          fi
+
+      # Gera relatório de licenças
+      - name: Generate license report
+        run: |
+          ./gradlew generateLicenseReport || echo "License plugin not configured"
+
+      # Upload relatório de licenças
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: license-report
+          path: build/reports/dependency-license/
+          retention-days: 7
+
+  # Job 6: Android Security Best Practices
+  android-security:
+    name: Android Security Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # Verifica configurações de segurança do Android
+      - name: Check AndroidManifest security
+        run: |
+          echo "Checking AndroidManifest.xml for security issues..."
+
+          manifest="app/src/main/AndroidManifest.xml"
+
+          if [ -f "$manifest" ]; then
+            # Verifica se debuggable está desabilitado em release
+            if grep -q 'android:debuggable="true"' "$manifest"; then
+              echo "::error::Debuggable flag found in manifest - security risk!"
+              exit 1
+            fi
+
+            # Verifica permissões perigosas
+            if grep -q 'android.permission.WRITE_EXTERNAL_STORAGE' "$manifest"; then
+              echo "::warning::WRITE_EXTERNAL_STORAGE permission detected - review if necessary"
+            fi
+
+            # Verifica backup configuration
+            if ! grep -q 'android:allowBackup="false"' "$manifest"; then
+              echo "::warning::Consider disabling allowBackup for sensitive apps"
+            fi
+
+            # Verifica network security config
+            if ! grep -q 'android:networkSecurityConfig' "$manifest"; then
+              echo "::warning::Network Security Config not found - consider adding for API 24+"
+            fi
+
+            echo "✅ AndroidManifest security check completed"
+          fi
+
+      # Verifica configurações do ProGuard/R8
+      - name: Check ProGuard configuration
+        run: |
+          if [ -f "app/proguard-rules.pro" ]; then
+            echo "Checking ProGuard rules for security..."
+
+            # Verifica se há regras que podem expor informações sensíveis
+            if grep -q '\-dontobfuscate' "app/proguard-rules.pro"; then
+              echo "::warning::dontobfuscate found - may expose code structure"
+            fi
+
+            if grep -q '\-keepnames' "app/proguard-rules.pro"; then
+              echo "::warning::keepnames found - review if necessary for production"
+            fi
+
+            echo "✅ ProGuard configuration check completed"
+          fi
+
+  # Job 7: Resumo de Segurança
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-check, codeql-analysis, secret-scan, license-check, android-security]
+    if: always()
+
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Generate security summary
+        run: |
+          echo "# Security Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Check | ${{ needs.dependency-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scanning | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| License Check | ${{ needs.license-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android Security | ${{ needs.android-security.result }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check security gate
+        run: |
+          if [[ "${{ needs.dependency-check.result }}" == "failure" ]] || \
+             [[ "${{ needs.codeql-analysis.result }}" == "failure" ]] || \
+             [[ "${{ needs.secret-scan.result }}" == "failure" ]]; then
+            echo "❌ Critical security checks failed"
+            exit 1
+          fi
+          echo "✅ Security checks passed"

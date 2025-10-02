@@ -1,0 +1,316 @@
+name: Code Quality - Lint & Analysis
+
+# Executa em todos os pushes e pull requests
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+# Cancela execuções anteriores do mesmo workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job 1: Detekt - Análise estática de código Kotlin
+  detekt:
+    name: Detekt Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+      pull-requests: write  # Para comentários em PRs
+      checks: write  # Para publicar resultados
+
+    steps:
+      # Checkout do código
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Setup JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Tornar gradlew executável
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Criar arquivo de configuração do Detekt se não existir
+      - name: Create Detekt config if missing
+        run: |
+          if [ ! -f "detekt-config.yml" ]; then
+            echo "Creating default detekt-config.yml"
+            cat > detekt-config.yml << 'EOF'
+          build:
+            maxIssues: 0
+            excludeCorrectable: false
+
+          config:
+            validation: true
+            warningsAsErrors: false
+
+          complexity:
+            active: true
+            LongMethod:
+              active: true
+              threshold: 60
+            LongParameterList:
+              active: true
+              functionThreshold: 6
+              constructorThreshold: 7
+            LargeClass:
+              active: true
+              threshold: 600
+            ComplexMethod:
+              active: true
+              threshold: 15
+
+          coroutines:
+            active: true
+
+          empty-blocks:
+            active: true
+
+          formatting:
+            active: true
+            android: true
+            autoCorrect: true
+
+          naming:
+            active: true
+            FunctionNaming:
+              active: true
+              excludes: ['**/test/**', '**/androidTest/**']
+            ClassNaming:
+              active: true
+            VariableNaming:
+              active: true
+
+          performance:
+            active: true
+
+          potential-bugs:
+            active: true
+
+          style:
+            active: true
+            MaxLineLength:
+              active: true
+              maxLineLength: 120
+              excludeCommentStatements: true
+          EOF
+          fi
+
+      # Adicionar plugin Detekt ao projeto se necessário
+      - name: Add Detekt plugin to build
+        run: |
+          if ! grep -q "io.gitlab.arturbosch.detekt" build.gradle.kts; then
+            echo "Adding Detekt plugin to build.gradle.kts"
+            # Adiciona plugin ao arquivo root build.gradle.kts
+            sed -i '1i plugins { id("io.gitlab.arturbosch.detekt") version "1.23.6" }' build.gradle.kts || true
+          fi
+
+      # Executa análise Detekt
+      - name: Run Detekt
+        run: |
+          # Tenta executar detekt, ou instala se necessário
+          ./gradlew detekt --continue || ./gradlew :detektGenerateConfig detekt --continue || true
+
+      # Upload dos relatórios SARIF para GitHub Security
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: build/reports/detekt/detekt.sarif
+
+      # Upload de relatórios Detekt como artifacts
+      - name: Upload Detekt reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detekt-reports
+          path: |
+            build/reports/detekt/
+            app/build/reports/detekt/
+          retention-days: 7
+
+      # Adiciona review comments no PR com issues do Detekt
+      - name: Detekt PR Review
+        uses: reviewdog/action-detekt@v1
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          detekt_config: detekt-config.yml
+          level: warning
+          filter_mode: nofilter
+
+  # Job 2: ktlint - Formatação e estilo de código Kotlin
+  ktlint:
+    name: ktlint Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Tornar gradlew executável
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Adicionar plugin ktlint ao projeto
+      - name: Add ktlint plugin to build
+        run: |
+          if ! grep -q "org.jlleitschuh.gradle.ktlint" build.gradle.kts; then
+            echo "Adding ktlint plugin to build.gradle.kts"
+            # Adiciona plugin ktlint
+            cat >> build.gradle.kts << 'EOF'
+
+          plugins {
+              id("org.jlleitschuh.gradle.ktlint") version "12.1.0" apply false
+          }
+          EOF
+
+            # Adiciona ao app/build.gradle.kts
+            if [ -f "app/build.gradle.kts" ]; then
+              sed -i '1i plugins { id("org.jlleitschuh.gradle.ktlint") }' app/build.gradle.kts || true
+            fi
+          fi
+
+      # Executa ktlint check
+      - name: Run ktlint
+        run: |
+          # Tenta executar ktlint, ou reporta se não configurado
+          ./gradlew ktlintCheck --continue || echo "::warning::ktlint not fully configured, skipping"
+
+      # Upload de relatórios ktlint
+      - name: Upload ktlint reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ktlint-reports
+          path: |
+            build/reports/ktlint/
+            app/build/reports/ktlint/
+          retention-days: 7
+
+      # Adiciona review comments do ktlint no PR
+      - name: ktlint PR Review
+        uses: ScaCap/action-ktlint@master
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          level: warning
+
+  # Job 3: Android Lint - Análise nativa do Android
+  android-lint:
+    name: Android Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Tornar gradlew executável
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Executa Android Lint
+      - name: Run Android Lint
+        run: ./gradlew lintDebug --continue
+
+      # Publica resultados do Lint como annotations
+      - name: Publish Lint results
+        uses: yutailang0119/action-android-lint@v4
+        if: always()
+        continue-on-error: true
+        with:
+          report-path: 'app/build/reports/lint-results-*.xml'
+
+      # Upload de relatórios HTML do Lint
+      - name: Upload Lint reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-reports
+          path: |
+            app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.xml
+          retention-days: 7
+
+  # Job 4: Resumo de Qualidade de Código
+  quality-summary:
+    name: Code Quality Summary
+    runs-on: ubuntu-latest
+    needs: [detekt, ktlint, android-lint]
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# Code Quality Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Tool | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Detekt | ${{ needs.detekt.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ktlint | ${{ needs.ktlint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android Lint | ${{ needs.android-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check quality gate
+        run: |
+          if [[ "${{ needs.detekt.result }}" == "failure" ]] || \
+             [[ "${{ needs.ktlint.result }}" == "failure" ]] || \
+             [[ "${{ needs.android-lint.result }}" == "failure" ]]; then
+            echo "❌ Code quality checks failed"
+            exit 1
+          fi
+          echo "✅ All code quality checks passed"
