@@ -130,7 +130,7 @@ jobs:
     steps:
       # Valida que o título do PR segue padrão Conventional Commits
       - name: Validate PR title
-        uses: amannn/action-semantic-pull-request@v5
+        uses: amannn/action-semantic-pull-request@v6
         with:
           types: |
             feat
