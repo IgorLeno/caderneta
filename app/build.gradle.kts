@@ -101,7 +101,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0") // Exemplo de versão estável (verifique a mais recente)
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.0") // Exemplo de versão estável
 
-    implementation("com.google.android.material:material:1.11.0") // Exemplo de versão estável (verifique a mais recente)
+    implementation("com.google.android.material:material:1.13.0") // Exemplo de versão estável (verifique a mais recente)
 
     implementation("androidx.navigation:navigation-fragment-ktx:$navVersion")
     implementation("androidx.navigation:navigation-ui-ktx:$navVersion")
