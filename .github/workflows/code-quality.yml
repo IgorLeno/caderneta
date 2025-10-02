@@ -270,7 +270,7 @@ jobs:
 
       # Publica resultados do Lint como annotations
       - name: Publish Lint results
-        uses: yutailang0119/action-android-lint@v4
+        uses: yutailang0119/action-android-lint@v5
         if: always()
         continue-on-error: true
         with:
