@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 data class Local(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val nome: String,
-    val endereco: String?= null,
+    val endereco: String? = null,
     val parentId: Long? = null,
     val level: Int = 0,
     var isExpanded: Boolean = false

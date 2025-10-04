@@ -8,19 +8,19 @@ import kotlinx.coroutines.withContext
 
 class ContaRepository(private val contaDao: ContaDao) {
 
-    suspend fun getContaByCliente(clienteId: Long): Conta? = withContext(Dispatchers.IO) {
-        contaDao.getContaByCliente(clienteId)
+    suspend fun getContaByCliente(clienteId: Long): Conta? {
+        return contaDao.getContaByCliente(clienteId)
     }
 
-    suspend fun insertConta(conta: Conta) = withContext(Dispatchers.IO) {
+    suspend fun insertConta(conta: Conta) {
         contaDao.insertConta(conta)
     }
 
-    suspend fun updateConta(conta: Conta) = withContext(Dispatchers.IO) {
+    suspend fun updateConta(conta: Conta) {
         contaDao.updateConta(conta)
     }
 
-    suspend fun atualizarSaldo(clienteId: Long, valor: Double) = withContext(Dispatchers.IO) {
+    suspend fun atualizarSaldo(clienteId: Long, valor: Double) {
         val contaExistente = contaDao.getContaByCliente(clienteId)
         if (contaExistente == null) {
             val novaConta = Conta(clienteId = clienteId, saldo = valor)
@@ -31,24 +31,23 @@ class ContaRepository(private val contaDao: ContaDao) {
         }
     }
 
-    suspend fun processarPagamento(clienteId: Long, valorPagamento: Double): Boolean = withContext(Dispatchers.IO) {
+    suspend fun processarPagamento(clienteId: Long, valorPagamento: Double): Boolean {
         try {
-            val conta = getContaByCliente(clienteId)
-            if (conta == null) {
-                // Se não existe conta, cria uma nova
-                insertConta(Conta(clienteId = clienteId, saldo = 0.0))
-                return@withContext true
+            if (valorPagamento <= 0) {
+                return false
             }
 
-            if (valorPagamento < 0) {
-                return@withContext false
+            val conta = getContaByCliente(clienteId)
+            if (conta == null) {
+                // Se não existe conta, não é possível processar pagamento
+                return false
             }
 
             val novoSaldo = conta.saldo - valorPagamento
             updateConta(conta.copy(saldo = novoSaldo))
-            return@withContext true
+            return true
         } catch (e: Exception) {
-            return@withContext false
+            return false
         }
     }
 

@@ -20,6 +20,12 @@ import java.util.Date
             childColumns = ["localId"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    indices = [
+        androidx.room.Index(value = ["clienteId"]),
+        androidx.room.Index(value = ["localId"]),
+        androidx.room.Index(value = ["data"]),
+        androidx.room.Index(value = ["operacaoId"])
     ]
 )
 

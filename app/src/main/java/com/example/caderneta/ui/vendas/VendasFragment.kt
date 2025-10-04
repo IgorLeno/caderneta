@@ -19,6 +19,8 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.caderneta.CadernetaApplication
@@ -117,8 +119,10 @@ class VendasFragment : Fragment() {
             },
             observeSaldoAtualizado = { observer ->
                 viewLifecycleOwner.lifecycleScope.launch {
-                    vendasViewModel.saldoAtualizado.collect { clienteId ->
-                        observer(clienteId)
+                    viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        vendasViewModel.saldoAtualizado.collect { clienteId ->
+                            observer(clienteId)
+                        }
                     }
                 }
             },
@@ -260,10 +264,12 @@ class VendasFragment : Fragment() {
 
 
         viewLifecycleOwner.lifecycleScope.launch {
-            vendasViewModel.clienteStateUpdates.collect { clienteId ->
-                val position = clientesAdapter.currentList.indexOfFirst { it.id == clienteId }
-                if (position != -1) {
-                    clientesAdapter.notifyItemChanged(position)
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                vendasViewModel.clienteStateUpdates.collect { clienteId ->
+                    val position = clientesAdapter.currentList.indexOfFirst { it.id == clienteId }
+                    if (position != -1) {
+                        clientesAdapter.notifyItemChanged(position)
+                    }
                 }
             }
         }

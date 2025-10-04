@@ -9,19 +9,19 @@ import kotlinx.coroutines.withContext
 class ClienteRepository(private val clienteDao: ClienteDao) {
     fun getAllClientes(): Flow<List<Cliente>> = clienteDao.getAllClientes()
 
-    suspend fun getClienteById(id: Long): Cliente? = withContext(Dispatchers.IO) {
-        clienteDao.getClienteById(id)
+    suspend fun getClienteById(id: Long): Cliente? {
+        return clienteDao.getClienteById(id)
     }
 
-    suspend fun insertCliente(cliente: Cliente): Long = withContext(Dispatchers.IO) {
-        clienteDao.insertCliente(cliente)
+    suspend fun insertCliente(cliente: Cliente): Long {
+        return clienteDao.insertCliente(cliente)
     }
 
-    suspend fun updateCliente(cliente: Cliente) = withContext(Dispatchers.IO) {
+    suspend fun updateCliente(cliente: Cliente) {
         clienteDao.updateCliente(cliente)
     }
 
-    suspend fun deleteCliente(cliente: Cliente) = withContext(Dispatchers.IO) {
+    suspend fun deleteCliente(cliente: Cliente) {
         clienteDao.deleteCliente(cliente)
     }
 
@@ -30,11 +30,11 @@ class ClienteRepository(private val clienteDao: ClienteDao) {
         clienteDao.getClientesByLocalHierarchy(localId)
 
     // Método original mantido para compatibilidade
-    suspend fun getClientesByLocal(localId: Long): List<Cliente> = withContext(Dispatchers.IO) {
-        clienteDao.getClientesByLocal(localId)
+    suspend fun getClientesByLocal(localId: Long): List<Cliente> {
+        return clienteDao.getClientesByLocal(localId)
     }
 
-    suspend fun buscarClientes(query: String): List<Cliente> = withContext(Dispatchers.IO) {
-        clienteDao.buscarClientes(query)
+    suspend fun buscarClientes(query: String): List<Cliente> {
+        return clienteDao.buscarClientes(query)
     }
 }

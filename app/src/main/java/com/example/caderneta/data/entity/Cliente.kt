@@ -31,6 +31,12 @@ import androidx.room.PrimaryKey
             childColumns = ["sublocal3Id"],
             onDelete = ForeignKey.SET_NULL
         )
+    ],
+    indices = [
+        androidx.room.Index(value = ["localId"]),
+        androidx.room.Index(value = ["sublocal1Id"]),
+        androidx.room.Index(value = ["sublocal2Id"]),
+        androidx.room.Index(value = ["sublocal3Id"])
     ]
 )
 

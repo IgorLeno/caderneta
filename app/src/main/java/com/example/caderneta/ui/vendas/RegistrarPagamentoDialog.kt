@@ -10,7 +10,7 @@ import com.example.caderneta.databinding.DialogRegistrarPagamentoBinding
 class RegistrarPagamentoDialog : DialogFragment() {
 
     private var _binding: DialogRegistrarPagamentoBinding? = null
-    private val binding get() = _binding!!
+    private val binding get() = requireNotNull(_binding) { "Binding should not be accessed before onCreateDialog or after onDestroyView" }
 
     var onPagamentoRegistrado: ((Double) -> Unit)? = null
 

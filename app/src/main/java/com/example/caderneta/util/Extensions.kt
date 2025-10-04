@@ -9,8 +9,12 @@ import com.google.android.material.snackbar.Snackbar
 import android.view.View
 
 fun Context.showSuccessToast(message: String) {
+    val activity = this as? androidx.fragment.app.FragmentActivity ?: run {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        return
+    }
     val snackbar = Snackbar.make(
-        (this as androidx.fragment.app.FragmentActivity).findViewById(android.R.id.content),
+        activity.findViewById(android.R.id.content),
         message,
         Snackbar.LENGTH_LONG
     )
@@ -19,8 +23,12 @@ fun Context.showSuccessToast(message: String) {
 }
 
 fun Context.showErrorToast(message: String) {
+    val activity = this as? androidx.fragment.app.FragmentActivity ?: run {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        return
+    }
     val snackbar = Snackbar.make(
-        (this as androidx.fragment.app.FragmentActivity).findViewById(android.R.id.content),
+        activity.findViewById(android.R.id.content),
         message,
         Snackbar.LENGTH_LONG
     )
