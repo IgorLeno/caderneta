@@ -57,23 +57,23 @@ android {
 // Confirme as versões mais recentes e estáveis para estas BOMs e dependências.
 // As versões que você tinha (ex: composeBom = "2025.05.00") eram muito futurísticas.
 // Usei exemplos mais próximos da realidade para Maio de 2025, mas você DEVE verificar as últimas estáveis.
-val composeBom = "2024.05.00" // Exemplo: Verifique a BOM estável mais recente (ex: lançada em Abril/Maio de 2024 para uso em 2025)
+val composeBom = "2025.09.01" // Exemplo: Verifique a BOM estável mais recente (ex: lançada em Abril/Maio de 2024 para uso em 2025)
 // ou a mais atual no momento que estiver configurando.
-val roomVersion = "2.6.1"    // Seu arquivo original tinha Room 2.6.1. Seus logs mostraram download de 2.7.1.
+val roomVersion = "2.8.1"    // Seu arquivo original tinha Room 2.6.1. Seus logs mostraram download de 2.7.1.
 // Escolha UMA e seja consistente. Para este exemplo, vou usar 2.6.1, mas se 2.7.1 é desejado e estável, use-o.
 // SE VOCÊ USAR 2.7.1, CERTIFIQUE-SE QUE É UMA VERSÃO ESTÁVEL.
-val navVersion = "2.7.7"     // Seu último arquivo build.gradle.kts tinha 2.9.0. Vou usar 2.7.7 que é mais comum para essa época.
+val navVersion = "2.9.5"     // Seu último arquivo build.gradle.kts tinha 2.9.0. Vou usar 2.7.7 que é mais comum para essa época.
 // Use a versão estável mais recente.
 
 dependencies {
     implementation("androidx.drawerlayout:drawerlayout:1.2.0")
 
-    implementation("androidx.core:core-ktx:1.12.0") // Exemplo de versão estável (verifique a mais recente)
-    implementation("androidx.appcompat:appcompat:1.6.1") // Exemplo de versão estável (verifique a mais recente)
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0") // Exemplo de versão estável (verifique a mais recente)
-    implementation("androidx.activity:activity-compose:1.9.0") // Exemplo de versão estável (verifique a mais recente)
+    implementation("androidx.core:core-ktx:1.17.0") // Exemplo de versão estável (verifique a mais recente)
+    implementation("androidx.appcompat:appcompat:1.7.1") // Exemplo de versão estável (verifique a mais recente)
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4") // Exemplo de versão estável (verifique a mais recente)
+    implementation("androidx.activity:activity-compose:1.11.0") // Exemplo de versão estável (verifique a mais recente)
 
-    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0") // Exemplo de versão estável
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4") // Exemplo de versão estável
 
     implementation(platform("androidx.compose:compose-bom:$composeBom"))
     implementation("androidx.compose.ui:ui")
@@ -94,12 +94,12 @@ dependencies {
 
     ksp("androidx.room:room-compiler:$roomVersion") // Temporariamente usando implementation em vez de ksp
 
-    implementation("androidx.paging:paging-runtime-ktx:3.2.1") // Exemplo de versão estável (verifique a mais recente)
+    implementation("androidx.paging:paging-runtime-ktx:3.3.6") // Exemplo de versão estável (verifique a mais recente)
     // implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0") // Já declarado acima, mantenha uma única declaração consistente
-    implementation("androidx.fragment:fragment-ktx:1.7.0") // Exemplo de versão estável (verifique a mais recente)
+    implementation("androidx.fragment:fragment-ktx:1.8.9") // Exemplo de versão estável (verifique a mais recente)
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0") // Exemplo de versão estável (verifique a mais recente)
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.0") // Exemplo de versão estável
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.9.4") // Exemplo de versão estável
 
     implementation("com.google.android.material:material:1.11.0") // Exemplo de versão estável (verifique a mais recente)
 
@@ -113,13 +113,13 @@ dependencies {
     testImplementation("androidx.arch.core:core-testing:2.2.0")
     testImplementation("junit:junit:4.13.2")
 
-    androidTestImplementation("androidx.test.ext:junit:1.1.5") // Exemplo de versão estável (verifique a mais recente)
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1") // Exemplo de versão estável
+    androidTestImplementation("androidx.test.ext:junit:1.3.0") // Exemplo de versão estável (verifique a mais recente)
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0") // Exemplo de versão estável
     androidTestImplementation(platform("androidx.compose:compose-bom:$composeBom"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
-    androidTestImplementation("androidx.test:runner:1.5.2") // Exemplo de versão estável
-    androidTestImplementation("androidx.test:rules:1.5.0") // Exemplo de versão estável
+    androidTestImplementation("androidx.test:runner:1.7.0") // Exemplo de versão estável
+    androidTestImplementation("androidx.test:rules:1.7.0") // Exemplo de versão estável
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0") // Corresponder à versão do coroutines-android
 
     debugImplementation("androidx.compose.ui:ui-tooling")
