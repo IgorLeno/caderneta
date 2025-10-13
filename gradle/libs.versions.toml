@@ -11,7 +11,7 @@ composeBom = "2024.04.01"
 material3Android = "1.2.1"
 media3CommonKtx = "1.4.1"
 filamentAndroid = "1.17.1"
-firebaseVertexai = "16.4.0"
+firebaseVertexai = "16.5.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
