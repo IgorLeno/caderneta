@@ -4,7 +4,7 @@ plugins {
     id("androidx.navigation.safeargs.kotlin")
     // id("kotlin-kapt") // REMOVIDO COMPLETAMENTE
     id("com.google.devtools.ksp") // APLICAÇÃO DO PLUGIN KSP - ESTA LINHA É CRUCIAL
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23" // Mantendo a versão atualizada do Kotlin
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.20" // Mantendo a versão atualizada do Kotlin
 }
 
 android {
@@ -98,7 +98,7 @@ dependencies {
     // implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0") // Já declarado acima, mantenha uma única declaração consistente
     implementation("androidx.fragment:fragment-ktx:1.7.0") // Exemplo de versão estável (verifique a mais recente)
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0") // Exemplo de versão estável (verifique a mais recente)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2") // Exemplo de versão estável (verifique a mais recente)
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.0") // Exemplo de versão estável
 
     implementation("com.google.android.material:material:1.11.0") // Exemplo de versão estável (verifique a mais recente)
@@ -120,7 +120,7 @@ dependencies {
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
     androidTestImplementation("androidx.test:runner:1.5.2") // Exemplo de versão estável
     androidTestImplementation("androidx.test:rules:1.5.0") // Exemplo de versão estável
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0") // Corresponder à versão do coroutines-android
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2") // Corresponder à versão do coroutines-android
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
