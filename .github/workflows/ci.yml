@@ -39,7 +39,7 @@ jobs:
 
       # Configuração do Gradle com cache otimizado
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v5
         with:
           cache-read-only: false
 
@@ -80,7 +80,7 @@ jobs:
 
       # Setup do Gradle
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v5
 
       # Torna o gradlew executável
       - name: Make gradlew executable
@@ -154,7 +154,7 @@ jobs:
 
       # Setup Gradle
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v5
 
       # Torna gradlew executável
       - name: Make gradlew executable
@@ -213,7 +213,7 @@ jobs:
 
       # Setup Gradle
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v5
 
       # Tornar gradlew executável
       - name: Make gradlew executable
