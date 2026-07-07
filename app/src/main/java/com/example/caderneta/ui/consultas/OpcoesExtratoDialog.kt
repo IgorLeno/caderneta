@@ -5,13 +5,13 @@ import android.app.Dialog
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.DialogOpcoesExtratoBinding
-import android.widget.Toast
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -21,9 +21,8 @@ class OpcoesExtratoDialog(
     private val cliente: Cliente,
     private val onEditarData: suspend (Venda, Date) -> Boolean,
     private val onEditarOperacao: (Venda) -> Unit,
-    private val onExcluir: suspend (Venda) -> Boolean
+    private val onExcluir: suspend (Venda) -> Boolean,
 ) : DialogFragment() {
-
     private var _binding: DialogOpcoesExtratoBinding? = null
     private val binding get() = _binding!!
 
@@ -32,11 +31,13 @@ class OpcoesExtratoDialog(
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogOpcoesExtratoBinding.inflate(LayoutInflater.from(context))
 
-        val dialog = AlertDialog.Builder(requireContext())
-            .setTitle("Opções")
-            .setView(binding.root)
-            .setNegativeButton("Fechar", null)
-            .create()
+        val dialog =
+            AlertDialog
+                .Builder(requireContext())
+                .setTitle("Opções")
+                .setView(binding.root)
+                .setNegativeButton("Fechar", null)
+                .create()
 
         dialog.setCanceledOnTouchOutside(false)
 
@@ -62,9 +63,12 @@ class OpcoesExtratoDialog(
         DatePickerDialog(
             requireContext(),
             { _, selectedYear, selectedMonth, selectedDay ->
-                val newDate = Calendar.getInstance().apply {
-                    set(selectedYear, selectedMonth, selectedDay)
-                }.time
+                val newDate =
+                    Calendar
+                        .getInstance()
+                        .apply {
+                            set(selectedYear, selectedMonth, selectedDay)
+                        }.time
 
                 lifecycleScope.launch {
                     try {
@@ -80,7 +84,7 @@ class OpcoesExtratoDialog(
             },
             year,
             month,
-            day
+            day,
         ).show()
     }
 
@@ -90,7 +94,8 @@ class OpcoesExtratoDialog(
     }
 
     private fun showConfirmacaoExclusao() {
-        AlertDialog.Builder(requireContext())
+        AlertDialog
+            .Builder(requireContext())
             .setTitle("Confirmar Exclusão")
             .setMessage("Tem certeza que deseja excluir esta operação?")
             .setPositiveButton("Excluir") { _, _ ->
@@ -105,12 +110,14 @@ class OpcoesExtratoDialog(
                         showFeedback("Erro ao excluir operação: ${e.message}", isError = true)
                     }
                 }
-            }
-            .setNegativeButton("Cancelar", null)
+            }.setNegativeButton("Cancelar", null)
             .show()
     }
 
-    private fun showFeedback(message: String, isError: Boolean = false) {
+    private fun showFeedback(
+        message: String,
+        isError: Boolean = false,
+    ) {
         val context = context ?: return
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }

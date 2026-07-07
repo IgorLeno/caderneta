@@ -21,33 +21,33 @@ import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
+import com.example.caderneta.data.entity.TransacaoVenda
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.ItemClienteBinding
 import com.example.caderneta.util.ContadorHelper
+import com.example.caderneta.util.centavosParaReais
+import com.example.caderneta.util.centavosParaTextoDecimal
+import com.example.caderneta.util.decimalParaCentavos
 import com.example.caderneta.util.showErrorToast
 import com.example.caderneta.util.showSuccessToast
+import com.example.caderneta.viewmodel.ClienteState
 import com.example.caderneta.viewmodel.ConsultasViewModel
-import com.example.caderneta.viewmodel.ConsultasViewModelFactory
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class EditarOperacaoDialog(
     private val venda: Venda,
-    private val cliente: Cliente
+    private val cliente: Cliente,
 ) : DialogFragment() {
-
     private var _binding: ItemClienteBinding? = null
     private val binding get() = _binding!!
 
-
     private var alertDialog: AlertDialog? = null
-
 
     private var contadorSalgadosHelper: ContadorHelper? = null
     private var contadorSucosHelper: ContadorHelper? = null
@@ -58,27 +58,25 @@ class EditarOperacaoDialog(
         VendasViewModelFactory(
             (requireActivity().application as CadernetaApplication).clienteRepository,
             (requireActivity().application as CadernetaApplication).localRepository,
-            (requireActivity().application as CadernetaApplication).produtoRepository,
             (requireActivity().application as CadernetaApplication).vendaRepository,
-            (requireActivity().application as CadernetaApplication).itemVendaRepository,
             (requireActivity().application as CadernetaApplication).configuracoesRepository,
-            (requireActivity().application as CadernetaApplication).operacaoRepository,
-            (requireActivity().application as CadernetaApplication).contaRepository
+            (requireActivity().application as CadernetaApplication).contaRepository,
+            (requireActivity().application as CadernetaApplication).financeiroService,
         )
     }
 
     private val consultasViewModel: ConsultasViewModel by viewModels(
-        ownerProducer = { requireParentFragment() }
+        ownerProducer = { requireParentFragment() },
     )
-
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = ItemClienteBinding.inflate(LayoutInflater.from(context))
 
-        return AlertDialog.Builder(requireContext())
+        return AlertDialog
+            .Builder(requireContext())
             .setTitle(getTitleForOperation())
             .setView(binding.root)
-            .setPositiveButton("Salvar") { _, _ -> }  // Criamos um listener vazio inicialmente
+            .setPositiveButton("Salvar") { _, _ -> } // Criamos um listener vazio inicialmente
             .setNegativeButton("Cancelar", null)
             .create()
             .apply {
@@ -94,13 +92,16 @@ class EditarOperacaoDialog(
                             try {
                                 // Atualizar valor se necessário
                                 when (venda.transacao) {
-                                    "pagamento" -> {
-                                        val valorPagamento = binding.etValorPagamento.text.toString().toDoubleOrNull()
+                                    TransacaoVenda.PAGAMENTO -> {
+                                        val valorPagamento =
+                                            binding.etValorPagamento.text
+                                                .toString()
+                                                .decimalParaCentavos()
                                         if (valorPagamento != null && valorPagamento > 0) {
                                             vendasViewModel.updateValorTotal(cliente.id, valorPagamento)
-                                            delay(100) // Pequeno delay para garantir atualização
                                         }
                                     }
+                                    else -> Unit
                                 }
 
                                 if (consultasViewModel.confirmarEdicaoOperacao(venda)) {
@@ -114,9 +115,9 @@ class EditarOperacaoDialog(
 
                                     requireContext().showSuccessToast(
                                         when (venda.transacao) {
-                                            "pagamento" -> "Pagamento atualizado com sucesso"
+                                            TransacaoVenda.PAGAMENTO -> "Pagamento atualizado com sucesso"
                                             else -> "Operação atualizada com sucesso"
-                                        }
+                                        },
                                     )
                                     dialog.dismiss()
                                 }
@@ -129,32 +130,34 @@ class EditarOperacaoDialog(
             }
     }
 
-    private fun getTitleForOperation(): String {
-        return when {
-            venda.transacao == "pagamento" -> "Editar Pagamento"
+    private fun getTitleForOperation(): String =
+        when {
+            venda.transacao == TransacaoVenda.PAGAMENTO -> "Editar Pagamento"
             venda.isPromocao -> "Editar Promoção"
             else -> "Editar Venda"
         }
-    }
 
     private fun updateDialogTitle(modoOperacao: ModoOperacao?) {
-        alertDialog?.setTitle(when (modoOperacao) {
-            ModoOperacao.VENDA -> "Editar Venda"
-            ModoOperacao.PROMOCAO -> "Editar Promoção"
-            ModoOperacao.PAGAMENTO -> "Editar Pagamento"
-            null -> getTitleForOperation()
-        })
+        alertDialog?.setTitle(
+            when (modoOperacao) {
+                ModoOperacao.VENDA -> "Editar Venda"
+                ModoOperacao.PROMOCAO -> "Editar Promoção"
+                ModoOperacao.PAGAMENTO -> "Editar Pagamento"
+                null -> getTitleForOperation()
+            },
+        )
     }
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        return binding.root
-    }
+        savedInstanceState: Bundle?,
+    ): View = binding.root
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
         super.onViewCreated(view, savedInstanceState)
         configureInitialLayout()
         setupUI()
@@ -164,7 +167,7 @@ class EditarOperacaoDialog(
 
     private fun configureInitialLayout() {
         when (venda.transacao) {
-            "pagamento" -> configurePagamentoLayout()
+            TransacaoVenda.PAGAMENTO -> configurePagamentoLayout()
             else -> configureVendaLayout()
         }
     }
@@ -193,7 +196,7 @@ class EditarOperacaoDialog(
 
             // Configurar layout de pagamento
             layoutPagamento.visibility = View.VISIBLE
-            etValorPagamento.setText(String.format("%.2f", venda.valor))
+            etValorPagamento.setText(venda.valorCentavos.centavosParaTextoDecimal())
             etValorPagamento.isEnabled = true
 
             // Remover botões de confirmação/cancelamento do layout de pagamento
@@ -203,13 +206,13 @@ class EditarOperacaoDialog(
             viewLifecycleOwner.lifecycleScope.launch {
                 val saldoAtual = consultasViewModel.getSaldoCliente(cliente.id)
                 // Soma o valor do pagamento sendo editado ao saldo atual
-                val saldoTotal = saldoAtual + venda.valor
+                val saldoTotal = saldoAtual + venda.valorCentavos
 
                 btnTudo.apply {
                     visibility = View.VISIBLE
                     isEnabled = saldoTotal > 0
                     setOnClickListener {
-                        etValorPagamento.setText(String.format("%.2f", saldoTotal))
+                        etValorPagamento.setText(saldoTotal.centavosParaTextoDecimal())
                         vendasViewModel.updateValorTotal(cliente.id, saldoTotal)
                     }
                 }
@@ -235,8 +238,8 @@ class EditarOperacaoDialog(
             btnPromocao.isSelected = venda.isPromocao
 
             layoutBotoesVenda.visibility = View.VISIBLE
-            btnAVista.isSelected = venda.transacao == "a_vista"
-            btnAPrazo.isSelected = venda.transacao == "a_prazo"
+            btnAVista.isSelected = venda.transacao == TransacaoVenda.A_VISTA
+            btnAPrazo.isSelected = venda.transacao == TransacaoVenda.A_PRAZO
 
             // Atualizar estilos dos botões
             updateButtonStyle(btnVenda)
@@ -258,73 +261,92 @@ class EditarOperacaoDialog(
     }
 
     private fun setupContadores() {
-        if (venda.transacao != "pagamento") {
+        if (venda.transacao != TransacaoVenda.PAGAMENTO) {
             // Configurar contadores de venda normal
-            contadorSalgadosHelper = ContadorHelper(binding.contadorSalgados.root).apply {
-                setOnQuantidadeChangedListener { quantidade ->
-                    vendasViewModel.updateQuantidadeSalgados(cliente.id, quantidade)
-                    recalcularValorTotal()
+            contadorSalgadosHelper =
+                ContadorHelper(binding.contadorSalgados.root).apply {
+                    setOnQuantidadeChangedListener { quantidade ->
+                        vendasViewModel.updateQuantidadeSalgados(cliente.id, quantidade)
+                        recalcularValorTotal()
+                    }
+                    setQuantidade(venda.quantidadeSalgados)
                 }
-                setQuantidade(venda.quantidadeSalgados)
-            }
 
-            contadorSucosHelper = ContadorHelper(binding.contadorSucos.root).apply {
-                setOnQuantidadeChangedListener { quantidade ->
-                    vendasViewModel.updateQuantidadeSucos(cliente.id, quantidade)
-                    recalcularValorTotal()
+            contadorSucosHelper =
+                ContadorHelper(binding.contadorSucos.root).apply {
+                    setOnQuantidadeChangedListener { quantidade ->
+                        vendasViewModel.updateQuantidadeSucos(cliente.id, quantidade)
+                        recalcularValorTotal()
+                    }
+                    setQuantidade(venda.quantidadeSucos)
                 }
-                setQuantidade(venda.quantidadeSucos)
-            }
 
             setupPromoContadores()
         }
     }
 
     private fun setupPromoContadores() {
-        contadorPromo1Helper = ContadorHelper(binding.contadorPromo1.root).apply {
-            setOnQuantidadeChangedListener { quantidade ->
-                vendasViewModel.updateQuantidadePromo1(cliente.id, quantidade)
-                recalcularValorTotal() // Adicionar esta linha
+        contadorPromo1Helper =
+            ContadorHelper(binding.contadorPromo1.root).apply {
+                setOnQuantidadeChangedListener { quantidade ->
+                    vendasViewModel.updateQuantidadePromo1(cliente.id, quantidade)
+                    recalcularValorTotal() // Adicionar esta linha
+                }
             }
-        }
 
-        contadorPromo2Helper = ContadorHelper(binding.contadorPromo2.root).apply {
-            setOnQuantidadeChangedListener { quantidade ->
-                vendasViewModel.updateQuantidadePromo2(cliente.id, quantidade)
-                recalcularValorTotal() // Adicionar esta linha
+        contadorPromo2Helper =
+            ContadorHelper(binding.contadorPromo2.root).apply {
+                setOnQuantidadeChangedListener { quantidade ->
+                    vendasViewModel.updateQuantidadePromo2(cliente.id, quantidade)
+                    recalcularValorTotal() // Adicionar esta linha
+                }
             }
-        }
     }
-
 
     private fun setupButtons() {
         binding.apply {
             btnVenda.setOnClickListener {
-                val novoModo = if (vendasViewModel.getClienteState(cliente.id)?.modoOperacao == ModoOperacao.VENDA)
-                    null else ModoOperacao.VENDA
+                val novoModo =
+                    if (vendasViewModel.getClienteState(cliente.id)?.modoOperacao == ModoOperacao.VENDA) {
+                        null
+                    } else {
+                        ModoOperacao.VENDA
+                    }
                 vendasViewModel.selecionarModoOperacao(cliente, novoModo)
                 resetContadores()
                 updateDialogTitle(novoModo)
             }
 
             btnPromocao.setOnClickListener {
-                val novoModo = if (vendasViewModel.getClienteState(cliente.id)?.modoOperacao == ModoOperacao.PROMOCAO)
-                    null else ModoOperacao.PROMOCAO
+                val novoModo =
+                    if (vendasViewModel.getClienteState(cliente.id)?.modoOperacao == ModoOperacao.PROMOCAO) {
+                        null
+                    } else {
+                        ModoOperacao.PROMOCAO
+                    }
                 vendasViewModel.selecionarModoOperacao(cliente, novoModo)
                 resetContadores()
                 updateDialogTitle(novoModo)
             }
 
             btnAVista.setOnClickListener {
-                val novoTipo = if (vendasViewModel.getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_VISTA)
-                    null else TipoTransacao.A_VISTA
+                val novoTipo =
+                    if (vendasViewModel.getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_VISTA) {
+                        null
+                    } else {
+                        TipoTransacao.A_VISTA
+                    }
                 vendasViewModel.selecionarTipoTransacao(cliente, novoTipo)
                 if (novoTipo == null) resetContadores()
             }
 
             btnAPrazo.setOnClickListener {
-                val novoTipo = if (vendasViewModel.getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_PRAZO)
-                    null else TipoTransacao.A_PRAZO
+                val novoTipo =
+                    if (vendasViewModel.getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_PRAZO) {
+                        null
+                    } else {
+                        TipoTransacao.A_PRAZO
+                    }
                 vendasViewModel.selecionarTipoTransacao(cliente, novoTipo)
                 if (novoTipo == null) resetContadores()
             }
@@ -355,9 +377,8 @@ class EditarOperacaoDialog(
         }
 
         // Força recálculo do valor total
-        vendasViewModel.updateValorTotal(cliente.id, 0.0)
+        vendasViewModel.updateValorTotal(cliente.id, 0)
     }
-
 
     private fun MaterialButton.insets(value: Int) {
         insetTop = value
@@ -382,20 +403,34 @@ class EditarOperacaoDialog(
 
     private fun setupValueFields() {
         binding.apply {
-            if (venda.transacao == "pagamento") {
+            if (venda.transacao == TransacaoVenda.PAGAMENTO) {
                 etValorPagamento.apply {
-                    setText(String.format("%.2f", venda.valor))
+                    setText(venda.valorCentavos.centavosParaTextoDecimal())
                     isEnabled = true
 
                     // Adicionar listener para atualizar o valor em tempo real
-                    addTextChangedListener(object : android.text.TextWatcher {
-                        override fun afterTextChanged(s: android.text.Editable?) {
-                            val valor = s.toString().toDoubleOrNull() ?: 0.0
-                            vendasViewModel.updateValorTotal(cliente.id, valor)
-                        }
-                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                    })
+                    addTextChangedListener(
+                        object : android.text.TextWatcher {
+                            override fun afterTextChanged(s: android.text.Editable?) {
+                                val valor = s.toString().decimalParaCentavos() ?: 0
+                                vendasViewModel.updateValorTotal(cliente.id, valor)
+                            }
+
+                            override fun beforeTextChanged(
+                                s: CharSequence?,
+                                start: Int,
+                                count: Int,
+                                after: Int,
+                            ) {}
+
+                            override fun onTextChanged(
+                                s: CharSequence?,
+                                start: Int,
+                                before: Int,
+                                count: Int,
+                            ) {}
+                        },
+                    )
                 }
             } else {
                 etValorTotal.isEnabled = false
@@ -409,48 +444,66 @@ class EditarOperacaoDialog(
             tvNomeCliente.text = cliente.nome
             viewLifecycleOwner.lifecycleScope.launch {
                 val saldo = consultasViewModel.getSaldoCliente(cliente.id)
-                tvValorDevido.text = String.format("R$ %.2f", saldo)
+                tvValorDevido.text = saldo.centavosParaReais()
                 tvValorDevido.setTextColor(
-                    if (saldo > 0) ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark)
-                    else ContextCompat.getColor(requireContext(), android.R.color.holo_green_dark)
+                    if (saldo > 0) {
+                        ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark)
+                    } else {
+                        ContextCompat.getColor(requireContext(), android.R.color.holo_green_dark)
+                    },
                 )
             }
         }
     }
 
     private fun initializeOperation() {
-        val initialState = VendasViewModel.ClienteState(
-            clienteId = cliente.id,
-            modoOperacao = when {
-                venda.transacao == "pagamento" -> ModoOperacao.PAGAMENTO
-                venda.isPromocao -> ModoOperacao.PROMOCAO
-                else -> ModoOperacao.VENDA
-            },
-            tipoTransacao = when (venda.transacao) {
-                "a_vista" -> TipoTransacao.A_VISTA
-                "a_prazo" -> TipoTransacao.A_PRAZO
-                else -> null
-            },
-            quantidadeSalgados = if (!venda.isPromocao) venda.quantidadeSalgados else 0,
-            quantidadeSucos = if (!venda.isPromocao) venda.quantidadeSucos else 0,
-            quantidadePromo1 = if (venda.isPromocao) {
-                extrairQuantidadePromocao(venda.promocaoDetalhes, "Promo 1")
-            } else 0,
-            quantidadePromo2 = if (venda.isPromocao) {
-                extrairQuantidadePromocao(venda.promocaoDetalhes, "Promo 2")
-            } else 0,
-            valorTotal = venda.valor
-        )
+        val initialState =
+            ClienteState(
+                clienteId = cliente.id,
+                modoOperacao =
+                    when {
+                        venda.transacao == TransacaoVenda.PAGAMENTO -> ModoOperacao.PAGAMENTO
+                        venda.isPromocao -> ModoOperacao.PROMOCAO
+                        else -> ModoOperacao.VENDA
+                    },
+                tipoTransacao =
+                    when (venda.transacao) {
+                        TransacaoVenda.A_VISTA -> TipoTransacao.A_VISTA
+                        TransacaoVenda.A_PRAZO -> TipoTransacao.A_PRAZO
+                        else -> null
+                    },
+                quantidadeSalgados = if (!venda.isPromocao) venda.quantidadeSalgados else 0,
+                quantidadeSucos = if (!venda.isPromocao) venda.quantidadeSucos else 0,
+                quantidadePromo1 =
+                    if (venda.isPromocao) {
+                        extrairQuantidadePromocao(venda.promocaoDetalhes, "Promo 1")
+                    } else {
+                        0
+                    },
+                quantidadePromo2 =
+                    if (venda.isPromocao) {
+                        extrairQuantidadePromocao(venda.promocaoDetalhes, "Promo 2")
+                    } else {
+                        0
+                    },
+                valorTotalCentavos = venda.valorCentavos,
+            )
 
         vendasViewModel.setInitialState(cliente.id, initialState)
     }
 
-    private fun extrairQuantidadePromocao(promocaoDetalhes: String?, promoNome: String): Int {
-        return promocaoDetalhes?.let { detalhes ->
+    private fun extrairQuantidadePromocao(
+        promocaoDetalhes: String?,
+        promoNome: String,
+    ): Int =
+        promocaoDetalhes?.let { detalhes ->
             val regex = "(\\d+)x\\s*$promoNome".toRegex()
-            regex.find(detalhes)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            regex
+                .find(detalhes)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull() ?: 0
         } ?: 0
-    }
 
     private fun observeViewModels() {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -458,16 +511,19 @@ class EditarOperacaoDialog(
                 launch {
                     vendasViewModel.clienteStates.collectLatest { states ->
                         states[cliente.id]?.let { state ->
-                            Log.d(TAG, """
-                        Estado atualizado:
-                        Modo: ${state.modoOperacao}
-                        Tipo Transação: ${state.tipoTransacao}
-                        Qtd Promo1: ${state.quantidadePromo1}
-                        Qtd Promo2: ${state.quantidadePromo2}
-                        Valor Total: ${state.valorTotal}
-                    """.trimIndent())
+                            Log.d(
+                                TAG,
+                                """
+                                Estado atualizado:
+                                Modo: ${state.modoOperacao}
+                                Tipo Transação: ${state.tipoTransacao}
+                                Qtd Promo1: ${state.quantidadePromo1}
+                                Qtd Promo2: ${state.quantidadePromo2}
+                                Valor Total: ${state.valorTotalCentavos}
+                                """.trimIndent(),
+                            )
 
-                            if (venda.transacao != "pagamento") {
+                            if (venda.transacao != TransacaoVenda.PAGAMENTO) {
                                 updateUI(state)
                                 updateValores(state)
                             }
@@ -508,7 +564,7 @@ class EditarOperacaoDialog(
         }
     }
 
-    private fun updateUI(state: VendasViewModel.ClienteState) {
+    private fun updateUI(state: ClienteState) {
         binding.apply {
             btnVenda.isSelected = state.modoOperacao == ModoOperacao.VENDA
             btnPromocao.isSelected = state.modoOperacao == ModoOperacao.PROMOCAO
@@ -516,10 +572,11 @@ class EditarOperacaoDialog(
             updateButtonStyle(btnVenda)
             updateButtonStyle(btnPromocao)
 
-            layoutVenda.visibility = when (state.modoOperacao) {
-                ModoOperacao.VENDA, ModoOperacao.PROMOCAO -> View.VISIBLE
-                else -> View.GONE
-            }
+            layoutVenda.visibility =
+                when (state.modoOperacao) {
+                    ModoOperacao.VENDA, ModoOperacao.PROMOCAO -> View.VISIBLE
+                    else -> View.GONE
+                }
 
             layoutBotoesVenda.visibility = View.VISIBLE
             btnAVista.isSelected = state.tipoTransacao == TipoTransacao.A_VISTA
@@ -556,7 +613,6 @@ class EditarOperacaoDialog(
         }
     }
 
-
     private fun resetVendaContadores() {
         contadorSalgadosHelper?.setQuantidade(0)
         contadorSucosHelper?.setQuantidade(0)
@@ -570,16 +626,18 @@ class EditarOperacaoDialog(
     private fun recalcularValorTotal() {
         viewLifecycleOwner.lifecycleScope.launch {
             vendasViewModel.clienteStates.value[cliente.id]?.let { state ->
-                Log.d(TAG, """
-                Recalculando valor final:
-                Modo: ${state.modoOperacao}
-                Valor: ${state.valorTotal}
-            """.trimIndent())
-                vendasViewModel.calcularValorTotal(state)
+                Log.d(
+                    TAG,
+                    """
+                    Recalculando valor final:
+                    Modo: ${state.modoOperacao}
+                    Valor: ${state.valorTotalCentavos}
+                    """.trimIndent(),
+                )
+                vendasViewModel.recalcularValorTotal(cliente.id)
             }
         }
     }
-
 
     private fun updateButtonStyle(button: MaterialButton) {
         if (button.isSelected) {
@@ -601,8 +659,8 @@ class EditarOperacaoDialog(
         }
     }
 
-    private fun updateQuantidades(state: VendasViewModel.ClienteState) {
-        if (venda.transacao == "pagamento") return
+    private fun updateQuantidades(state: ClienteState) {
+        if (venda.transacao == TransacaoVenda.PAGAMENTO) return
 
         when (state.modoOperacao) {
             ModoOperacao.VENDA -> {
@@ -623,10 +681,10 @@ class EditarOperacaoDialog(
         }
     }
 
-    private fun updateValores(state: VendasViewModel.ClienteState) {
+    private fun updateValores(state: ClienteState) {
         binding.apply {
             try {
-                val valorFormatado = String.format("%.2f", state.valorTotal)
+                val valorFormatado = state.valorTotalCentavos.centavosParaTextoDecimal()
                 when (state.modoOperacao) {
                     ModoOperacao.VENDA -> {
                         etValorTotal.setText(valorFormatado)
@@ -649,7 +707,6 @@ class EditarOperacaoDialog(
         }
     }
 
-
     override fun onDestroyView() {
         super.onDestroyView()
         // Limpar todos os contadores
@@ -660,8 +717,6 @@ class EditarOperacaoDialog(
         alertDialog = null
         _binding = null
     }
-
-
 
     companion object {
         const val TAG = "EditarOperacaoDialog"

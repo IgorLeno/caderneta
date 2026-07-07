@@ -4,7 +4,6 @@ import android.animation.ObjectAnimator
 import android.animation.StateListAnimator
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.ColorStateList
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -23,30 +22,35 @@ import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.databinding.ItemClienteBinding
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.util.ContadorHelper
-import com.example.caderneta.viewmodel.VendasViewModel
+import com.example.caderneta.util.centavosParaReais
+import com.example.caderneta.util.centavosParaTextoDecimal
+import com.example.caderneta.util.decimalParaCentavos
+import com.example.caderneta.viewmodel.ClienteState
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
 
+@Suppress("LongParameterList")
 class ClientesAdapter(
     private val contaRepository: ContaRepository,
     private val lifecycleScope: LifecycleCoroutineScope,
-    private val fragmentManager: androidx.fragment.app.FragmentManager,  // Novo parâmetro
-    private val getClienteState: (Long) -> VendasViewModel.ClienteState?,
+    private val fragmentManager: androidx.fragment.app.FragmentManager, // Novo parâmetro
+    private val getClienteState: (Long) -> ClienteState?,
     private val getConfiguracoes: () -> Configuracoes?,
     private val onModoOperacaoSelected: (Cliente, ModoOperacao?) -> Unit,
     private val onTipoTransacaoSelected: (Cliente, TipoTransacao?) -> Unit,
     private val onQuantidadeChanged: (Long, TipoQuantidade, Int) -> Unit,
     private val onConfirmarOperacao: (Long) -> Unit,
     private val onCancelarOperacao: (Long) -> Unit,
-    private val onUpdateValorTotal: (Long, Double) -> Unit,
+    private val onUpdateValorTotal: (Long, Long) -> Unit,
     private val observeSaldoAtualizado: ((suspend (Long) -> Unit) -> Unit),
     private val onEditarCliente: (Cliente) -> Unit,
-    private val onExcluirCliente: (Cliente) -> Unit
-
+    private val onExcluirCliente: (Cliente) -> Unit,
 ) : ListAdapter<Cliente, ClientesAdapter.ClienteViewHolder>(ClienteDiffCallback()) {
-
     enum class TipoQuantidade {
-        SALGADO, SUCO, PROMO1, PROMO2
+        SALGADO,
+        SUCO,
+        PROMO1,
+        PROMO2,
     }
 
     init {
@@ -60,16 +64,26 @@ class ClientesAdapter(
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ClienteViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): ClienteViewHolder {
         val binding = ItemClienteBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return ClienteViewHolder(binding)
     }
 
-    override fun onBindViewHolder(holder: ClienteViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: ClienteViewHolder,
+        position: Int,
+    ) {
         holder.bind(getItem(position))
     }
 
-    override fun onBindViewHolder(holder: ClienteViewHolder, position: Int, payloads: List<Any>) {
+    override fun onBindViewHolder(
+        holder: ClienteViewHolder,
+        position: Int,
+        payloads: List<Any>,
+    ) {
         if (payloads.isNotEmpty()) {
             when (payloads[0]) {
                 is Payload.ValorTotalChanged -> holder.updateValorTotal(payloads[0] as Payload.ValorTotalChanged)
@@ -86,9 +100,9 @@ class ClientesAdapter(
         holder.cleanupContadores()
     }
 
-    inner class ClienteViewHolder(private val binding: ItemClienteBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-
+    inner class ClienteViewHolder(
+        private val binding: ItemClienteBinding,
+    ) : RecyclerView.ViewHolder(binding.root) {
         private var contadorSalgadosHelper: ContadorHelper? = null
         private var contadorSucosHelper: ContadorHelper? = null
         private var contadorPromo1Helper: ContadorHelper? = null
@@ -104,7 +118,6 @@ class ClientesAdapter(
             updateButtonStates(cliente)
             setupButtonStateListeners()
             setupMenuOpcoes(cliente)
-
         }
 
         fun cleanupContadores() {
@@ -122,41 +135,45 @@ class ClientesAdapter(
         fun updateSaldo() {
             lifecycleScope.launch {
                 val cliente = getItem(bindingAdapterPosition)
-                val saldo = contaRepository.getContaByCliente(cliente.id)?.saldo ?: 0.0
-                binding.tvValorDevido.text = "R$ %.2f".format(saldo)
+                val saldo = contaRepository.getContaByCliente(cliente.id)?.saldoCentavos ?: 0
+                binding.tvValorDevido.text = saldo.centavosParaReais()
                 binding.tvValorDevido.setTextColor(
                     ContextCompat.getColor(
                         itemView.context,
-                        if (saldo > 0) R.color.delete_color else R.color.add_color
-                    )
+                        if (saldo > 0) R.color.delete_color else R.color.add_color,
+                    ),
                 )
             }
         }
 
         private fun setupContadores(cliente: Cliente) {
-            contadorSalgadosHelper = ContadorHelper(binding.contadorSalgados.root).apply {
-                setOnQuantidadeChangedListener { quantidade ->
-                    onQuantidadeChanged(cliente.id, TipoQuantidade.SALGADO, quantidade)
+            contadorSalgadosHelper =
+                ContadorHelper(binding.contadorSalgados.root).apply {
+                    setOnQuantidadeChangedListener { quantidade ->
+                        onQuantidadeChanged(cliente.id, TipoQuantidade.SALGADO, quantidade)
+                    }
                 }
-            }
 
-            contadorSucosHelper = ContadorHelper(binding.contadorSucos.root).apply {
-                setOnQuantidadeChangedListener { quantidade ->
-                    onQuantidadeChanged(cliente.id, TipoQuantidade.SUCO, quantidade)
+            contadorSucosHelper =
+                ContadorHelper(binding.contadorSucos.root).apply {
+                    setOnQuantidadeChangedListener { quantidade ->
+                        onQuantidadeChanged(cliente.id, TipoQuantidade.SUCO, quantidade)
+                    }
                 }
-            }
 
-            contadorPromo1Helper = ContadorHelper(binding.contadorPromo1.root).apply {
-                setOnQuantidadeChangedListener { quantidade ->
-                    onQuantidadeChanged(cliente.id, TipoQuantidade.PROMO1, quantidade)
+            contadorPromo1Helper =
+                ContadorHelper(binding.contadorPromo1.root).apply {
+                    setOnQuantidadeChangedListener { quantidade ->
+                        onQuantidadeChanged(cliente.id, TipoQuantidade.PROMO1, quantidade)
+                    }
                 }
-            }
 
-            contadorPromo2Helper = ContadorHelper(binding.contadorPromo2.root).apply {
-                setOnQuantidadeChangedListener { quantidade ->
-                    onQuantidadeChanged(cliente.id, TipoQuantidade.PROMO2, quantidade)
+            contadorPromo2Helper =
+                ContadorHelper(binding.contadorPromo2.root).apply {
+                    setOnQuantidadeChangedListener { quantidade ->
+                        onQuantidadeChanged(cliente.id, TipoQuantidade.PROMO2, quantidade)
+                    }
                 }
-            }
 
             // Atualizar valores iniciais
             val state = getClienteState(cliente.id)
@@ -196,15 +213,23 @@ class ClientesAdapter(
         private fun setupVendaButtons(cliente: Cliente) {
             binding.apply {
                 btnAVista.setOnClickListener {
-                    val newTipoTransacao = if (getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_VISTA)
-                        null else TipoTransacao.A_VISTA
+                    val newTipoTransacao =
+                        if (getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_VISTA) {
+                            null
+                        } else {
+                            TipoTransacao.A_VISTA
+                        }
                     onTipoTransacaoSelected(cliente, newTipoTransacao)
                     updateButtonStates(cliente)
                 }
 
                 btnAPrazo.setOnClickListener {
-                    val newTipoTransacao = if (getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_PRAZO)
-                        null else TipoTransacao.A_PRAZO
+                    val newTipoTransacao =
+                        if (getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_PRAZO) {
+                            null
+                        } else {
+                            TipoTransacao.A_PRAZO
+                        }
                     onTipoTransacaoSelected(cliente, newTipoTransacao)
                     updateButtonStates(cliente)
                 }
@@ -215,19 +240,33 @@ class ClientesAdapter(
             binding.apply {
                 btnTudo.setOnClickListener {
                     lifecycleScope.launch {
-                        val saldo = contaRepository.getContaByCliente(cliente.id)?.saldo ?: 0.0
-                        etValorPagamento.setText(saldo.toString())
+                        val saldo = contaRepository.getContaByCliente(cliente.id)?.saldoCentavos ?: 0
+                        etValorPagamento.setText(saldo.centavosParaTextoDecimal())
                         onUpdateValorTotal(cliente.id, saldo)
                     }
                 }
 
-                etValorPagamento.addTextChangedListener(object : TextWatcher {
-                    override fun afterTextChanged(s: Editable?) {
-                        onUpdateValorTotal(cliente.id, s.toString().toDoubleOrNull() ?: 0.0)
-                    }
-                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                })
+                etValorPagamento.addTextChangedListener(
+                    object : TextWatcher {
+                        override fun afterTextChanged(s: Editable?) {
+                            onUpdateValorTotal(cliente.id, s.toString().decimalParaCentavos() ?: 0)
+                        }
+
+                        override fun beforeTextChanged(
+                            s: CharSequence?,
+                            start: Int,
+                            count: Int,
+                            after: Int,
+                        ) {}
+
+                        override fun onTextChanged(
+                            s: CharSequence?,
+                            start: Int,
+                            before: Int,
+                            count: Int,
+                        ) {}
+                    },
+                )
 
                 btnConfirmarPagamento.setOnClickListener {
                     onConfirmarOperacao(cliente.id)
@@ -235,7 +274,7 @@ class ClientesAdapter(
 
                 btnCancelarPagamento.setOnClickListener {
                     etValorPagamento.text?.clear()
-                    onUpdateValorTotal(cliente.id, 0.0)
+                    onUpdateValorTotal(cliente.id, 0)
                     onCancelarOperacao(cliente.id)
                 }
             }
@@ -267,13 +306,14 @@ class ClientesAdapter(
             updatePromocoesInfo(state, config)
         }
 
-        private fun updateButtonSelections(state: VendasViewModel.ClienteState) {
+        private fun updateButtonSelections(state: ClienteState) {
             binding.apply {
                 btnVenda.isSelected = state.modoOperacao == ModoOperacao.VENDA
                 btnPromocao.isSelected = state.modoOperacao == ModoOperacao.PROMOCAO
                 btnPagamento.isSelected = state.modoOperacao == ModoOperacao.PAGAMENTO
 
-                val isVendaOrPromocao = state.modoOperacao == ModoOperacao.VENDA ||
+                val isVendaOrPromocao =
+                    state.modoOperacao == ModoOperacao.VENDA ||
                         state.modoOperacao == ModoOperacao.PROMOCAO
                 btnAVista.isSelected = isVendaOrPromocao && state.tipoTransacao == TipoTransacao.A_VISTA
                 btnAPrazo.isSelected = isVendaOrPromocao && state.tipoTransacao == TipoTransacao.A_PRAZO
@@ -282,73 +322,85 @@ class ClientesAdapter(
             }
         }
 
-        private fun updateLayoutVisibility(state: VendasViewModel.ClienteState) {
+        @Suppress("CyclomaticComplexMethod")
+        private fun updateLayoutVisibility(state: ClienteState) {
             binding.apply {
-                layoutVenda.visibility = when {
-                    state.modoOperacao == null -> View.GONE
-                    state.modoOperacao == ModoOperacao.PAGAMENTO -> View.GONE
-                    else -> View.VISIBLE
-                }
+                layoutVenda.visibility =
+                    when {
+                        state.modoOperacao == null -> View.GONE
+                        state.modoOperacao == ModoOperacao.PAGAMENTO -> View.GONE
+                        else -> View.VISIBLE
+                    }
 
-                layoutBotoesVenda.visibility = when {
-                    state.modoOperacao == ModoOperacao.VENDA ||
+                layoutBotoesVenda.visibility =
+                    when {
+                        state.modoOperacao == ModoOperacao.VENDA ||
                             state.modoOperacao == ModoOperacao.PROMOCAO -> View.VISIBLE
-                    else -> View.GONE
-                }
+                        else -> View.GONE
+                    }
 
-                layoutVendaNormal.visibility = when {
-                    state.modoOperacao == ModoOperacao.VENDA &&
+                layoutVendaNormal.visibility =
+                    when {
+                        state.modoOperacao == ModoOperacao.VENDA &&
                             state.tipoTransacao != null -> View.VISIBLE
-                    else -> View.GONE
-                }
+                        else -> View.GONE
+                    }
 
-                layoutVendaPromocao.visibility = when {
-                    state.modoOperacao == ModoOperacao.PROMOCAO &&
+                layoutVendaPromocao.visibility =
+                    when {
+                        state.modoOperacao == ModoOperacao.PROMOCAO &&
                             state.tipoTransacao != null -> View.VISIBLE
-                    else -> View.GONE
-                }
+                        else -> View.GONE
+                    }
 
-                layoutPagamento.visibility = when {
-                    state.modoOperacao == ModoOperacao.PAGAMENTO -> View.VISIBLE
-                    else -> View.GONE
-                }
+                layoutPagamento.visibility =
+                    when {
+                        state.modoOperacao == ModoOperacao.PAGAMENTO -> View.VISIBLE
+                        else -> View.GONE
+                    }
 
-                layoutBotoesConfirmacao.visibility = when {
-                    (state.modoOperacao == ModoOperacao.VENDA ||
-                            state.modoOperacao == ModoOperacao.PROMOCAO) &&
+                layoutBotoesConfirmacao.visibility =
+                    when {
+                        (
+                            state.modoOperacao == ModoOperacao.VENDA ||
+                                state.modoOperacao == ModoOperacao.PROMOCAO
+                        ) &&
                             state.tipoTransacao != null -> View.VISIBLE
-                    else -> View.GONE
-                }
+                        else -> View.GONE
+                    }
             }
         }
 
-        private fun updateContadoresState(state: VendasViewModel.ClienteState) {
+        private fun updateContadoresState(state: ClienteState) {
             if (state.modoOperacao == ModoOperacao.PROMOCAO) {
                 contadorPromo1Helper?.setQuantidade(state.quantidadePromo1)
                 contadorPromo2Helper?.setQuantidade(state.quantidadePromo2)
-                binding.etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
+                binding.etValorTotalPromocao.setText(state.valorTotalCentavos.centavosParaTextoDecimal())
             } else {
                 contadorSalgadosHelper?.setQuantidade(state.quantidadeSalgados)
                 contadorSucosHelper?.setQuantidade(state.quantidadeSucos)
-                binding.etValorTotal.setText(String.format("%.2f", state.valorTotal))
+                binding.etValorTotal.setText(state.valorTotalCentavos.centavosParaTextoDecimal())
             }
         }
 
-        private fun updatePromocoesInfo(state: VendasViewModel.ClienteState, config: Configuracoes) {
+        private fun updatePromocoesInfo(
+            state: ClienteState,
+            config: Configuracoes,
+        ) {
             if (state.modoOperacao == ModoOperacao.PROMOCAO) {
                 binding.apply {
                     contadorPromo1.root.visibility =
                         if (config.isPromocaoValida(1)) View.VISIBLE else View.GONE
                     contadorPromo2.root.visibility =
                         if (config.isPromocaoValida(2)) View.VISIBLE else View.GONE
-                    etValorTotalPromocao.setText(String.format("%.2f", state.valorTotal))
+                    etValorTotalPromocao.setText(state.valorTotalCentavos.centavosParaTextoDecimal())
                 }
             }
         }
 
         fun updateValorTotal(payload: Payload.ValorTotalChanged) {
-            binding.etValorTotal.setText(String.format("%.2f", payload.novoValor))
-            binding.etValorTotalPromocao.setText(String.format("%.2f", payload.novoValor))
+            binding.etValorTotal.setText(payload.novoValorCentavos.centavosParaTextoDecimal())
+            binding.etValorTotalPromocao.setText(payload.novoValorCentavos.centavosParaTextoDecimal())
         }
 
         private fun resetContadores() {
@@ -374,11 +426,12 @@ class ClientesAdapter(
 
         private fun updateButtonStyle(button: MaterialButton) {
             val context = button.context
-            val (backgroundColor, iconTint) = if (button.isSelected) {
-                Pair(R.color.button_background_selected, R.color.button_icon_selected)
-            } else {
-                Pair(R.color.button_background_unselected, R.color.button_icon_unselected)
-            }
+            val (backgroundColor, iconTint) =
+                if (button.isSelected) {
+                    Pair(R.color.button_background_selected, R.color.button_icon_selected)
+                } else {
+                    Pair(R.color.button_background_unselected, R.color.button_icon_unselected)
+                }
 
             button.apply {
                 setBackgroundColor(ContextCompat.getColor(context, backgroundColor))
@@ -401,45 +454,50 @@ class ClientesAdapter(
                 OpcoesClienteDialog(
                     cliente = cliente,
                     onEditarClick = { onEditarCliente(it) },
-                    onExcluirClick = { onExcluirCliente(it) }
+                    onExcluirClick = { onExcluirCliente(it) },
                 ).show(fragmentManager, OpcoesClienteDialog.DIALOG_TAG)
                 true
             }
         }
 
         @SuppressLint("ObjectAnimatorBinding")
-        private fun createStateListAnimator(): StateListAnimator {
-            return StateListAnimator().apply {
+        private fun createStateListAnimator(): StateListAnimator =
+            StateListAnimator().apply {
                 addState(
                     intArrayOf(android.R.attr.state_selected),
-                    ObjectAnimator.ofFloat(null, "elevation", dpToPx(itemView.context, 8f))
+                    ObjectAnimator.ofFloat(null, "elevation", dpToPx(itemView.context, 8f)),
                 )
                 addState(
                     intArrayOf(),
-                    ObjectAnimator.ofFloat(null, "elevation", 0f)
+                    ObjectAnimator.ofFloat(null, "elevation", 0f),
                 )
             }
-        }
     }
 
     class ClienteDiffCallback : DiffUtil.ItemCallback<Cliente>() {
-        override fun areItemsTheSame(oldItem: Cliente, newItem: Cliente): Boolean {
-            return oldItem.id == newItem.id
-        }
+        override fun areItemsTheSame(
+            oldItem: Cliente,
+            newItem: Cliente,
+        ): Boolean = oldItem.id == newItem.id
 
-        override fun areContentsTheSame(oldItem: Cliente, newItem: Cliente): Boolean {
-            return oldItem == newItem
-        }
+        override fun areContentsTheSame(
+            oldItem: Cliente,
+            newItem: Cliente,
+        ): Boolean = oldItem == newItem
     }
 
     sealed class Payload {
-        data class ValorTotalChanged(val novoValor: Double) : Payload()
+        data class ValorTotalChanged(
+            val novoValorCentavos: Long,
+        ) : Payload()
+
         object SaldoChanged : Payload()
     }
 
     companion object {
-        private fun dpToPx(context: Context, dp: Float): Float {
-            return dp * context.resources.displayMetrics.density
-        }
+        private fun dpToPx(
+            context: Context,
+            dp: Float,
+        ): Float = dp * context.resources.displayMetrics.density
     }
 }

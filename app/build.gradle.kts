@@ -18,6 +18,10 @@ ktlint {
     baseline.set(file("ktlint-baseline.xml"))
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
     namespace = "com.example.caderneta"
     compileSdk = 36
@@ -37,7 +41,7 @@ android {
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }

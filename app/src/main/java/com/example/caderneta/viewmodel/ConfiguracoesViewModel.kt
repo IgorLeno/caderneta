@@ -10,8 +10,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
-class ConfiguracoesViewModel(private val repository: ConfiguracoesRepository) : ViewModel() {
-
+class ConfiguracoesViewModel(
+    private val repository: ConfiguracoesRepository,
+) : ViewModel() {
+    /** Nulo enquanto não houver configuração salva (primeira execução). */
     private val _configuracoes = MutableStateFlow<Configuracoes?>(null)
     val configuracoes: StateFlow<Configuracoes?> = _configuracoes
 
@@ -27,13 +29,13 @@ class ConfiguracoesViewModel(private val repository: ConfiguracoesRepository) : 
 
     private fun loadConfiguracoes() {
         viewModelScope.launch {
-            repository.getConfiguracoes()
+            repository
+                .getConfiguracoes()
                 .catch { e ->
                     _error.value = "Erro ao carregar configurações: ${e.message}"
-                }
-                .collect { configuracoes ->
+                }.collect { configuracoes ->
                     _configuracoes.value = configuracoes
-                    _promocoesAtivadas.value = configuracoes.promocoesAtivadas
+                    _promocoesAtivadas.value = configuracoes?.promocoesAtivadas ?: false
                 }
         }
     }
@@ -47,7 +49,6 @@ class ConfiguracoesViewModel(private val repository: ConfiguracoesRepository) : 
             try {
                 if (novasConfiguracoes.isValid()) {
                     repository.salvarConfiguracoes(novasConfiguracoes)
-                    _configuracoes.value = novasConfiguracoes
                     _error.value = null
                 } else {
                     _error.value = "Configurações inválidas. Verifique os valores inseridos."
@@ -63,7 +64,9 @@ class ConfiguracoesViewModel(private val repository: ConfiguracoesRepository) : 
     }
 }
 
-class ConfiguracoesViewModelFactory(private val repository: ConfiguracoesRepository) : ViewModelProvider.Factory {
+class ConfiguracoesViewModelFactory(
+    private val repository: ConfiguracoesRepository,
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ConfiguracoesViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")

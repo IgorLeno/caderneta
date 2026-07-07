@@ -12,14 +12,13 @@ import com.example.caderneta.databinding.ItemLocalConsultaBinding
 
 class LocalConsultaAdapter(
     private val onLocalClick: (Local) -> Unit,
-    private val onToggleExpand: (Local) -> Unit
+    private val onToggleExpand: (Local) -> Unit,
 ) : ListAdapter<LocalWithChildren, LocalConsultaAdapter.LocalViewHolder>(LocalDiffCallback()) {
-
     private var allLocals: List<LocalWithChildren> = emptyList()
 
-    inner class LocalViewHolder(private val binding: ItemLocalConsultaBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-
+    inner class LocalViewHolder(
+        private val binding: ItemLocalConsultaBinding,
+    ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(localWithChildren: LocalWithChildren) {
             val local = localWithChildren.local
             binding.tvNomeLocal.text = local.nome
@@ -29,41 +28,59 @@ class LocalConsultaAdapter(
 
             // Configura o botão de expandir/retrair
             binding.btnExpandir.apply {
-                visibility = if (localWithChildren.hasChildren) android.view.View.VISIBLE
-                else android.view.View.INVISIBLE
+                visibility =
+                    if (localWithChildren.hasChildren) {
+                        android.view.View.VISIBLE
+                    } else {
+                        android.view.View.INVISIBLE
+                    }
                 setImageResource(
-                    if (local.isExpanded) R.drawable.ic_chevron_down
-                    else R.drawable.ic_chevron_right
+                    if (local.isExpanded) {
+                        R.drawable.ic_chevron_down
+                    } else {
+                        R.drawable.ic_chevron_right
+                    },
                 )
                 setOnClickListener { onToggleExpand(local) }
             }
 
             // Define a cor de fundo com base no nível
-            val colorRes = when (local.level) {
-                0 -> R.color.level_0
-                1 -> R.color.level_1
-                2 -> R.color.level_2
-                else -> R.color.level_3
-            }
+            val colorRes =
+                when (local.level) {
+                    0 -> R.color.level_0
+                    1 -> R.color.level_1
+                    2 -> R.color.level_2
+                    else -> R.color.level_3
+                }
             itemView.setBackgroundColor(ContextCompat.getColor(itemView.context, colorRes))
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): LocalViewHolder {
-        val binding = ItemLocalConsultaBinding.inflate(
-            LayoutInflater.from(parent.context), parent, false
-        )
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): LocalViewHolder {
+        val binding =
+            ItemLocalConsultaBinding.inflate(
+                LayoutInflater.from(parent.context),
+                parent,
+                false,
+            )
         return LocalViewHolder(binding)
     }
 
-    override fun onBindViewHolder(holder: LocalViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: LocalViewHolder,
+        position: Int,
+    ) {
         holder.bind(getItem(position))
     }
 
     fun updateLocais(locais: List<Local>) {
-        allLocals = locais.map { local ->
-            LocalWithChildren(local, locais.any { it.parentId == local.id })
-        }
+        allLocals =
+            locais.map { local ->
+                LocalWithChildren(local, locais.any { it.parentId == local.id })
+            }
         val flattenedList = flattenLocals(allLocals)
         submitList(flattenedList)
     }
@@ -84,7 +101,7 @@ class LocalConsultaAdapter(
 
     private fun getAllChildrenRecursive(
         parent: LocalWithChildren,
-        allLocals: List<LocalWithChildren>
+        allLocals: List<LocalWithChildren>,
     ): List<LocalWithChildren> {
         val result = mutableListOf<LocalWithChildren>()
         val directChildren = allLocals.filter { it.local.parentId == parent.local.id }
@@ -100,18 +117,17 @@ class LocalConsultaAdapter(
     private class LocalDiffCallback : DiffUtil.ItemCallback<LocalWithChildren>() {
         override fun areItemsTheSame(
             oldItem: LocalWithChildren,
-            newItem: LocalWithChildren
-        ): Boolean {
-            return oldItem.local.id == newItem.local.id
-        }
+            newItem: LocalWithChildren,
+        ): Boolean = oldItem.local.id == newItem.local.id
 
         override fun areContentsTheSame(
             oldItem: LocalWithChildren,
-            newItem: LocalWithChildren
-        ): Boolean {
-            return oldItem == newItem
-        }
+            newItem: LocalWithChildren,
+        ): Boolean = oldItem == newItem
     }
 }
 
-data class LocalWithChildren(val local: Local, val hasChildren: Boolean)
+data class LocalWithChildren(
+    val local: Local,
+    val hasChildren: Boolean,
+)

@@ -21,23 +21,21 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
-import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.FragmentConsultasBinding
 import com.example.caderneta.ui.vendas.NovoClienteDialog
 import com.example.caderneta.viewmodel.ConsultasViewModel
 import com.example.caderneta.viewmodel.ConsultasViewModelFactory
+import com.example.caderneta.viewmodel.VendasViewModel
+import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import com.example.caderneta.viewmodel.VendasViewModel
-import com.example.caderneta.viewmodel.VendasViewModelFactory
 
 class ConsultasFragment : Fragment() {
-
     private var _binding: FragmentConsultasBinding? = null
     private val binding get() = _binding!!
 
@@ -47,8 +45,8 @@ class ConsultasFragment : Fragment() {
             (requireActivity().application as CadernetaApplication).vendaRepository,
             (requireActivity().application as CadernetaApplication).localRepository,
             (requireActivity().application as CadernetaApplication).contaRepository,
-            (requireActivity().application as CadernetaApplication).operacaoRepository,
-            (requireActivity().application as CadernetaApplication).configuracoesRepository
+            (requireActivity().application as CadernetaApplication).configuracoesRepository,
+            (requireActivity().application as CadernetaApplication).financeiroService,
         )
     }
 
@@ -56,12 +54,10 @@ class ConsultasFragment : Fragment() {
         VendasViewModelFactory(
             (requireActivity().application as CadernetaApplication).clienteRepository,
             (requireActivity().application as CadernetaApplication).localRepository,
-            (requireActivity().application as CadernetaApplication).produtoRepository,
             (requireActivity().application as CadernetaApplication).vendaRepository,
-            (requireActivity().application as CadernetaApplication).itemVendaRepository,
             (requireActivity().application as CadernetaApplication).configuracoesRepository,
-            (requireActivity().application as CadernetaApplication).operacaoRepository,
-            (requireActivity().application as CadernetaApplication).contaRepository
+            (requireActivity().application as CadernetaApplication).contaRepository,
+            (requireActivity().application as CadernetaApplication).financeiroService,
         )
     }
 
@@ -72,70 +68,23 @@ class ConsultasFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         _binding = FragmentConsultasBinding.inflate(inflater, container, false)
         return binding.root
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
         super.onViewCreated(view, savedInstanceState)
-
-        // Forçar carregamento inicial dos locais
-        viewLifecycleOwner.lifecycleScope.launch {
-            // Pequeno delay para garantir que o ViewModel esteja pronto
-            delay(100)
-            viewModel.carregarDados()
-        }
 
         setupUI()
         setupBackNavigation()
         observeViewModel()
         handleNavigationArgs()
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.saldosAtualizados.collectLatest { saldos ->
-                Log.d("SaldoDebug", "Recebendo saldos atualizados: $saldos")
-                if (saldos.isNotEmpty()) {
-                    val currentList = resultadosAdapter.currentList.toMutableList()
-                    var hasChanges = false
-
-                    saldos.forEach { (clienteId, novoSaldo) ->
-                        Log.d(
-                            "SaldoDebug",
-                            "Processando cliente $clienteId - Novo saldo: $novoSaldo"
-                        )
-                        val index = currentList.indexOfFirst {
-                            (it is ResultadoConsulta.Cliente && it.cliente.id == clienteId)
-                        }
-
-                        if (index != -1) {
-                            val item = currentList[index]
-                            if (item is ResultadoConsulta.Cliente) {
-                                Log.d(
-                                    "SaldoDebug",
-                                    "Cliente encontrado na posição $index - Saldo anterior: ${item.saldo}"
-                                )
-                                currentList[index] = ResultadoConsulta.Cliente(
-                                    item.cliente,
-                                    novoSaldo
-                                )
-                                hasChanges = true
-                            }
-                        }
-                    }
-
-                    if (hasChanges) {
-                        Log.d("SaldoDebug", "Submitting nova lista com saldos atualizados")
-                        resultadosAdapter.submitList(null)
-                        resultadosAdapter.submitList(currentList)
-                    }
-                }
-            }
-        }
     }
-
-
 
     private fun handleNavigationArgs() {
         val args = ConsultasFragmentArgs.fromBundle(requireArguments())
@@ -162,21 +111,21 @@ class ConsultasFragment : Fragment() {
     }
 
     private fun setupBackNavigation() {
-        val callback = object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                    binding.drawerLayout.closeDrawer(GravityCompat.START)
-                } else {
-                    findNavController().navigateUp()
+        val callback =
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                        binding.drawerLayout.closeDrawer(GravityCompat.START)
+                    } else {
+                        findNavController().navigateUp()
+                    }
                 }
             }
-        }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, callback)
     }
 
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
+    override fun onOptionsItemSelected(item: MenuItem): Boolean =
+        when (item.itemId) {
             android.R.id.home -> {
                 // Tenta navegar de volta quando o botão da toolbar é clicado
                 try {
@@ -190,7 +139,6 @@ class ConsultasFragment : Fragment() {
             }
             else -> super.onOptionsItemSelected(item)
         }
-    }
 
     private fun setupUI() {
         setupToolbar()
@@ -212,27 +160,28 @@ class ConsultasFragment : Fragment() {
 
     private fun setupRecyclerView() {
 // Dentro da setupRecyclerView()
-        resultadosAdapter = ResultadosConsultaAdapter(
-            onLocalClick = { localId ->
-                viewModel.selecionarLocal(localId)
-                binding.drawerLayout.closeDrawer(GravityCompat.START)
-            },
-            onClienteClick = { clienteId ->
-                viewModel.carregarVendasPorCliente(clienteId)
-            },
-            onExtratoItemClick = { venda, cliente ->
-                showOpcoesExtratoDialog(venda, cliente)
-            },
-            onEditarCliente = { cliente ->
-                showEditClienteDialog(cliente)
-            },
-            onExcluirCliente = { cliente ->
-                vendasViewModel.excluirCliente(cliente)
-            },
-            localRepository = (requireActivity().application as CadernetaApplication).localRepository,
-            coroutineScope = viewLifecycleOwner.lifecycleScope,
-            fragmentManager = childFragmentManager
-        )
+        resultadosAdapter =
+            ResultadosConsultaAdapter(
+                onLocalClick = { localId ->
+                    viewModel.selecionarLocal(localId)
+                    binding.drawerLayout.closeDrawer(GravityCompat.START)
+                },
+                onClienteClick = { clienteId ->
+                    viewModel.carregarVendasPorCliente(clienteId)
+                },
+                onExtratoItemClick = { venda, cliente ->
+                    showOpcoesExtratoDialog(venda, cliente)
+                },
+                onEditarCliente = { cliente ->
+                    showEditClienteDialog(cliente)
+                },
+                onExcluirCliente = { cliente ->
+                    vendasViewModel.excluirCliente(cliente)
+                },
+                localRepository = (requireActivity().application as CadernetaApplication).localRepository,
+                coroutineScope = viewLifecycleOwner.lifecycleScope,
+                fragmentManager = childFragmentManager,
+            )
 
         binding.rvResultados.apply {
             layoutManager = LinearLayoutManager(requireContext())
@@ -242,24 +191,28 @@ class ConsultasFragment : Fragment() {
 
     private fun showEditClienteDialog(cliente: Cliente) {
         vendasViewModel.reloadLocais()
-        val dialog = NovoClienteDialog(vendasViewModel).apply {
-            setClienteExistente(cliente)
-            onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
-                vendasViewModel.editarCliente(
-                    cliente = cliente,
-                    novoNome = nome,
-                    novoTelefone = telefone,
-                    novoLocalId = localId,
-                    novoSublocal1Id = sublocal1Id,
-                    novoSublocal2Id = sublocal2Id,
-                    novoSublocal3Id = sublocal3Id
-                )
+        val dialog =
+            NovoClienteDialog(vendasViewModel).apply {
+                setClienteExistente(cliente)
+                onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
+                    vendasViewModel.editarCliente(
+                        cliente = cliente,
+                        novoNome = nome,
+                        novoTelefone = telefone,
+                        novoLocalId = localId,
+                        novoSublocal1Id = sublocal1Id,
+                        novoSublocal2Id = sublocal2Id,
+                        novoSublocal3Id = sublocal3Id,
+                    )
+                }
             }
-        }
         dialog.show(childFragmentManager, "EditClienteDialog")
     }
 
-    private fun showOpcoesExtratoDialog(venda: Venda, cliente: Cliente) {
+    private fun showOpcoesExtratoDialog(
+        venda: Venda,
+        cliente: Cliente,
+    ) {
         OpcoesExtratoDialog(
             venda = venda,
             cliente = cliente,
@@ -271,26 +224,30 @@ class ConsultasFragment : Fragment() {
             },
             onExcluir = { vendaAtual ->
                 viewModel.excluirVenda(vendaAtual)
-            }
+            },
         ).show(childFragmentManager, OpcoesExtratoDialog.TAG)
     }
 
-    private fun showEditarOperacaoDialog(venda: Venda, cliente: Cliente) {
+    private fun showEditarOperacaoDialog(
+        venda: Venda,
+        cliente: Cliente,
+    ) {
         EditarOperacaoDialog(
             venda = venda,
-            cliente = cliente
+            cliente = cliente,
         ).show(childFragmentManager, EditarOperacaoDialog.TAG)
     }
 
     private fun setupNavDrawer() {
-        val toggle = ActionBarDrawerToggle(
-            requireActivity(),
-            binding.drawerLayout,
-            R.string.navigation_drawer_open,
-            R.string.navigation_drawer_close
-        ).apply {
-            drawerArrowDrawable.color = ContextCompat.getColor(requireContext(), R.color.on_primary)
-        }
+        val toggle =
+            ActionBarDrawerToggle(
+                requireActivity(),
+                binding.drawerLayout,
+                R.string.navigation_drawer_open,
+                R.string.navigation_drawer_close,
+            ).apply {
+                drawerArrowDrawable.color = ContextCompat.getColor(requireContext(), R.color.on_primary)
+            }
 
         binding.drawerLayout.apply {
             addDrawerListener(toggle)
@@ -299,32 +256,40 @@ class ConsultasFragment : Fragment() {
         toggle.syncState()
     }
 
-    private fun createDrawerListener() = object : androidx.drawerlayout.widget.DrawerLayout.DrawerListener {
-        override fun onDrawerSlide(drawerView: View, slideOffset: Float) {}
+    private fun createDrawerListener() =
+        object : androidx.drawerlayout.widget.DrawerLayout.DrawerListener {
+            override fun onDrawerSlide(
+                drawerView: View,
+                slideOffset: Float,
+            ) {}
 
-        override fun onDrawerOpened(drawerView: View) {
-            Log.d("ConsultasFragment", "Menu lateral aberto")
+            override fun onDrawerOpened(drawerView: View) {
+                Log.d("ConsultasFragment", "Menu lateral aberto")
+            }
+
+            override fun onDrawerClosed(drawerView: View) {
+                binding.navView
+                    .findViewById<TextInputEditText>(R.id.et_pesquisar_local)
+                    .text
+                    ?.clear()
+                Log.d("ConsultasFragment", "Menu lateral fechado")
+            }
+
+            override fun onDrawerStateChanged(newState: Int) {}
         }
-
-        override fun onDrawerClosed(drawerView: View) {
-            binding.navView.findViewById<TextInputEditText>(R.id.et_pesquisar_local).text?.clear()
-            Log.d("ConsultasFragment", "Menu lateral fechado")
-        }
-
-        override fun onDrawerStateChanged(newState: Int) {}
-    }
 
     private fun setupLocalRecyclerView() {
-        localAdapter = LocalConsultaAdapter(
-            onLocalClick = { local ->
-                viewModel.selecionarLocal(local.id)
-                binding.etBusca.text?.clear()  // Clear search field
-                binding.drawerLayout.closeDrawer(GravityCompat.START)
-            },
-            onToggleExpand = { local ->
-                viewModel.toggleLocalExpansion(local)
-            }
-        )
+        localAdapter =
+            LocalConsultaAdapter(
+                onLocalClick = { local ->
+                    viewModel.selecionarLocal(local.id)
+                    binding.etBusca.text?.clear() // Clear search field
+                    binding.drawerLayout.closeDrawer(GravityCompat.START)
+                },
+                onToggleExpand = { local ->
+                    viewModel.toggleLocalExpansion(local)
+                },
+            )
 
         binding.navView.findViewById<RecyclerView>(R.id.rv_locais).apply {
             layoutManager = LinearLayoutManager(context)
@@ -339,36 +304,69 @@ class ConsultasFragment : Fragment() {
     }
 
     private fun setupClienteSearch() {
-        binding.etBusca.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                searchDebounceJob?.cancel()
-                searchDebounceJob = lifecycleScope.launch {
-                    kotlinx.coroutines.delay(300)
-                    val query = s.toString().trim()
-                    Log.d("ConsultasFragment", "Buscando clientes: '$query'")
-                    viewModel.buscarClientes(query)
+        binding.etBusca.addTextChangedListener(
+            object : TextWatcher {
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int,
+                ) {}
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int,
+                ) {}
+
+                override fun afterTextChanged(s: Editable?) {
+                    searchDebounceJob?.cancel()
+                    searchDebounceJob =
+                        lifecycleScope.launch {
+                            kotlinx.coroutines.delay(300)
+                            val query = s.toString().trim()
+                            Log.d("ConsultasFragment", "Buscando clientes: '$query'")
+                            viewModel.buscarClientes(query)
+                        }
                 }
-            }
-        })
+            },
+        )
     }
 
     private fun setupLocalSearch() {
-        binding.navView.findViewById<TextInputEditText>(R.id.et_pesquisar_local)
-            .addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                override fun afterTextChanged(s: Editable?) {
-                    val query = s.toString().trim()
-                    Log.d("ConsultasFragment", "Buscando locais: '$query'")
-                    viewModel.buscarLocais(query)
-                }
-            })
+        binding.navView
+            .findViewById<TextInputEditText>(R.id.et_pesquisar_local)
+            .addTextChangedListener(
+                object : TextWatcher {
+                    override fun beforeTextChanged(
+                        s: CharSequence?,
+                        start: Int,
+                        count: Int,
+                        after: Int,
+                    ) {}
+
+                    override fun onTextChanged(
+                        s: CharSequence?,
+                        start: Int,
+                        before: Int,
+                        count: Int,
+                    ) {}
+
+                    override fun afterTextChanged(s: Editable?) {
+                        val query = s.toString().trim()
+                        Log.d("ConsultasFragment", "Buscando locais: '$query'")
+                        viewModel.buscarLocais(query)
+                    }
+                },
+            )
     }
 
     private fun initializeDrawerState() {
-        binding.navView.findViewById<TextInputEditText>(R.id.et_pesquisar_local).text?.clear()
+        binding.navView
+            .findViewById<TextInputEditText>(R.id.et_pesquisar_local)
+            .text
+            ?.clear()
     }
 
     private fun observeViewModel() {
@@ -389,21 +387,28 @@ class ConsultasFragment : Fragment() {
 
             launch {
                 viewModel.clientesComSaldo.collectLatest { clientesComSaldo ->
-                    Log.d("SaldoDebug", "Nova lista de clientes recebida: ${
+                    Log.d(
+                        "SaldoDebug",
+                        "Nova lista de clientes recebida: ${
+                            clientesComSaldo.map { (cliente, saldo) ->
+                                "${cliente.id}: $saldo"
+                            }
+                        }",
+                    )
+                    resultadosAdapter.submitList(
                         clientesComSaldo.map { (cliente, saldo) ->
-                            "${cliente.id}: $saldo"
-                        }
-                    }")
-                    resultadosAdapter.submitList(clientesComSaldo.map { (cliente, saldo) ->
-                        ResultadoConsulta.Cliente(cliente, saldo)
-                    })
+                            ResultadoConsulta.Cliente(cliente, saldo)
+                        },
+                    )
                 }
             }
 
             launch {
                 viewModel.vendasPorCliente.collectLatest { vendasPorCliente ->
-                    Log.d("ConsultasFragment",
-                        "Atualizando vendas por cliente: ${vendasPorCliente.size} clientes com vendas")
+                    Log.d(
+                        "ConsultasFragment",
+                        "Atualizando vendas por cliente: ${vendasPorCliente.size} clientes com vendas",
+                    )
                     resultadosAdapter.updateVendasPorCliente(vendasPorCliente)
                 }
             }
@@ -420,9 +425,10 @@ class ConsultasFragment : Fragment() {
                 viewModel.saldoAtualizado.collectLatest { clienteId ->
                     // Força uma atualização imediata do adapter
                     val currentList = resultadosAdapter.currentList.toMutableList()
-                    val index = currentList.indexOfFirst {
-                        (it is ResultadoConsulta.Cliente && it.cliente.id == clienteId)
-                    }
+                    val index =
+                        currentList.indexOfFirst {
+                            (it is ResultadoConsulta.Cliente && it.cliente.id == clienteId)
+                        }
 
                     if (index != -1) {
                         val item = currentList[index]
@@ -455,7 +461,6 @@ class ConsultasFragment : Fragment() {
             }
         }
     }
-
 
     override fun onDestroyView() {
         super.onDestroyView()

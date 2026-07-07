@@ -1,52 +1,97 @@
 package com.example.caderneta.viewmodel
 
+import android.database.sqlite.SQLiteConstraintException
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.caderneta.data.entity.*
-import com.example.caderneta.repository.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import com.example.caderneta.data.entity.Cliente
+import com.example.caderneta.data.entity.Configuracoes
+import com.example.caderneta.data.entity.Local
+import com.example.caderneta.data.entity.ModoOperacao
+import com.example.caderneta.data.entity.TipoTransacao
+import com.example.caderneta.domain.FinanceiroService
+import com.example.caderneta.repository.ClienteRepository
+import com.example.caderneta.repository.ConfiguracoesRepository
+import com.example.caderneta.repository.ContaRepository
+import com.example.caderneta.repository.LocalRepository
+import com.example.caderneta.repository.VendaRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.util.*
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class VendasViewModel(
     private val clienteRepository: ClienteRepository,
     private val localRepository: LocalRepository,
-    private val produtoRepository: ProdutoRepository,
     private val vendaRepository: VendaRepository,
-    private val itemVendaRepository: ItemVendaRepository,
     private val configuracoesRepository: ConfiguracoesRepository,
-    private val operacaoRepository: OperacaoRepository,
-    private val contaRepository: ContaRepository
+    private val contaRepository: ContaRepository,
+    private val financeiroService: FinanceiroService,
 ) : ViewModel() {
-
-    private val _clientes = MutableStateFlow<List<Cliente>>(emptyList())
-    val clientes: StateFlow<List<Cliente>> = _clientes
-
-    private val _locais = MutableStateFlow<List<Local>>(emptyList())
-    val locais: StateFlow<List<Local>> = _locais
-
     private val _localSelecionado = MutableStateFlow<Local?>(null)
-    val localSelecionado: StateFlow<Local?> = _localSelecionado
+    val localSelecionado: StateFlow<Local?> = _localSelecionado.asStateFlow()
 
-    private val _produtos = MutableStateFlow<List<Produto>>(emptyList())
-    val produtos: StateFlow<List<Produto>> = _produtos
+    private val _searchQuery = MutableStateFlow("")
 
-    private val _configuracoes = MutableStateFlow<Configuracoes?>(null)
-    val configuracoes: StateFlow<Configuracoes?> = _configuracoes
+    /**
+     * Cadeia reativa única: local selecionado + busca -> lista de clientes.
+     * flatMapLatest cancela a coleta anterior a cada mudança — não há
+     * coletores acumulados. Regra de busca unificada: contém o texto,
+     * sem diferenciar maiúsculas (igual em todos os filtros).
+     */
+    val clientes: StateFlow<List<Cliente>> =
+        combine(_localSelecionado, _searchQuery) { local, query -> local to query }
+            .flatMapLatest { (local, query) ->
+                val base =
+                    if (local == null) {
+                        clienteRepository.getAllClientes()
+                    } else {
+                        clienteRepository.getClientesByLocalHierarchy(local.id)
+                    }
+                base.map { lista ->
+                    lista.filter { cliente ->
+                        !cliente.arquivado &&
+                            (query.isEmpty() || cliente.nome.contains(query, ignoreCase = true))
+                    }
+                }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Expansão da árvore de locais é estado de UI, mantido só em memória. */
+    private val _locaisExpandidos = MutableStateFlow<Set<Long>>(emptySet())
+    private val _filtroLocais = MutableStateFlow("")
+
+    val locais: StateFlow<List<Local>> =
+        combine(localRepository.getAllLocais(), _locaisExpandidos, _filtroLocais) { lista, expandidos, filtro ->
+            lista
+                .filter { local ->
+                    !local.arquivado && (filtro.isEmpty() || local.nome.contains(filtro, ignoreCase = true))
+                }.map { it.copy(isExpanded = it.id in expandidos) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val configuracoes: StateFlow<Configuracoes?> =
+        configuracoesRepository
+            .getConfiguracoes()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _clienteStates = MutableStateFlow<Map<Long, ClienteState>>(emptyMap())
     val clienteStates: StateFlow<Map<Long, ClienteState>> = _clienteStates.asStateFlow()
 
-    private val _valorTotal = MutableStateFlow<Pair<Long, Double>>(0L to 0.0)
-    val valorTotal: StateFlow<Pair<Long, Double>> = _valorTotal.asStateFlow()
+    private val _valorTotal = MutableStateFlow<Pair<Long, Long>>(0L to 0L)
+    val valorTotal: StateFlow<Pair<Long, Long>> = _valorTotal.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     private val _saldoAtualizado = MutableSharedFlow<Long>()
     val saldoAtualizado = _saldoAtualizado.asSharedFlow()
@@ -57,86 +102,21 @@ class VendasViewModel(
     private val _operacaoConfirmada = MutableStateFlow<OperacaoConfirmada?>(null)
     val operacaoConfirmada: StateFlow<OperacaoConfirmada?> = _operacaoConfirmada.asStateFlow()
 
-    private val _searchQuery = MutableStateFlow("")
-
-    init {
-        carregarDados()
-    }
-
-    data class ClienteState(
-        val clienteId: Long,
-        var modoOperacao: ModoOperacao? = null,
-        var tipoTransacao: TipoTransacao? = null,
-        var quantidadeSalgados: Int = 0,
-        var quantidadeSucos: Int = 0,
-        var quantidadePromo1: Int = 0,
-        var quantidadePromo2: Int = 0,
-        var valorTotal: Double = 0.0
-    ) {
-        fun resetQuantidades() {
-            quantidadeSalgados = 0
-            quantidadeSucos = 0
-            quantidadePromo1 = 0
-            quantidadePromo2 = 0
-            valorTotal = 0.0
-        }
-
-        fun isPromocao() = modoOperacao == ModoOperacao.PROMOCAO
-    }
+    /** Guarda contra confirmação duplicada (duplo clique) por cliente. */
+    private val confirmacoesEmAndamento = mutableSetOf<Long>()
 
     sealed class OperacaoConfirmada {
         object Venda : OperacaoConfirmada()
+
         object Pagamento : OperacaoConfirmada()
     }
 
-    private fun carregarDados() {
-        viewModelScope.launch {
-            try {
-                // Carregar configurações e produtos (código existente)
-                launch {
-                    configuracoesRepository.getConfiguracoes().collect { configuracoes ->
-                        _configuracoes.value = configuracoes
-                    }
-                }
+    // ----- seleção de local e busca -----
 
-                launch {
-                    localRepository.getAllLocais().collect { locais ->
-                        _locais.value = locais
-                    }
-                }
-
-                // Carregar todos os clientes inicialmente
-                launch {
-                    clienteRepository.getAllClientes().collect { clientes ->
-                        _clientes.value = clientes
-                    }
-                }
-            } catch (e: Exception) {
-                _error.value = "Erro ao carregar dados: ${e.message}"
-            }
-        }
-    }
-
-    // Atualizar função de seleção de local
     fun selecionarLocal(localId: Long?) {
         viewModelScope.launch {
             try {
-                if (localId == null) {
-                    _localSelecionado.value = null
-                    // Carregar todos os clientes quando nenhum local selecionado
-                    clienteRepository.getAllClientes().collect { clientes ->
-                        _clientes.value = clientes
-                    }
-                } else {
-                    val local = localRepository.getLocalById(localId)
-                    _localSelecionado.value = local
-
-                    clienteRepository.getClientesByLocalHierarchy(localId)
-                        .collect { clientesFiltrados ->
-                            _clientes.value = clientesFiltrados
-                        }
-                }
-                // Reset search query when changing location
+                _localSelecionado.value = localId?.let { localRepository.getLocalById(it) }
                 _searchQuery.value = ""
             } catch (e: Exception) {
                 _error.value = "Erro ao selecionar local: ${e.message}"
@@ -144,537 +124,202 @@ class VendasViewModel(
         }
     }
 
-    fun getClienteState(clienteId: Long): ClienteState? {
-        return _clienteStates.value[clienteId]
+    fun buscarClientes(query: String) {
+        _searchQuery.value = query.trim()
     }
 
-    fun editarCliente(
-        cliente: Cliente,
-        novoNome: String,
-        novoTelefone: String,
-        novoLocalId: Long,
-        novoSublocal1Id: Long?,
-        novoSublocal2Id: Long?,
-        novoSublocal3Id: Long?
+    // ----- estado de operação por cliente -----
+
+    fun getClienteState(clienteId: Long): ClienteState? = _clienteStates.value[clienteId]
+
+    fun setInitialState(
+        clienteId: Long,
+        state: ClienteState,
     ) {
-        viewModelScope.launch {
-            try {
-                val clienteAtualizado = cliente.copy(
-                    nome = novoNome,
-                    telefone = novoTelefone,
-                    localId = novoLocalId,
-                    sublocal1Id = novoSublocal1Id,
-                    sublocal2Id = novoSublocal2Id,
-                    sublocal3Id = novoSublocal3Id
-                )
-
-                // Validar hierarquia de locais
-                val locais = listOfNotNull(
-                    localRepository.getLocalById(novoLocalId),
-                    novoSublocal1Id?.let { localRepository.getLocalById(it) },
-                    novoSublocal2Id?.let { localRepository.getLocalById(it) },
-                    novoSublocal3Id?.let { localRepository.getLocalById(it) }
-                )
-
-                // Validar níveis da hierarquia
-                if (locais.zipWithNext().any { (parent, child) ->
-                        child.level <= parent.level
-                    }) {
-                    throw IllegalStateException("Hierarquia de locais inválida")
-                }
-
-                clienteRepository.updateCliente(clienteAtualizado)
-
-                // Recarregar clientes do local atual
-                _localSelecionado.value?.let { local ->
-                    clienteRepository.getClientesByLocalHierarchy(local.id).collect { clientes ->
-                        _clientes.value = clientes
-                    }
-                }
-            } catch (e: Exception) {
-                _error.value = "Erro ao atualizar cliente: ${e.message}"
-            }
-        }
+        _clienteStates.update { it + (clienteId to state) }
     }
 
-    fun excluirCliente(cliente: Cliente) {
-        viewModelScope.launch {
-            try {
-                clienteRepository.deleteCliente(cliente)
-
-                // Recarregar lista de clientes
-                _localSelecionado.value?.let { local ->
-                    clienteRepository.getClientesByLocalHierarchy(local.id).collect { clientes ->
-                        _clientes.value = clientes
-                    }
-                }
-            } catch (e: Exception) {
-                _error.value = "Erro ao excluir cliente: ${e.message}"
+    fun selecionarModoOperacao(
+        cliente: Cliente,
+        modoOperacao: ModoOperacao?,
+    ) {
+        val atual = _clienteStates.value[cliente.id]
+        val novo =
+            if (atual == null || atual.modoOperacao != modoOperacao) {
+                ClienteState(clienteId = cliente.id, modoOperacao = modoOperacao)
+            } else {
+                ClienteState(clienteId = cliente.id)
             }
-        }
+        atualizarState(novo)
     }
 
-    fun setInitialState(clienteId: Long, state: ClienteState) {
-        viewModelScope.launch {
-            _clienteStates.update { currentStates ->
-                currentStates.toMutableMap().apply {
-                    put(clienteId, state)
-                }
-            }
-        }
-    }
-
-
-    suspend fun confirmarEdicaoOperacao(vendaOriginal: Venda): Boolean {
-        val clienteState = _clienteStates.value[vendaOriginal.clienteId] ?: return false
-
-        try {
-            // Calcular saldo a ser ajustado
-            val ajusteSaldo = when {
-                // Se a operação original era a prazo e a nova não é, diminuir saldo antigo
-                vendaOriginal.transacao == "a_prazo" &&
-                        clienteState.tipoTransacao != TipoTransacao.A_PRAZO -> -vendaOriginal.valor
-
-                // Se a operação original não era a prazo e a nova é, aumentar com novo valor
-                vendaOriginal.transacao != "a_prazo" &&
-                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO -> clienteState.valorTotal
-
-                // Se ambas são a prazo, ajustar a diferença
-                vendaOriginal.transacao == "a_prazo" &&
-                        clienteState.tipoTransacao == TipoTransacao.A_PRAZO ->
-                    clienteState.valorTotal - vendaOriginal.valor
-
-                else -> 0.0
-            }
-
-            // Criar nova venda baseada no estado atual
-            val novaVenda = vendaOriginal.copy(
-                transacao = when (clienteState.tipoTransacao) {
-                    TipoTransacao.A_VISTA -> "a_vista"
-                    TipoTransacao.A_PRAZO -> "a_prazo"
-                    null -> "pagamento"
-                },
-                quantidadeSalgados = clienteState.quantidadeSalgados,
-                quantidadeSucos = clienteState.quantidadeSucos,
-                isPromocao = clienteState.modoOperacao == ModoOperacao.PROMOCAO,
-                valor = clienteState.valorTotal
-            )
-
-            // Atualizar venda no banco de dados
-            vendaRepository.updateVenda(novaVenda)
-
-            // Atualizar operação correspondente
-            operacaoRepository.updateOperacao(
-                Operacao(
-                    id = vendaOriginal.operacaoId,
-                    clienteId = vendaOriginal.clienteId,
-                    tipoOperacao = when (clienteState.modoOperacao) {
-                        ModoOperacao.VENDA -> "Venda"
-                        ModoOperacao.PROMOCAO -> "Promo"
-                        ModoOperacao.PAGAMENTO -> "Pagamento"
-                        null -> throw IllegalStateException("Modo de operação inválido")
-                    },
-                    valor = clienteState.valorTotal,
-                    data = vendaOriginal.data
-                )
-            )
-
-            // Atualizar saldo se necessário
-            if (ajusteSaldo != 0.0) {
-                contaRepository.atualizarSaldo(vendaOriginal.clienteId, ajusteSaldo)
-                _saldoAtualizado.emit(vendaOriginal.clienteId)
-            }
-
-            return true
-        } catch (e: Exception) {
-            _error.value = "Erro ao atualizar operação: ${e.message}"
-            return false
-        }
-    }
-
-
-    fun selecionarModoOperacao(cliente: Cliente, modoOperacao: ModoOperacao?) {
-        val currentState = _clienteStates.value[cliente.id]
-        val newState = if (currentState == null || currentState.modoOperacao != modoOperacao) {
-            ClienteState(clienteId = cliente.id, modoOperacao = modoOperacao)
-        } else {
-            currentState.copy(
-                modoOperacao = null,
-                tipoTransacao = null,
+    fun selecionarTipoTransacao(
+        cliente: Cliente,
+        tipoTransacao: TipoTransacao?,
+    ) {
+        val atual = _clienteStates.value[cliente.id] ?: return
+        val novoTipo = if (atual.tipoTransacao == tipoTransacao) null else tipoTransacao
+        atualizarState(
+            atual.copy(
+                tipoTransacao = novoTipo,
                 quantidadeSalgados = 0,
                 quantidadeSucos = 0,
-                valorTotal = 0.0
-            )
-        }
-        _clienteStates.value =
-            _clienteStates.value.toMutableMap().apply { put(cliente.id, newState) }
-        calcularValorTotal(newState)
-    }
-
-    fun selecionarTipoTransacao(cliente: Cliente, tipoTransacao: TipoTransacao?) {
-        val clienteState = _clienteStates.value[cliente.id] ?: return
-        val newTipoTransacao =
-            if (clienteState.tipoTransacao == tipoTransacao) null else tipoTransacao
-        val newState = clienteState.copy(
-            tipoTransacao = newTipoTransacao,
-            quantidadeSalgados = 0,
-            quantidadeSucos = 0,
-            quantidadePromo1 = 0, // Adicionar esta linha
-            quantidadePromo2 = 0, // Adicionar esta linha
-            valorTotal = 0.0
+                quantidadePromo1 = 0,
+                quantidadePromo2 = 0,
+                valorTotalCentavos = 0,
+            ),
         )
-        _clienteStates.value =
-            _clienteStates.value.toMutableMap().apply { put(cliente.id, newState) }
-        calcularValorTotal(newState)
     }
 
-    fun updateQuantidadeSalgados(clienteId: Long, quantidade: Int) {
-        val clienteState = _clienteStates.value[clienteId] ?: return
-        val newState = clienteState.copy(quantidadeSalgados = quantidade)
-        _clienteStates.value =
-            _clienteStates.value.toMutableMap().apply { put(clienteId, newState) }
-        calcularValorTotal(newState)
-    }
-
-    fun updateQuantidadeSucos(clienteId: Long, quantidade: Int) {
-        val clienteState = _clienteStates.value[clienteId] ?: return
-        val newState = clienteState.copy(quantidadeSucos = quantidade)
-        _clienteStates.value =
-            _clienteStates.value.toMutableMap().apply { put(clienteId, newState) }
-        calcularValorTotal(newState)
-    }
-
-    fun updateQuantidadePromo1(clienteId: Long, quantidade: Int) {
-        val clienteState = _clienteStates.value[clienteId] ?: return
-        val newState = clienteState.copy(quantidadePromo1 = quantidade)
-        _clienteStates.value =
-            _clienteStates.value.toMutableMap().apply { put(clienteId, newState) }
-        calcularValorTotal(newState)
-    }
-
-    fun updateQuantidadePromo2(clienteId: Long, quantidade: Int) {
-        val clienteState = _clienteStates.value[clienteId] ?: return
-        val newState = clienteState.copy(quantidadePromo2 = quantidade)
-        _clienteStates.value =
-            _clienteStates.value.toMutableMap().apply { put(clienteId, newState) }
-        calcularValorTotal(newState)
-    }
-
-    fun calcularValorTotal(state: ClienteState) {
-        val config = _configuracoes.value ?: return
-
-        val novoValor = when (state.modoOperacao) {
-            ModoOperacao.VENDA -> calcularValorVendaNormal(state, config)
-            ModoOperacao.PROMOCAO -> calcularValorVendaPromocional(state, config)
-            ModoOperacao.PAGAMENTO -> state.valorTotal
-            null -> 0.0
-        }
-
-        state.valorTotal = novoValor
-
-        viewModelScope.launch {
-            _valorTotal.emit(state.clienteId to novoValor)
-            _clienteStates.update { currentStates ->
-                currentStates.toMutableMap().apply {
-                    put(state.clienteId, state)
-                }
-            }
+    fun updateQuantidadeSalgados(
+        clienteId: Long,
+        quantidade: Int,
+    ) {
+        _clienteStates.value[clienteId]?.let {
+            atualizarState(it.copy(quantidadeSalgados = quantidade))
         }
     }
 
-    private fun calcularValorVendaNormal(state: ClienteState, config: Configuracoes): Double {
-        val tipoTransacao = state.tipoTransacao ?: return 0.0
-
-        return when (tipoTransacao) {
-            TipoTransacao.A_VISTA -> {
-                (state.quantidadeSalgados * config.precoSalgadoVista) +
-                        (state.quantidadeSucos * config.precoSucoVista)
-            }
-
-            TipoTransacao.A_PRAZO -> {
-                (state.quantidadeSalgados * config.precoSalgadoPrazo) +
-                        (state.quantidadeSucos * config.precoSucoPrazo)
-            }
+    fun updateQuantidadeSucos(
+        clienteId: Long,
+        quantidade: Int,
+    ) {
+        _clienteStates.value[clienteId]?.let {
+            atualizarState(it.copy(quantidadeSucos = quantidade))
         }
     }
 
-    private fun calcularValorVendaPromocional(state: ClienteState, config: Configuracoes): Double {
-        if (!config.promocoesAtivadas) return 0.0
-
-        val tipoTransacao = state.tipoTransacao ?: return 0.0
-
-        // Calcula valor da Promoção 1
-        val valorPromo1 = if (state.quantidadePromo1 > 0) {
-            when (tipoTransacao) {
-                TipoTransacao.A_VISTA -> config.promo1Vista * state.quantidadePromo1
-                TipoTransacao.A_PRAZO -> config.promo1Prazo * state.quantidadePromo1
-            }
-        } else 0.0
-
-        // Calcula valor da Promoção 2
-        val valorPromo2 = if (state.quantidadePromo2 > 0) {
-            when (tipoTransacao) {
-                TipoTransacao.A_VISTA -> config.promo2Vista * state.quantidadePromo2
-                TipoTransacao.A_PRAZO -> config.promo2Prazo * state.quantidadePromo2
-            }
-        } else 0.0
-
-        return valorPromo1 + valorPromo2
-    }
-
-    fun resetQuantidades(clienteId: Long) {
-        _clienteStates.update { currentStates ->
-            val currentState = currentStates[clienteId]
-            if (currentState != null) {
-                currentStates + (clienteId to currentState.copy(
-                    quantidadeSalgados = 0,
-                    quantidadeSucos = 0,
-                    quantidadePromo1 = 0,
-                    quantidadePromo2 = 0,
-                    valorTotal = 0.0
-                ))
-            } else {
-                currentStates
-            }
+    fun updateQuantidadePromo1(
+        clienteId: Long,
+        quantidade: Int,
+    ) {
+        _clienteStates.value[clienteId]?.let {
+            atualizarState(it.copy(quantidadePromo1 = quantidade))
         }
     }
 
-    fun atualizarModoOperacao(clienteId: Long, modoOperacao: ModoOperacao?) {
-        _clienteStates.update { currentStates ->
-            val currentState = currentStates[clienteId]
-            if (currentState != null) {
-                val newState = currentState.copy(
-                    modoOperacao = modoOperacao,
-                    tipoTransacao = null
-                )
-                resetQuantidades(clienteId)
-                currentStates + (clienteId to newState)
-            } else {
-                currentStates
-            }
+    fun updateQuantidadePromo2(
+        clienteId: Long,
+        quantidade: Int,
+    ) {
+        _clienteStates.value[clienteId]?.let {
+            atualizarState(it.copy(quantidadePromo2 = quantidade))
         }
     }
+
+    /** Valor digitado manualmente (pagamento), em centavos. */
+    fun updateValorTotal(
+        clienteId: Long,
+        valorCentavos: Long,
+    ) {
+        val atual = _clienteStates.value[clienteId] ?: ClienteState(clienteId = clienteId)
+        val novo = atual.copy(valorTotalCentavos = valorCentavos)
+        _clienteStates.update { it + (clienteId to novo) }
+        _valorTotal.value = clienteId to valorCentavos
+    }
+
+    /**
+     * Recalcula o valor e publica o novo estado. Para PAGAMENTO o valor é o
+     * digitado; para venda/promoção deriva de quantidades e configurações.
+     */
+    private fun atualizarState(state: ClienteState) {
+        val config = configuracoes.value
+        val valor =
+            when (state.modoOperacao) {
+                ModoOperacao.VENDA -> config?.let { state.calcularValorVendaNormal(it) } ?: 0
+                ModoOperacao.PROMOCAO -> config?.let { state.calcularValorPromocional(it) } ?: 0
+                ModoOperacao.PAGAMENTO -> state.valorTotalCentavos
+                null -> 0
+            }
+        val novo = state.copy(valorTotalCentavos = valor)
+        _clienteStates.update { it + (state.clienteId to novo) }
+        _valorTotal.value = state.clienteId to valor
+    }
+
+    /** Recalcula a partir do estado atual (usado pela edição de operação). */
+    fun recalcularValorTotal(clienteId: Long) {
+        _clienteStates.value[clienteId]?.let { atualizarState(it) }
+    }
+
+    // ----- confirmação de operações (delegada ao FinanceiroService) -----
 
     fun confirmarOperacao(clienteId: Long) {
         val clienteState = _clienteStates.value[clienteId] ?: return
-        when (clienteState.modoOperacao) {
-            ModoOperacao.VENDA, ModoOperacao.PROMOCAO -> confirmarVenda(clienteId)
-            ModoOperacao.PAGAMENTO -> confirmarPagamento(clienteId)
-            else -> {}
+        if (!confirmacoesEmAndamento.add(clienteId)) return
+        viewModelScope.launch {
+            try {
+                when (clienteState.modoOperacao) {
+                    ModoOperacao.VENDA, ModoOperacao.PROMOCAO -> confirmarVenda(clienteState)
+                    ModoOperacao.PAGAMENTO -> confirmarPagamento(clienteState)
+                    null -> {}
+                }
+            } finally {
+                confirmacoesEmAndamento.remove(clienteId)
+            }
         }
     }
 
-    private fun confirmarVenda(clienteId: Long) {
-        viewModelScope.launch {
-            try {
-                val clienteState = _clienteStates.value[clienteId]
-                    ?: throw IllegalStateException("Estado do cliente não encontrado")
-                val localId = _localSelecionado.value?.id
-                    ?: throw IllegalStateException("Local não selecionado")
-                val config = _configuracoes.value
-                    ?: throw IllegalStateException("Configurações não encontradas")
+    private suspend fun confirmarVenda(clienteState: ClienteState) {
+        try {
+            val localId =
+                checkNotNull(_localSelecionado.value?.id) {
+                    "Selecione um local antes de registrar a venda"
+                }
+            val config =
+                checkNotNull(configuracoes.value) {
+                    "Configure os preços antes de registrar vendas"
+                }
+            val tipoTransacao =
+                checkNotNull(clienteState.tipoTransacao) {
+                    "Selecione à vista ou a prazo"
+                }
 
-                val tipoTransacao = clienteState.tipoTransacao
-                    ?: throw IllegalStateException("Tipo de transação não selecionado")
-
-                // Calcula as quantidades totais
-                val (quantidadeSalgadosFinal, quantidadeSucosFinal) = calcularQuantidades(
-                    clienteState,
-                    config
-                )
-
-                // Calcula o valor total
-                val valorTotal = if (clienteState.isPromocao()) {
-                    calcularValorVendaPromocional(clienteState, config)
+            val (quantidadeSalgados, quantidadeSucos) = clienteState.calcularQuantidadesTotais(config)
+            val valorCentavos =
+                if (clienteState.isPromocao()) {
+                    clienteState.calcularValorPromocional(config)
                 } else {
-                    calcularValorVendaNormal(clienteState, config)
+                    clienteState.calcularValorVendaNormal(config)
                 }
 
-                // Registra operação e venda
-                registrarOperacaoEVenda(
-                    clienteId = clienteId,
-                    localId = localId,
-                    clienteState = clienteState,
-                    valorTotal = valorTotal,
-                    quantidadeSalgados = quantidadeSalgadosFinal,
-                    quantidadeSucos = quantidadeSucosFinal,
-                    config = config,
-                    tipoTransacao = tipoTransacao
-                )
-
-                // Atualiza saldo se for venda a prazo
-                if (tipoTransacao == TipoTransacao.A_PRAZO) {
-                    atualizarSaldoVendaPrazo(clienteId, valorTotal)
-                }
-
-                resetClienteState(clienteId)
-                _operacaoConfirmada.value = OperacaoConfirmada.Venda
-
-            } catch (e: Exception) {
-                _error.value = "Erro ao confirmar venda: ${e.message}"
-            }
-        }
-    }
-
-    private fun calcularQuantidades(
-        clienteState: ClienteState,
-        config: Configuracoes
-    ): Pair<Int, Int> {
-        return if (clienteState.isPromocao()) {
-            val quant1 = config.calcularQuantidadesPromocao(1, clienteState.quantidadePromo1)
-            val quant2 = config.calcularQuantidadesPromocao(2, clienteState.quantidadePromo2)
-            Pair(
-                quant1.salgados + quant2.salgados,
-                quant1.sucos + quant2.sucos
+            financeiroService.registrarVenda(
+                clienteId = clienteState.clienteId,
+                localId = localId,
+                tipoTransacao = tipoTransacao,
+                isPromocao = clienteState.isPromocao(),
+                quantidadeSalgados = quantidadeSalgados,
+                quantidadeSucos = quantidadeSucos,
+                valorCentavos = valorCentavos,
+                promocaoDetalhes =
+                    if (clienteState.isPromocao()) {
+                        clienteState.montarPromocaoDetalhes(config)
+                    } else {
+                        null
+                    },
             )
-        } else {
-            Pair(clienteState.quantidadeSalgados, clienteState.quantidadeSucos)
-        }
-    }
 
-    private suspend fun registrarOperacaoEVenda(
-        clienteId: Long,
-        localId: Long,
-        clienteState: ClienteState,
-        valorTotal: Double,
-        quantidadeSalgados: Int,
-        quantidadeSucos: Int,
-        config: Configuracoes,
-        tipoTransacao: TipoTransacao
-    ) {
-        val operacao = Operacao(
-            clienteId = clienteId,
-            tipoOperacao = if (clienteState.isPromocao()) "Promo" else "Venda",
-            valor = valorTotal,
-            data = Date()
-        )
-        val operacaoId = operacaoRepository.insertOperacao(operacao)
-
-        val venda = Venda(
-            operacaoId = operacaoId,
-            clienteId = clienteId,
-            localId = localId,
-            data = Date(),
-            transacao = when (tipoTransacao) {
-                TipoTransacao.A_VISTA -> "a_vista"
-                TipoTransacao.A_PRAZO -> "a_prazo"
-            },
-            quantidadeSalgados = quantidadeSalgados,
-            quantidadeSucos = quantidadeSucos,
-            valor = valorTotal,
-            isPromocao = clienteState.isPromocao(),
-            promocaoDetalhes = if (clienteState.isPromocao()) {
-                buildPromocaoDetalhes(clienteState, config)
-            } else null
-        )
-        vendaRepository.insertVenda(venda)
-    }
-
-    private suspend fun atualizarSaldoVendaPrazo(clienteId: Long, valorTotal: Double) {
-        withContext(Dispatchers.IO) {
-            val conta = contaRepository.getContaByCliente(clienteId)
-            if (conta == null) {
-                contaRepository.insertConta(Conta(clienteId = clienteId, saldo = valorTotal))
-            } else {
-                contaRepository.atualizarSaldo(clienteId, valorTotal)
+            if (tipoTransacao == TipoTransacao.A_PRAZO) {
+                _saldoAtualizado.emit(clienteState.clienteId)
             }
-        }
-        _saldoAtualizado.emit(clienteId)
-    }
-
-    private fun buildPromocaoDetalhes(state: ClienteState, config: Configuracoes): String {
-        val detalhes = mutableListOf<String>()
-
-        if (state.quantidadePromo1 > 0) {
-            detalhes.add("${state.quantidadePromo1}x ${config.promo1Nome}")
-        }
-        if (state.quantidadePromo2 > 0) {
-            detalhes.add("${state.quantidadePromo2}x ${config.promo2Nome}")
-        }
-
-        return detalhes.joinToString(", ")
-    }
-
-    private fun confirmarPagamento(clienteId: Long) {
-        viewModelScope.launch {
-            try {
-                val clienteState = _clienteStates.value[clienteId]
-                    ?: throw IllegalStateException("Estado do cliente não encontrado")
-                val valorPagamento = clienteState.valorTotal
-
-                Log.d(
-                    "VendasViewModel",
-                    "Tentando confirmar pagamento: clienteId=$clienteId, valor=$valorPagamento"
-                )
-
-                if (valorPagamento <= 0) {
-                    throw IllegalStateException("Valor do pagamento inválido")
-                }
-
-                // Verifica se tem saldo suficiente
-                val conta = contaRepository.getContaByCliente(clienteId)
-                if (conta == null || valorPagamento > conta.saldo) {
-                    throw IllegalStateException("Valor do pagamento maior que o saldo devedor")
-                }
-
-                // Processa o pagamento
-                val pagamentoProcessado = withContext(Dispatchers.IO) {
-                    contaRepository.processarPagamento(clienteId, valorPagamento)
-                }
-
-                if (!pagamentoProcessado) {
-                    throw IllegalStateException("Erro ao processar pagamento")
-                }
-
-                // Registra operação e pagamento
-                withContext(Dispatchers.IO) {
-                    registrarOperacaoEPagamento(clienteId, valorPagamento)
-                }
-
-                // Atualiza UI
-                withContext(Dispatchers.Main) {
-                    _saldoAtualizado.emit(clienteId)
-                    resetClienteState(clienteId)
-                    _operacaoConfirmada.value = OperacaoConfirmada.Pagamento
-                }
-
-            } catch (e: Exception) {
-                Log.e("VendasViewModel", "Erro ao confirmar pagamento", e)
-                _error.value = "Erro ao confirmar pagamento: ${e.message}"
-            }
+            resetClienteState(clienteState.clienteId)
+            _operacaoConfirmada.value = OperacaoConfirmada.Venda
+        } catch (e: Exception) {
+            _error.value = "Erro ao confirmar venda: ${e.message}"
         }
     }
 
-    private suspend fun registrarOperacaoEPagamento(clienteId: Long, valorPagamento: Double) {
-        val operacao = Operacao(
-            clienteId = clienteId,
-            tipoOperacao = "Pagamento",
-            valor = valorPagamento,
-            data = Date()
-        )
-        val operacaoId = operacaoRepository.insertOperacao(operacao)
-
-        val venda = Venda(
-            operacaoId = operacaoId,
-            clienteId = clienteId,
-            localId = _localSelecionado.value?.id ?: 0,
-            data = Date(),
-            transacao = "pagamento",
-            quantidadeSalgados = 0,
-            quantidadeSucos = 0,
-            valor = valorPagamento
-        )
-        vendaRepository.insertVenda(venda)
-    }
-
-    fun updateValorTotal(clienteId: Long, valor: Double) {
-        viewModelScope.launch {
-            _clienteStates.update { currentStates ->
-                val currentState = currentStates[clienteId] ?: ClienteState(clienteId = clienteId)
-                val newState = currentState.copy(valorTotal = valor)
-                currentStates + (clienteId to newState)
-            }
-            _valorTotal.emit(clienteId to valor)
+    private suspend fun confirmarPagamento(clienteState: ClienteState) {
+        try {
+            financeiroService.registrarPagamento(
+                clienteId = clienteState.clienteId,
+                localId = _localSelecionado.value?.id,
+                valorCentavos = clienteState.valorTotalCentavos,
+            )
+            _saldoAtualizado.emit(clienteState.clienteId)
+            resetClienteState(clienteState.clienteId)
+            _operacaoConfirmada.value = OperacaoConfirmada.Pagamento
+        } catch (e: Exception) {
+            _error.value = "Erro ao confirmar pagamento: ${e.message}"
         }
     }
 
@@ -683,16 +328,9 @@ class VendasViewModel(
     }
 
     private fun resetClienteState(clienteId: Long) {
-        viewModelScope.launch(Dispatchers.Main) {
-            _clienteStates.update { currentStates ->
-                currentStates.toMutableMap().apply {
-                    put(clienteId, ClienteState(clienteId = clienteId))
-                }
-            }
-            _valorTotal.emit(clienteId to 0.0)
-            delay(100) // Pequeno delay para garantir que a UI esteja pronta
-            _clienteStateUpdates.emit(clienteId)
-        }
+        _clienteStates.update { it + (clienteId to ClienteState(clienteId = clienteId)) }
+        _valorTotal.value = clienteId to 0L
+        viewModelScope.launch { _clienteStateUpdates.emit(clienteId) }
     }
 
     fun resetOperacaoConfirmada() {
@@ -703,23 +341,19 @@ class VendasViewModel(
         _error.value = null
     }
 
-    // Funções relacionadas a Locais
-    fun addLocal(nome: String, parentId: Long? = null) {
+    // ----- locais -----
+
+    fun addLocal(
+        nome: String,
+        parentId: Long? = null,
+    ) {
         viewModelScope.launch {
             try {
-                val parentLevel =
-                    parentId?.let { localRepository.getLocalById(it)?.level ?: -1 } ?: -1
-                val newLocal = Local(
-                    nome = nome,
-                    endereco = "",
-                    parentId = parentId,
-                    level = parentLevel + 1
+                val parentLevel = parentId?.let { localRepository.getLocalById(it)?.level ?: -1 } ?: -1
+                localRepository.insertLocal(
+                    Local(nome = nome, endereco = "", parentId = parentId, level = parentLevel + 1),
                 )
-                val newId = localRepository.insertLocal(newLocal)
-                Log.d("VendasViewModel", "Novo local adicionado com ID: $newId")
-                reloadLocais()
             } catch (e: Exception) {
-                Log.e("VendasViewModel", "Erro ao adicionar local", e)
                 _error.value = "Erro ao adicionar local: ${e.message}"
             }
         }
@@ -729,245 +363,173 @@ class VendasViewModel(
         viewModelScope.launch {
             try {
                 localRepository.updateLocal(local)
-                carregarDados()
             } catch (e: Exception) {
                 _error.value = "Erro ao editar local: ${e.message}"
             }
         }
     }
 
+    /**
+     * Local com clientes/vendas/sublocais não pode ser apagado (FK RESTRICT):
+     * nesse caso é arquivado, preservando o histórico.
+     */
     fun deleteLocal(local: Local) {
         viewModelScope.launch {
             try {
                 localRepository.deleteLocal(local)
-                reloadLocais()
+            } catch (e: SQLiteConstraintException) {
+                Log.w(TAG, "Arquivando local com referências protegidas por FK", e)
+                localRepository.updateLocal(local.copy(arquivado = true))
+                _error.value = "${local.nome} possui registros e foi arquivado em vez de excluído"
             } catch (e: Exception) {
                 _error.value = "Erro ao deletar local: ${e.message}"
             }
         }
     }
 
+    /** A lista de locais é reativa; método mantido por compatibilidade. */
     fun reloadLocais() {
-        viewModelScope.launch {
-            try {
-                _locais.value = localRepository.getAllLocais().first()
-            } catch (e: Exception) {
-                _error.value = "Erro ao recarregar locais: ${e.message}"
-            }
-        }
+        _filtroLocais.value = ""
     }
 
     fun searchLocais(query: String) {
-        viewModelScope.launch {
-            try {
-                _locais.value = localRepository.buscarLocais(query)
-            } catch (e: Exception) {
-                _error.value = "Erro ao buscar locais: ${e.message}"
-            }
-        }
+        _filtroLocais.value = query.trim()
     }
 
     fun toggleLocalExpansion(local: Local) {
-        viewModelScope.launch {
-            try {
-                val updatedLocal = local.copy(isExpanded = !local.isExpanded)
-                localRepository.updateLocal(updatedLocal)
-                val updatedLocais = localRepository.getAllLocais().first()
-                _locais.value = updatedLocais
-            } catch (e: Exception) {
-                _error.value = "Erro ao alternar expansão do local: ${e.message}"
-            }
+        _locaisExpandidos.update { atual ->
+            if (local.id in atual) atual - local.id else atual + local.id
         }
     }
 
-    fun getSublocais(parentId: Long?): List<Local> {
-        return _locais.value.filter { it.parentId == parentId }
-    }
+    fun getSublocais(parentId: Long?): List<Local> = locais.value.filter { it.parentId == parentId }
 
     fun getLocalHierarchy(localId: Long): List<Local> {
         val hierarchy = mutableListOf<Local>()
         var currentId: Long? = localId
 
         while (currentId != null) {
-            val currentLocal = _locais.value.find { it.id == currentId } ?: break
-            hierarchy.add(0, currentLocal) // Adiciona no início para manter a ordem correta
+            val currentLocal = locais.value.find { it.id == currentId } ?: break
+            hierarchy.add(0, currentLocal)
             currentId = currentLocal.parentId
         }
 
-        // Valida se a hierarquia está ordenada por nível
         if (hierarchy.zipWithNext().any { (parent, child) -> child.level <= parent.level }) {
-            Log.w("VendasViewModel", "Hierarquia com níveis inconsistentes detectada")
             return emptyList()
         }
 
         return hierarchy
     }
 
+    // ----- clientes -----
+
+    @Suppress("LongParameterList")
     fun addCliente(
         nome: String,
         telefone: String,
         localId: Long,
         sublocal1Id: Long?,
         sublocal2Id: Long?,
-        sublocal3Id: Long?
+        sublocal3Id: Long?,
     ) {
         viewModelScope.launch {
             try {
-                Log.d(
-                    "VendasViewModel", """
-                === Iniciando cadastro de novo cliente ===
-                Nome: $nome
-                Local ID: $localId
-                Sublocal 1 ID: $sublocal1Id
-                Sublocal 2 ID: $sublocal2Id
-                Sublocal 3 ID: $sublocal3Id
-            """.trimIndent()
+                validarHierarquia(localId, sublocal1Id, sublocal2Id, sublocal3Id)
+                clienteRepository.insertCliente(
+                    Cliente(
+                        nome = nome,
+                        telefone = telefone,
+                        localId = localId,
+                        sublocal1Id = sublocal1Id,
+                        sublocal2Id = sublocal2Id,
+                        sublocal3Id = sublocal3Id,
+                    ),
                 )
-
-                // Verifica a existência dos locais
-                val local = localRepository.getLocalById(localId)
-                    ?: throw IllegalStateException("Local principal não encontrado")
-
-                // Validamos a hierarquia completa
-                val hierarchy = listOfNotNull(
-                    local,
-                    sublocal1Id?.let { localRepository.getLocalById(it) },
-                    sublocal2Id?.let { localRepository.getLocalById(it) },
-                    sublocal3Id?.let { localRepository.getLocalById(it) }
-                )
-
-                // Validamos a ordem da hierarquia pelos níveis
-                hierarchy.zipWithNext().forEach { (parent, child) ->
-                    if (child.level <= parent.level) {
-                        throw IllegalStateException("Hierarquia de locais inválida: nível do filho não é maior que do pai")
-                    }
-                }
-
-                val novoCliente = Cliente(
-                    nome = nome,
-                    telefone = telefone,
-                    localId = localId,
-                    sublocal1Id = sublocal1Id,
-                    sublocal2Id = sublocal2Id,
-                    sublocal3Id = sublocal3Id
-                )
-
-                Log.d(
-                    "VendasViewModel", """
-                === Dados finais do cliente para cadastro ===
-                Local principal: ${local.nome} (ID: ${local.id})
-                Hierarquia completa: ${hierarchy.joinToString { it.nome }}
-                Cliente: ${novoCliente.nome}
-                - Local ID: ${novoCliente.localId}
-                - Sublocal 1 ID: ${novoCliente.sublocal1Id}
-                - Sublocal 2 ID: ${novoCliente.sublocal2Id}
-                - Sublocal 3 ID: ${novoCliente.sublocal3Id}
-            """.trimIndent()
-                )
-
-                val clienteId = clienteRepository.insertCliente(novoCliente)
-                Log.d("VendasViewModel", "Cliente cadastrado com sucesso! ID: $clienteId")
-
-                // Reaplicar o filtro do local atualmente selecionado
-                _localSelecionado.value?.let { localAtual ->
-                    selecionarLocal(localAtual.id)
-                }
-
             } catch (e: Exception) {
-                Log.e("VendasViewModel", "Erro ao adicionar cliente", e)
                 _error.value = "Erro ao adicionar cliente: ${e.message}"
             }
         }
     }
 
-    private fun logHieraquiaClientes(localId: Long, clientes: List<Cliente>) {
+    @Suppress("LongParameterList")
+    fun editarCliente(
+        cliente: Cliente,
+        novoNome: String,
+        novoTelefone: String,
+        novoLocalId: Long,
+        novoSublocal1Id: Long?,
+        novoSublocal2Id: Long?,
+        novoSublocal3Id: Long?,
+    ) {
         viewModelScope.launch {
-            val local = localRepository.getLocalById(localId)
-            Log.d("VendasViewModel", "=== Análise de Hierarquia de Clientes ===")
-            Log.d("VendasViewModel", "Local selecionado: ${local?.nome} (ID: $localId)")
-            Log.d("VendasViewModel", "Total de clientes nesta hierarquia: ${clientes.size}")
-
-            // Agrupa clientes por nível na hierarquia
-            // Agrupa clientes por nível na hierarquia
-            val clientesPorNivel = clientes.groupBy { cliente ->
-                when {
-                    cliente.localId == localId -> "Principal"
-                    cliente.sublocal1Id == localId -> "Sublocal 1"
-                    cliente.sublocal2Id == localId -> "Sublocal 2"
-                    cliente.sublocal3Id == localId -> "Sublocal 3"
-                    else -> "Outro"
-                }
-            }
-
-            clientesPorNivel.forEach { (nivel, clientesDoNivel) ->
-                Log.d(
-                    "VendasViewModel",
-                    "\n=== Clientes no nível: $nivel (${clientesDoNivel.size}) ==="
+            try {
+                validarHierarquia(novoLocalId, novoSublocal1Id, novoSublocal2Id, novoSublocal3Id)
+                clienteRepository.updateCliente(
+                    cliente.copy(
+                        nome = novoNome,
+                        telefone = novoTelefone,
+                        localId = novoLocalId,
+                        sublocal1Id = novoSublocal1Id,
+                        sublocal2Id = novoSublocal2Id,
+                        sublocal3Id = novoSublocal3Id,
+                    ),
                 )
-                clientesDoNivel.forEach { cliente ->
-                    Log.d(
-                        "VendasViewModel", """
-                    Cliente: ${cliente.nome}
-                    ID: ${cliente.id}
-                    - Local principal: ${cliente.localId}
-                    - Sublocal 1: ${cliente.sublocal1Id}
-                    - Sublocal 2: ${cliente.sublocal2Id}
-                    - Sublocal 3: ${cliente.sublocal3Id}
-                    ---------------------
-                """.trimIndent()
-                    )
-                }
+            } catch (e: Exception) {
+                _error.value = "Erro ao atualizar cliente: ${e.message}"
             }
         }
     }
 
-    fun buscarClientes(query: String) {
+    /**
+     * Cliente com histórico financeiro não pode ser apagado (FK RESTRICT):
+     * nesse caso é arquivado, preservando vendas e extrato.
+     */
+    fun excluirCliente(cliente: Cliente) {
         viewModelScope.launch {
-            _searchQuery.value = query
             try {
-                when (val localAtual = _localSelecionado.value) {
-                    null -> {
-                        // Busca em toda base quando nenhum local selecionado
-                        val clientes = if (query.isEmpty()) {
-                            clienteRepository.getAllClientes().first()
-                        } else {
-                            clienteRepository.buscarClientes("%$query%")
-                        }
-                        _clientes.value = clientes
-                    }
-
-                    else -> {
-                        // Busca filtrada por local
-                        clienteRepository.getClientesByLocalHierarchy(localAtual.id)
-                            .collect { clientes ->
-                                val clientesFiltrados = if (query.isEmpty()) {
-                                    clientes
-                                } else {
-                                    clientes.filter {
-                                        it.nome.startsWith(query, ignoreCase = true)
-                                    }
-                                }
-                                _clientes.value = clientesFiltrados
-                            }
-                    }
-                }
+                clienteRepository.deleteCliente(cliente)
+            } catch (e: SQLiteConstraintException) {
+                Log.w(TAG, "Arquivando cliente com histórico financeiro protegido por FK", e)
+                clienteRepository.updateCliente(cliente.copy(arquivado = true))
+                _error.value = "${cliente.nome} possui histórico e foi arquivado em vez de excluído"
             } catch (e: Exception) {
-                _error.value = "Erro ao buscar clientes: ${e.message}"
+                _error.value = "Erro ao excluir cliente: ${e.message}"
             }
         }
+    }
+
+    private suspend fun validarHierarquia(
+        localId: Long,
+        sublocal1Id: Long?,
+        sublocal2Id: Long?,
+        sublocal3Id: Long?,
+    ) {
+        val hierarquia =
+            listOfNotNull(
+                checkNotNull(localRepository.getLocalById(localId)) {
+                    "Local principal não encontrado"
+                },
+                sublocal1Id?.let { localRepository.getLocalById(it) },
+                sublocal2Id?.let { localRepository.getLocalById(it) },
+                sublocal3Id?.let { localRepository.getLocalById(it) },
+            )
+        hierarquia.zipWithNext().forEach { (parent, child) ->
+            check(child.level > parent.level) { "Hierarquia de locais inválida" }
+        }
+    }
+
+    private companion object {
+        const val TAG = "VendasViewModel"
     }
 }
-
 
 class VendasViewModelFactory(
     private val clienteRepository: ClienteRepository,
     private val localRepository: LocalRepository,
-    private val produtoRepository: ProdutoRepository,
     private val vendaRepository: VendaRepository,
-    private val itemVendaRepository: ItemVendaRepository,
     private val configuracoesRepository: ConfiguracoesRepository,
-    private val operacaoRepository: OperacaoRepository,
-    private val contaRepository: ContaRepository
+    private val contaRepository: ContaRepository,
+    private val financeiroService: FinanceiroService,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(VendasViewModel::class.java)) {
@@ -975,12 +537,10 @@ class VendasViewModelFactory(
             return VendasViewModel(
                 clienteRepository,
                 localRepository,
-                produtoRepository,
                 vendaRepository,
-                itemVendaRepository,
                 configuracoesRepository,
-                operacaoRepository,
-                contaRepository
+                contaRepository,
+                financeiroService,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

@@ -2,90 +2,98 @@ package com.example.caderneta.data.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.caderneta.util.centavosParaReais
 
-// Atualizações na entidade Configuracoes.kt
+/**
+ * Preços em centavos (Long) — ver util/Dinheiro.kt.
+ */
 @Entity(tableName = "configuracoes")
 data class Configuracoes(
     @PrimaryKey val id: Int = 1,
     // Preços padrão
-    val precoSalgadoVista: Double,
-    val precoSalgadoPrazo: Double,
-    val precoSucoVista: Double,
-    val precoSucoPrazo: Double,
-
+    val precoSalgadoVistaCentavos: Long,
+    val precoSalgadoPrazoCentavos: Long,
+    val precoSucoVistaCentavos: Long,
+    val precoSucoPrazoCentavos: Long,
     // Flag de ativação de promoções
     val promocoesAtivadas: Boolean,
-
     // Promoção 1
     val promo1Nome: String,
     val promo1Salgados: Int,
     val promo1Sucos: Int,
-    val promo1Vista: Double,
-    val promo1Prazo: Double,
-
+    val promo1VistaCentavos: Long,
+    val promo1PrazoCentavos: Long,
     // Promoção 2
     val promo2Nome: String,
     val promo2Salgados: Int,
     val promo2Sucos: Int,
-    val promo2Vista: Double,
-    val promo2Prazo: Double
+    val promo2VistaCentavos: Long,
+    val promo2PrazoCentavos: Long,
 ) {
     fun isValid(): Boolean {
-        val basicValuesValid = precoSalgadoVista > 0 && precoSalgadoPrazo > 0 &&
-                precoSucoVista > 0 && precoSucoPrazo > 0
+        val basicValuesValid =
+            precoSalgadoVistaCentavos > 0 &&
+                precoSalgadoPrazoCentavos > 0 &&
+                precoSucoVistaCentavos > 0 &&
+                precoSucoPrazoCentavos > 0
 
-        val promocoesValid = if (promocoesAtivadas) {
-            // Validação específica para promoções quando ativadas
-            promo1Salgados >= 0 && promo1Sucos >= 0 &&
-                    promo1Vista > 0 && promo1Prazo > 0 &&
-                    promo2Salgados >= 0 && promo2Sucos >= 0 &&
-                    promo2Vista > 0 && promo2Prazo > 0 &&
-                    promo1Nome.isNotBlank() && promo2Nome.isNotBlank()
-        } else true
+        val promocoesValid =
+            if (promocoesAtivadas) {
+                promo1Salgados >= 0 &&
+                    promo1Sucos >= 0 &&
+                    promo1VistaCentavos > 0 &&
+                    promo1PrazoCentavos > 0 &&
+                    promo2Salgados >= 0 &&
+                    promo2Sucos >= 0 &&
+                    promo2VistaCentavos > 0 &&
+                    promo2PrazoCentavos > 0 &&
+                    promo1Nome.isNotBlank() &&
+                    promo2Nome.isNotBlank()
+            } else {
+                true
+            }
 
         return basicValuesValid && promocoesValid
     }
 
-    // Calcula o valor total de uma promoção com base na quantidade e tipo de transação
-
+    /** Valor total (centavos) de uma promoção para a quantidade e tipo de transação. */
     fun calcularValorPromocao(
         numeroPromocao: Int,
         quantidade: Int,
-        tipoTransacao: TipoTransacao
-    ): Double {
-        if (!promocoesAtivadas || quantidade <= 0) return 0.0
+        tipoTransacao: TipoTransacao,
+    ): Long {
+        if (!promocoesAtivadas || quantidade <= 0) return 0
 
         return when (numeroPromocao) {
-            1 -> quantidade * if (tipoTransacao == TipoTransacao.A_VISTA) promo1Vista else promo1Prazo
-            2 -> quantidade * if (tipoTransacao == TipoTransacao.A_VISTA) promo2Vista else promo2Prazo
-            else -> 0.0
+            1 -> quantidade * if (tipoTransacao == TipoTransacao.A_VISTA) promo1VistaCentavos else promo1PrazoCentavos
+            2 -> quantidade * if (tipoTransacao == TipoTransacao.A_VISTA) promo2VistaCentavos else promo2PrazoCentavos
+            else -> 0
         }
     }
 
-    // Calcula a quantidade total de itens para uma promoção
-
+    /** Quantidades totais de itens para uma promoção. */
     fun calcularQuantidadesPromocao(
         numeroPromocao: Int,
-        quantidade: Int
+        quantidade: Int,
     ): PromoQuantidades {
         if (!promocoesAtivadas || quantidade <= 0) {
             return PromoQuantidades(0, 0)
         }
 
         return when (numeroPromocao) {
-            1 -> PromoQuantidades(
-                salgados = promo1Salgados * quantidade,
-                sucos = promo1Sucos * quantidade
-            )
-            2 -> PromoQuantidades(
-                salgados = promo2Salgados * quantidade,
-                sucos = promo2Sucos * quantidade
-            )
+            1 ->
+                PromoQuantidades(
+                    salgados = promo1Salgados * quantidade,
+                    sucos = promo1Sucos * quantidade,
+                )
+            2 ->
+                PromoQuantidades(
+                    salgados = promo2Salgados * quantidade,
+                    sucos = promo2Sucos * quantidade,
+                )
             else -> PromoQuantidades(0, 0)
         }
     }
-
-    // Verifica se uma promoção está configurada corretamente
 
     fun isPromocaoValida(numeroPromocao: Int): Boolean {
         if (!promocoesAtivadas) return false
@@ -97,7 +105,6 @@ data class Configuracoes(
         }
     }
 
-    // Obtém o nome da promoção formatado
     fun getNomePromocao(numeroPromocao: Int): String {
         if (!promocoesAtivadas) return ""
 
@@ -108,13 +115,12 @@ data class Configuracoes(
         }
     }
 
-    // Obtém a descrição detalhada da promoção
     fun getDescricaoPromocao(numeroPromocao: Int): String {
         if (!promocoesAtivadas) return ""
 
         return when (numeroPromocao) {
-            1 -> formatarDescricaoPromocao(promo1Salgados, promo1Sucos, promo1Vista, promo1Prazo)
-            2 -> formatarDescricaoPromocao(promo2Salgados, promo2Sucos, promo2Vista, promo2Prazo)
+            1 -> formatarDescricaoPromocao(promo1Salgados, promo1Sucos, promo1VistaCentavos, promo1PrazoCentavos)
+            2 -> formatarDescricaoPromocao(promo2Salgados, promo2Sucos, promo2VistaCentavos, promo2PrazoCentavos)
             else -> ""
         }
     }
@@ -122,20 +128,20 @@ data class Configuracoes(
     private fun formatarDescricaoPromocao(
         salgados: Int,
         sucos: Int,
-        valorVista: Double,
-        valorPrazo: Double
+        valorVistaCentavos: Long,
+        valorPrazoCentavos: Long,
     ): String {
         val itens = mutableListOf<String>()
         if (salgados > 0) itens.add("$salgados salgado${if (salgados > 1) "s" else ""}")
         if (sucos > 0) itens.add("$sucos suco${if (sucos > 1) "s" else ""}")
 
         return "${itens.joinToString(" + ")}\n" +
-                "À vista: R$ %.2f | A prazo: R$ %.2f".format(valorVista, valorPrazo)
+            "À vista: ${valorVistaCentavos.centavosParaReais()} | A prazo: ${valorPrazoCentavos.centavosParaReais()}"
     }
 }
 
 // Classe auxiliar para retornar quantidades calculadas
 data class PromoQuantidades(
     val salgados: Int,
-    val sucos: Int
+    val sucos: Int,
 )

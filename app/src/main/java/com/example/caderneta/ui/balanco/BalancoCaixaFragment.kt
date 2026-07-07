@@ -10,17 +10,14 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.databinding.FragmentBalancoCaixaBinding
+import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.viewmodel.BalancoCaixaViewModel
 import com.example.caderneta.viewmodel.BalancoCaixaViewModelFactory
-import com.example.caderneta.data.entity.Venda
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
-import java.util.Locale
 
 class BalancoCaixaFragment : Fragment() {
-
     private var _binding: FragmentBalancoCaixaBinding? = null
     private val binding get() = _binding!!
 
@@ -28,12 +25,19 @@ class BalancoCaixaFragment : Fragment() {
         BalancoCaixaViewModelFactory((requireActivity().application as CadernetaApplication).vendaRepository)
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
         _binding = FragmentBalancoCaixaBinding.inflate(inflater, container, false)
         return binding.root
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
         super.onViewCreated(view, savedInstanceState)
 
         setupCardViews()
@@ -72,22 +76,18 @@ class BalancoCaixaFragment : Fragment() {
     private fun updateVendasCards(state: BalancoCaixaViewModel.VendasState) {
         with(binding) {
             cardVendasDiarias.apply {
-                setTotalVendas("Total: ${formatCurrency(state.totalVendasDiarias)}")
-                setTotalRecebimentos("Recebimentos: ${formatCurrency(state.totalRecebimentosDiarios)}")
+                setTotalVendas("Total: ${state.totalVendasDiariasCentavos.centavosParaReais()}")
+                setTotalRecebimentos("Recebimentos: ${state.totalRecebimentosDiariosCentavos.centavosParaReais()}")
             }
             cardVendasSemanais.apply {
-                setTotalVendas("Total: ${formatCurrency(state.totalVendasSemanais)}")
-                setTotalRecebimentos("Recebimentos: ${formatCurrency(state.totalRecebimentosSemanais)}")
+                setTotalVendas("Total: ${state.totalVendasSemanaisCentavos.centavosParaReais()}")
+                setTotalRecebimentos("Recebimentos: ${state.totalRecebimentosSemanaisCentavos.centavosParaReais()}")
             }
             cardVendasMensais.apply {
-                setTotalVendas("Total: ${formatCurrency(state.totalVendasMensais)}")
-                setTotalRecebimentos("Recebimentos: ${formatCurrency(state.totalRecebimentosMensais)}")
+                setTotalVendas("Total: ${state.totalVendasMensaisCentavos.centavosParaReais()}")
+                setTotalRecebimentos("Recebimentos: ${state.totalRecebimentosMensaisCentavos.centavosParaReais()}")
             }
         }
-    }
-
-    private fun formatCurrency(value: Double): String {
-        return NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(value)
     }
 
     override fun onDestroyView() {

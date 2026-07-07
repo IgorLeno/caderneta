@@ -22,7 +22,8 @@ interface ClienteDao {
     suspend fun deleteCliente(cliente: Cliente)
 
     // Nova query para buscar clientes por local hierarquicamente
-    @Query("""
+    @Query(
+        """
         WITH RECURSIVE local_hierarchy AS (
             SELECT id, parentId
             FROM locais
@@ -38,7 +39,8 @@ interface ClienteDao {
         OR c.sublocal1Id IN (SELECT id FROM local_hierarchy)
         OR c.sublocal2Id IN (SELECT id FROM local_hierarchy)
         OR c.sublocal3Id IN (SELECT id FROM local_hierarchy)
-    """)
+    """,
+    )
     fun getClientesByLocalHierarchy(localId: Long): Flow<List<Cliente>>
 
     // Mantém a query original para casos específicos

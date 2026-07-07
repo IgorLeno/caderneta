@@ -1,9 +1,15 @@
 package com.example.caderneta.ui.consultas
 
-import com.example.caderneta.data.entity.Cliente
-import com.example.caderneta.data.entity.Local
+import com.example.caderneta.data.entity.Cliente as ClienteEntity
+import com.example.caderneta.data.entity.Local as LocalEntity
 
 sealed class ResultadoConsulta {
-    data class Local(val local: com.example.caderneta.data.entity.Local) : ResultadoConsulta()
-    data class Cliente(val cliente: com.example.caderneta.data.entity.Cliente, val saldo: Double) : ResultadoConsulta()
+    data class Local(
+        val local: LocalEntity,
+    ) : ResultadoConsulta()
+
+    data class Cliente(
+        val cliente: ClienteEntity,
+        val saldoCentavos: Long,
+    ) : ResultadoConsulta()
 }

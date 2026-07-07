@@ -2,20 +2,16 @@ package com.example.caderneta.repository
 
 import com.example.caderneta.data.dao.ClienteDao
 import com.example.caderneta.data.entity.Cliente
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.withContext
 
-class ClienteRepository(private val clienteDao: ClienteDao) {
+class ClienteRepository(
+    private val clienteDao: ClienteDao,
+) {
     fun getAllClientes(): Flow<List<Cliente>> = clienteDao.getAllClientes()
 
-    suspend fun getClienteById(id: Long): Cliente? {
-        return clienteDao.getClienteById(id)
-    }
+    suspend fun getClienteById(id: Long): Cliente? = clienteDao.getClienteById(id)
 
-    suspend fun insertCliente(cliente: Cliente): Long {
-        return clienteDao.insertCliente(cliente)
-    }
+    suspend fun insertCliente(cliente: Cliente): Long = clienteDao.insertCliente(cliente)
 
     suspend fun updateCliente(cliente: Cliente) {
         clienteDao.updateCliente(cliente)
@@ -30,11 +26,7 @@ class ClienteRepository(private val clienteDao: ClienteDao) {
         clienteDao.getClientesByLocalHierarchy(localId)
 
     // Método original mantido para compatibilidade
-    suspend fun getClientesByLocal(localId: Long): List<Cliente> {
-        return clienteDao.getClientesByLocal(localId)
-    }
+    suspend fun getClientesByLocal(localId: Long): List<Cliente> = clienteDao.getClientesByLocal(localId)
 
-    suspend fun buscarClientes(query: String): List<Cliente> {
-        return clienteDao.buscarClientes(query)
-    }
+    suspend fun buscarClientes(query: String): List<Cliente> = clienteDao.buscarClientes(query)
 }
