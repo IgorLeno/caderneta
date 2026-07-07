@@ -1,10 +1,9 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android") // Não precisa de versão aqui, herda do projeto
-    id("androidx.navigation.safeargs.kotlin")
-    // id("kotlin-kapt") // REMOVIDO COMPLETAMENTE
-    id("com.google.devtools.ksp") // APLICAÇÃO DO PLUGIN KSP - ESTA LINHA É CRUCIAL
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23" // Mantendo a versão atualizada do Kotlin
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.navigation.safeargs)
 }
 
 android {
@@ -14,7 +13,7 @@ android {
     defaultConfig {
         applicationId = "com.example.caderneta"
         minSdk = 21
-        targetSdk = 35 // RECOMENDADO atualizar para corresponder ao compileSdk
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -43,9 +42,7 @@ android {
         compose = true
     }
     composeOptions {
-        // Para Kotlin 1.9.24, a compose compiler extension compatível é geralmente 1.5.12 ou superior.
-        // Verifique a tabela de compatibilidade: https://developer.android.com/jetpack/androidx/releases/compose-kotlin
-        kotlinCompilerExtensionVersion = "1.5.12" // Ou a versão compatível mais recente para Kotlin 1.9.24
+        kotlinCompilerExtensionVersion = "1.5.12"
     }
     packaging {
         resources {
@@ -54,85 +51,59 @@ android {
     }
 }
 
-// Confirme as versões mais recentes e estáveis para estas BOMs e dependências.
-// As versões que você tinha (ex: composeBom = "2025.05.00") eram muito futurísticas.
-// Usei exemplos mais próximos da realidade para Maio de 2025, mas você DEVE verificar as últimas estáveis.
-val composeBom = "2024.05.00" // Exemplo: Verifique a BOM estável mais recente (ex: lançada em Abril/Maio de 2024 para uso em 2025)
-// ou a mais atual no momento que estiver configurando.
-val roomVersion = "2.6.1"    // Seu arquivo original tinha Room 2.6.1. Seus logs mostraram download de 2.7.1.
-// Escolha UMA e seja consistente. Para este exemplo, vou usar 2.6.1, mas se 2.7.1 é desejado e estável, use-o.
-// SE VOCÊ USAR 2.7.1, CERTIFIQUE-SE QUE É UMA VERSÃO ESTÁVEL.
-val navVersion = "2.7.7"     // Seu último arquivo build.gradle.kts tinha 2.9.0. Vou usar 2.7.7 que é mais comum para essa época.
-// Use a versão estável mais recente.
-
 dependencies {
-    implementation("androidx.drawerlayout:drawerlayout:1.2.0")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.fragment.ktx)
+    implementation(libs.androidx.drawerlayout)
 
-    implementation("androidx.core:core-ktx:1.12.0") // Exemplo de versão estável (verifique a mais recente)
-    implementation("androidx.appcompat:appcompat:1.6.1") // Exemplo de versão estável (verifique a mais recente)
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0") // Exemplo de versão estável (verifique a mais recente)
-    implementation("androidx.activity:activity-compose:1.9.0") // Exemplo de versão estável (verifique a mais recente)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
 
-    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0") // Exemplo de versão estável
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.ui.ktx)
 
-    implementation(platform("androidx.compose:compose-bom:$composeBom"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended") // Deixe a BOM gerenciar
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
-    implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    // implementation("androidx.room:room-paging:$roomVersion") // Descomente apenas se usar Room com Paging 3
+    implementation(libs.androidx.paging.runtime.ktx)
 
-    // Se libs.filament.android e libs.firebase.vertexai não estiverem definidas em um catálogo de versões (libs.versions.toml)
-    // você precisará adicionar as dependências com suas versões explícitas aqui.
-    // Exemplo:
-    // implementation("com.google.ar.sceneform:filament-android:1.17.1") // Verifique a última versão do Filament
-    // implementation("com.google.firebase:firebase-vertexai:XXX") // Verifique o artefato e versão corretos para Vertex AI
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
 
-    ksp("androidx.room:room-compiler:$roomVersion") // Temporariamente usando implementation em vez de ksp
+    implementation(libs.material)
+    implementation(libs.mpandroidchart)
 
-    implementation("androidx.paging:paging-runtime-ktx:3.2.1") // Exemplo de versão estável (verifique a mais recente)
-    // implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0") // Já declarado acima, mantenha uma única declaração consistente
-    implementation("androidx.fragment:fragment-ktx:1.7.0") // Exemplo de versão estável (verifique a mais recente)
+    implementation(libs.kotlinx.coroutines.android)
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0") // Exemplo de versão estável (verifique a mais recente)
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.0") // Exemplo de versão estável
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    implementation("com.google.android.material:material:1.11.0") // Exemplo de versão estável (verifique a mais recente)
+    testImplementation(libs.junit)
+    testImplementation(libs.androidx.arch.core.testing)
 
-    implementation("androidx.navigation:navigation-fragment-ktx:$navVersion")
-    implementation("androidx.navigation:navigation-ui-ktx:$navVersion")
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
-
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4") // Ou 2.1.5 se for a mais recente que você encontrou
-
-    testImplementation("androidx.arch.core:core-testing:2.2.0")
-    testImplementation("junit:junit:4.13.2")
-
-    androidTestImplementation("androidx.test.ext:junit:1.1.5") // Exemplo de versão estável (verifique a mais recente)
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1") // Exemplo de versão estável
-    androidTestImplementation(platform("androidx.compose:compose-bom:$composeBom"))
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    androidTestImplementation("androidx.room:room-testing:$roomVersion")
-    androidTestImplementation("androidx.test:runner:1.5.2") // Exemplo de versão estável
-    androidTestImplementation("androidx.test:rules:1.5.0") // Exemplo de versão estável
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0") // Corresponder à versão do coroutines-android
-
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
 configurations.all {
     resolutionStrategy {
-        force("junit:junit:4.13.2") // Você já tem isso
-
-        // Adicione esta exclusão para as anotações conflitantes
+        force("junit:junit:4.13.2")
         exclude(group = "com.intellij", module = "annotations")
     }
 }
-
-// O bloco kapt { ... } deve ser REMOVIDO se você não estiver usando o plugin kotlin-kapt
