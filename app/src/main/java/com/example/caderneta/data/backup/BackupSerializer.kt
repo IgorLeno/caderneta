@@ -12,6 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Date
 
+@Suppress("TooManyFunctions")
 class BackupSerializer {
     fun toJson(snapshot: BackupSnapshot): String =
         JSONObject()

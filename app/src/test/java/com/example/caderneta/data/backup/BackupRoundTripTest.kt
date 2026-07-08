@@ -50,50 +50,66 @@ class BackupRoundTripTest {
     }
 
     @Test
-    fun exportaERestauraSnapshotRecalculandoConta() = runTest {
-        val localId = db.localDao().insertLocal(Local(nome = "Local"))
-        val clienteId = db.clienteDao().insertCliente(Cliente(nome = "Cliente", telefone = null, localId = localId))
-        db.configuracoesDao().insertConfiguracoes(config())
-        financeiroService.registrarVenda(clienteId, localId, TipoTransacao.A_PRAZO, false, 1, 0, 1000, null)
-        financeiroService.registrarPagamento(clienteId, null, 300)
+    fun exportaERestauraSnapshotRecalculandoConta() =
+        runTest {
+            val localId = db.localDao().insertLocal(Local(nome = "Local"))
+            val clienteId = db.clienteDao().insertCliente(Cliente(nome = "Cliente", telefone = null, localId = localId))
+            db.configuracoesDao().insertConfiguracoes(config())
+            financeiroService.registrarVenda(clienteId, localId, TipoTransacao.A_PRAZO, false, 1, 0, 1000, null)
+            financeiroService.registrarPagamento(clienteId, null, 300)
 
-        val output = ByteArrayOutputStream()
-        manager.exportar(output)
-        val (snapshot) = manager.lerResumo(ByteArrayInputStream(output.toByteArray()))
+            val output = ByteArrayOutputStream()
+            manager.exportar(output)
+            val (snapshot) = manager.lerResumo(ByteArrayInputStream(output.toByteArray()))
 
-        db.localDao().insertLocal(Local(nome = "Ruido"))
-        manager.restaurar(snapshot.copy(contas = emptyList()))
+            db.localDao().insertLocal(Local(nome = "Ruido"))
+            manager.restaurar(snapshot.copy(contas = emptyList()))
 
-        assertEquals(1, db.clienteDao().getAllClientes().first().size)
-        assertEquals(2, db.vendaDao().getAllVendas().first().size)
-        assertEquals(700L, db.contaDao().getContaByCliente(clienteId)?.saldoCentavos)
-    }
-
-    @Test
-    fun backupInvalidoNaoAlteraBanco() = runTest {
-        val localId = db.localDao().insertLocal(Local(nome = "Local"))
-        val snapshot =
-            BackupSnapshot(
-                app = "outro.app",
-                geradoEmMillis = 1,
-                locais = emptyList(),
-                clientes = emptyList(),
-                operacoes = emptyList(),
-                vendas = emptyList(),
-                contas = emptyList(),
-                configuracoes = emptyList(),
+            assertEquals(
+                1,
+                db
+                    .clienteDao()
+                    .getAllClientes()
+                    .first()
+                    .size,
             )
-
-        var falhou = false
-        try {
-            manager.restaurar(snapshot)
-        } catch (_: IllegalArgumentException) {
-            falhou = true
+            assertEquals(
+                2,
+                db
+                    .vendaDao()
+                    .getAllVendas()
+                    .first()
+                    .size,
+            )
+            assertEquals(700L, db.contaDao().getContaByCliente(clienteId)?.saldoCentavos)
         }
 
-        assertTrue(falhou)
-        assertEquals(localId, db.localDao().getLocalById(localId)?.id)
-    }
+    @Test
+    fun backupInvalidoNaoAlteraBanco() =
+        runTest {
+            val localId = db.localDao().insertLocal(Local(nome = "Local"))
+            val snapshot =
+                BackupSnapshot(
+                    app = "outro.app",
+                    geradoEmMillis = 1,
+                    locais = emptyList(),
+                    clientes = emptyList(),
+                    operacoes = emptyList(),
+                    vendas = emptyList(),
+                    contas = emptyList(),
+                    configuracoes = emptyList(),
+                )
+
+            var falhou = false
+            try {
+                manager.restaurar(snapshot)
+            } catch (_: IllegalArgumentException) {
+                falhou = true
+            }
+
+            assertTrue(falhou)
+            assertEquals(localId, db.localDao().getLocalById(localId)?.id)
+        }
 
     private fun config() =
         Configuracoes(

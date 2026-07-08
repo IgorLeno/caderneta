@@ -13,7 +13,9 @@ import java.util.Locale
 private val localeBr = Locale.forLanguageTag("pt-BR")
 
 sealed class ParseDinheiro {
-    data class Valido(val centavos: Long) : ParseDinheiro()
+    data class Valido(
+        val centavos: Long,
+    ) : ParseDinheiro()
 
     data object Vazio : ParseDinheiro()
 
@@ -38,6 +40,7 @@ fun Long.centavosParaTextoDecimal(): String = String.format(localeBr, "%.2f", Bi
  * último separador é decimal e o outro é milhar. Separador repetido é tratado
  * como milhar, então "1.234.567" vira 123456700 centavos.
  */
+@Suppress("ReturnCount")
 fun String.parseDinheiro(): ParseDinheiro {
     val semMoeda =
         trim()
@@ -71,9 +74,12 @@ fun String.parseDinheiro(): ParseDinheiro {
 /** Wrapper compatível: retorna null para qualquer entrada não monetária válida. */
 fun String.decimalParaCentavos(): Long? = (parseDinheiro() as? ParseDinheiro.Valido)?.centavos
 
+@Suppress("CyclomaticComplexMethod", "ReturnCount")
 private fun normalizarDecimal(texto: String): String? {
-    if (texto.any { !it.isDigit() && it != ',' && it != '.' && it != '+' }) return null
-    if (texto.count { it == '+' } > 1 || (texto.contains('+') && !texto.startsWith('+'))) return null
+    if (!texto.all(::isCaracterMonetario)) return null
+    val quantidadeSinais = texto.count { it == '+' }
+    if (quantidadeSinais > 1) return null
+    if (quantidadeSinais == 1 && !texto.startsWith('+')) return null
 
     val valor = texto.removePrefix("+")
     if (valor.isEmpty()) return null
@@ -96,3 +102,9 @@ private fun normalizarDecimal(texto: String): String? {
         valor.replace(separador, '.')
     }
 }
+
+private fun isCaracterMonetario(char: Char): Boolean =
+    char.isDigit() ||
+        char == ',' ||
+        char == '.' ||
+        char == '+'

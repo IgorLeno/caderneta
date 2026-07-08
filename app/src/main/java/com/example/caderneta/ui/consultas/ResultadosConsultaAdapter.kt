@@ -19,7 +19,6 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.caderneta.R
 import com.example.caderneta.data.entity.Venda
-import com.example.caderneta.data.entity.Cliente as ClienteEntity
 import com.example.caderneta.databinding.ItemResultadoConsultaBinding
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.util.centavosParaReais
@@ -28,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.caderneta.data.entity.Cliente as ClienteEntity
 
 @Suppress("LongParameterList")
 class ResultadosConsultaAdapter(

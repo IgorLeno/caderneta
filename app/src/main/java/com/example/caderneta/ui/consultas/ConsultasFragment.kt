@@ -440,8 +440,10 @@ class ConsultasFragment : Fragment() {
                 viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                     viewModel.eventos.collectLatest { evento ->
                         when (evento) {
-                            is UiEvento.Erro -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
-                            is UiEvento.Sucesso -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
+                            is UiEvento.Erro ->
+                                Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
+                            is UiEvento.Sucesso ->
+                                Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
                             is UiEvento.ConfirmarRestauracao -> Unit
                         }
                     }

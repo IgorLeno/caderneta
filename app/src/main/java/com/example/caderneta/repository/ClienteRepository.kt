@@ -18,15 +18,14 @@ class ClienteRepository(
         clienteDao.updateCliente(cliente)
     }
 
-    suspend fun deleteCliente(cliente: Cliente): Boolean {
-        return try {
+    suspend fun deleteCliente(cliente: Cliente): Boolean =
+        try {
             clienteDao.deleteCliente(cliente)
             false
         } catch (_: SQLiteConstraintException) {
             clienteDao.updateCliente(cliente.copy(arquivado = true))
             true
         }
-    }
 
     // Novo método para buscar clientes hierarquicamente
     fun getClientesByLocalHierarchy(localId: Long): Flow<List<Cliente>> =

@@ -25,9 +25,9 @@ import com.example.caderneta.data.entity.TransacaoVenda
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.ItemClienteBinding
 import com.example.caderneta.util.ContadorHelper
+import com.example.caderneta.util.ParseDinheiro
 import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.util.centavosParaTextoDecimal
-import com.example.caderneta.util.ParseDinheiro
 import com.example.caderneta.util.decimalParaCentavos
 import com.example.caderneta.util.parseDinheiro
 import com.example.caderneta.util.showErrorToast

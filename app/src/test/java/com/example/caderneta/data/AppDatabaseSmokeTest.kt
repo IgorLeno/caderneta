@@ -39,35 +39,36 @@ class AppDatabaseSmokeTest {
     }
 
     @Test
-    fun criaBancoComForeignKeysEIndices() = runTest {
-        val localId = db.localDao().insertLocal(Local(nome = "Escola"))
-        val clienteId =
-            db.clienteDao().insertCliente(
-                Cliente(
-                    nome = "Cliente",
-                    telefone = null,
-                    localId = localId,
-                ),
-            )
+    fun criaBancoComForeignKeysEIndices() =
+        runTest {
+            val localId = db.localDao().insertLocal(Local(nome = "Escola"))
+            val clienteId =
+                db.clienteDao().insertCliente(
+                    Cliente(
+                        nome = "Cliente",
+                        telefone = null,
+                        localId = localId,
+                    ),
+                )
 
-        val cliente = db.clienteDao().getClienteById(clienteId)
-        assertEquals(localId, cliente?.localId)
+            val cliente = db.clienteDao().getClienteById(clienteId)
+            assertEquals(localId, cliente?.localId)
 
-        db.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { cursor ->
-            assertEquals(0, cursor.count)
-        }
-
-        val indices = mutableSetOf<String>()
-        db.openHelper.writableDatabase.query("PRAGMA index_list('clientes')").use { cursor ->
-            val nameColumn = cursor.getColumnIndex("name")
-            while (cursor.moveToNext()) {
-                indices += cursor.getString(nameColumn)
+            db.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { cursor ->
+                assertEquals(0, cursor.count)
             }
-        }
 
-        assertTrue("index_clientes_localId" in indices)
-        assertTrue("index_clientes_sublocal1Id" in indices)
-        assertTrue("index_clientes_sublocal2Id" in indices)
-        assertTrue("index_clientes_sublocal3Id" in indices)
-    }
+            val indices = mutableSetOf<String>()
+            db.openHelper.writableDatabase.query("PRAGMA index_list('clientes')").use { cursor ->
+                val nameColumn = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    indices += cursor.getString(nameColumn)
+                }
+            }
+
+            assertTrue("index_clientes_localId" in indices)
+            assertTrue("index_clientes_sublocal1Id" in indices)
+            assertTrue("index_clientes_sublocal2Id" in indices)
+            assertTrue("index_clientes_sublocal3Id" in indices)
+        }
 }

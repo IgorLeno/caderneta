@@ -12,6 +12,7 @@ import com.example.caderneta.data.entity.Operacao
 import com.example.caderneta.data.entity.Venda
 
 @Dao
+@Suppress("TooManyFunctions")
 interface BackupDao {
     @Query("SELECT * FROM locais")
     suspend fun getAllLocais(): List<Local>

@@ -23,12 +23,12 @@ import com.example.caderneta.viewmodel.ConfiguracoesViewModelFactory
 import com.example.caderneta.viewmodel.UiEvento
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 
 class ConfiguracoesFragment : Fragment() {
     private var _binding: FragmentConfiguracoesBinding? = null
@@ -100,8 +100,10 @@ class ConfiguracoesFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.eventos.collectLatest { evento ->
                     when (evento) {
-                        is UiEvento.Erro -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
-                        is UiEvento.Sucesso -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
+                        is UiEvento.Erro ->
+                            Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
+                        is UiEvento.Sucesso ->
+                            Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
                         is UiEvento.ConfirmarRestauracao -> confirmarRestauracao(evento.resumo)
                     }
                 }
@@ -162,7 +164,7 @@ class ConfiguracoesFragment : Fragment() {
         return "caderneta-backup-$data.json"
     }
 
-    @Suppress("LongMethod")
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private fun lerConfiguracoesOuFocarErro(): Configuracoes? {
         var primeiroErro: EditText? = null
 
@@ -199,14 +201,30 @@ class ConfiguracoesFragment : Fragment() {
                 etPromo2Nome.error = null
             }
 
-            val promo1Salgados = validar(etPromo1Salgados) { etPromo1Salgados.lerInteiroOuErro(promocoesAtivadas) }
-            val promo1Sucos = validar(etPromo1Sucos) { etPromo1Sucos.lerInteiroOuErro(promocoesAtivadas) }
-            val promo1Vista = validar(etPromo1Vista) { etPromo1Vista.lerCentavosOuErro("Informe o valor à vista", promocoesAtivadas) }
-            val promo1Prazo = validar(etPromo1Prazo) { etPromo1Prazo.lerCentavosOuErro("Informe o valor a prazo", promocoesAtivadas) }
-            val promo2Salgados = validar(etPromo2Salgados) { etPromo2Salgados.lerInteiroOuErro(promocoesAtivadas) }
-            val promo2Sucos = validar(etPromo2Sucos) { etPromo2Sucos.lerInteiroOuErro(promocoesAtivadas) }
-            val promo2Vista = validar(etPromo2Vista) { etPromo2Vista.lerCentavosOuErro("Informe o valor à vista", promocoesAtivadas) }
-            val promo2Prazo = validar(etPromo2Prazo) { etPromo2Prazo.lerCentavosOuErro("Informe o valor a prazo", promocoesAtivadas) }
+            val promo1Salgados =
+                validar(etPromo1Salgados) { etPromo1Salgados.lerInteiroOuErro(promocoesAtivadas) }
+            val promo1Sucos =
+                validar(etPromo1Sucos) { etPromo1Sucos.lerInteiroOuErro(promocoesAtivadas) }
+            val promo1Vista =
+                validar(etPromo1Vista) {
+                    etPromo1Vista.lerCentavosOuErro("Informe o valor à vista", promocoesAtivadas)
+                }
+            val promo1Prazo =
+                validar(etPromo1Prazo) {
+                    etPromo1Prazo.lerCentavosOuErro("Informe o valor a prazo", promocoesAtivadas)
+                }
+            val promo2Salgados =
+                validar(etPromo2Salgados) { etPromo2Salgados.lerInteiroOuErro(promocoesAtivadas) }
+            val promo2Sucos =
+                validar(etPromo2Sucos) { etPromo2Sucos.lerInteiroOuErro(promocoesAtivadas) }
+            val promo2Vista =
+                validar(etPromo2Vista) {
+                    etPromo2Vista.lerCentavosOuErro("Informe o valor à vista", promocoesAtivadas)
+                }
+            val promo2Prazo =
+                validar(etPromo2Prazo) {
+                    etPromo2Prazo.lerCentavosOuErro("Informe o valor a prazo", promocoesAtivadas)
+                }
 
             primeiroErro?.let {
                 it.requestFocus()

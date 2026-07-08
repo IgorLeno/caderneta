@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import java.util.Date
 
 @Dao
+@Suppress("TooManyFunctions")
 interface VendaDao {
     @Query("SELECT * FROM vendas")
     fun getAllVendas(): Flow<List<Venda>>

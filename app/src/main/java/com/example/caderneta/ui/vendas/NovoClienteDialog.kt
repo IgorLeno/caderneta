@@ -220,7 +220,6 @@ class NovoClienteDialog(
     }
 
     private fun updateSublocal1Spinner(sublocais: List<Local>) {
-
         sublocal1Adapter.clear()
         sublocal1Adapter.addAll(sublocais)
         sublocal1Adapter.notifyDataSetChanged()
@@ -236,7 +235,6 @@ class NovoClienteDialog(
     }
 
     private fun updateSublocal2Spinner(sublocais: List<Local>) {
-
         sublocal2Adapter.clear()
         sublocal2Adapter.addAll(sublocais)
         sublocal2Adapter.notifyDataSetChanged()
@@ -259,7 +257,6 @@ class NovoClienteDialog(
     }
 
     private fun updateSublocal3Spinner(sublocais: List<Local>) {
-
         sublocal3Adapter.clear()
         sublocal3Adapter.addAll(sublocais)
         sublocal3Adapter.notifyDataSetChanged()
@@ -379,7 +376,6 @@ class NovoClienteDialog(
                         importedHierarchy?.getOrNull(3)?.id
                             ?: selectedSublocal3Id
 
-
                     onClienteAdicionado?.invoke(nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id)
                     dismiss()
                 }
@@ -436,6 +432,4 @@ class NovoClienteDialog(
         super.onDestroyView()
         _binding = null
     }
-
-    private fun <T> ArrayAdapter<T>.getAllItems(): List<T> = (0 until count).map { getItem(it) }.filterNotNull()
 }

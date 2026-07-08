@@ -36,11 +36,12 @@ class BackupManager(
     fun lerResumo(inputStream: InputStream): Pair<BackupSnapshot, BackupResumo> {
         val snapshot = serializer.fromJson(inputStream.reader(Charsets.UTF_8).readText())
         validator.validar(snapshot)
-        return snapshot to BackupResumo(
-            clientes = snapshot.clientes.size,
-            lancamentos = snapshot.vendas.size,
-            geradoEmMillis = snapshot.geradoEmMillis,
-        )
+        return snapshot to
+            BackupResumo(
+                clientes = snapshot.clientes.size,
+                lancamentos = snapshot.vendas.size,
+                geradoEmMillis = snapshot.geradoEmMillis,
+            )
     }
 
     suspend fun restaurar(snapshot: BackupSnapshot) {
