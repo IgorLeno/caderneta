@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -20,7 +21,12 @@ import com.example.caderneta.util.parseDinheiro
 import com.example.caderneta.viewmodel.ConfiguracoesViewModel
 import com.example.caderneta.viewmodel.ConfiguracoesViewModelFactory
 import com.example.caderneta.viewmodel.UiEvento
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -29,12 +35,24 @@ class ConfiguracoesFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: ConfiguracoesViewModel by viewModels {
+        val app = requireActivity().application as CadernetaApplication
         ConfiguracoesViewModelFactory(
             ConfiguracoesRepository(
-                (requireActivity().application as CadernetaApplication).database.configuracoesDao(),
+                app.database.configuracoesDao(),
             ),
+            app.backupManager,
         )
     }
+
+    private val criarBackupLauncher =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            uri?.let { viewModel.exportarBackup(it) }
+        }
+
+    private val abrirBackupLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let { viewModel.prepararRestauracao(it) }
+        }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -71,12 +89,20 @@ class ConfiguracoesFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.ultimoBackupMillis.collectLatest { millis ->
+                binding.tvUltimoBackup.text =
+                    millis?.let { "Último backup: ${DateFormat.getDateTimeInstance().format(Date(it))}" }
+                        ?: "Último backup: nunca"
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.eventos.collectLatest { evento ->
                     when (evento) {
                         is UiEvento.Erro -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
                         is UiEvento.Sucesso -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
-                        is UiEvento.ConfirmarRestauracao -> Unit
+                        is UiEvento.ConfirmarRestauracao -> confirmarRestauracao(evento.resumo)
                     }
                 }
             }
@@ -112,6 +138,28 @@ class ConfiguracoesFragment : Fragment() {
             val novasConfiguracoes = lerConfiguracoesOuFocarErro() ?: return@setOnClickListener
             viewModel.salvarConfiguracoes(novasConfiguracoes)
         }
+
+        binding.btnExportarBackup.setOnClickListener {
+            criarBackupLauncher.launch(nomeArquivoBackup())
+        }
+
+        binding.btnRestaurarBackup.setOnClickListener {
+            abrirBackupLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/plain"))
+        }
+    }
+
+    private fun confirmarRestauracao(resumo: String) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Restaurar backup?")
+            .setMessage(resumo)
+            .setPositiveButton("Restaurar") { _, _ -> viewModel.confirmarRestauracao() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun nomeArquivoBackup(): String {
+        val data = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
+        return "caderneta-backup-$data.json"
     }
 
     @Suppress("LongMethod")

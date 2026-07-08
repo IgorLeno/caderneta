@@ -1,19 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
--->
+<?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Auto Backup do Google é best-effort. O export JSON via SAF é o mecanismo primário. -->
+        <include domain="database" path="caderneta_database" />
+        <include domain="sharedpref" path="backup_prefs.xml" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="database" path="caderneta_database" />
+        <include domain="sharedpref" path="backup_prefs.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

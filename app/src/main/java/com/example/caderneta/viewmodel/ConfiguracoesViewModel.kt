@@ -1,8 +1,11 @@
 package com.example.caderneta.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.caderneta.data.backup.BackupManager
+import com.example.caderneta.data.backup.BackupSnapshot
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.util.rethrowCancellation
@@ -15,6 +18,7 @@ import kotlinx.coroutines.launch
 
 class ConfiguracoesViewModel(
     private val repository: ConfiguracoesRepository,
+    private val backupManager: BackupManager,
 ) : ViewModel() {
     /** Nulo enquanto não houver configuração salva (primeira execução). */
     private val _configuracoes = MutableStateFlow<Configuracoes?>(null)
@@ -23,8 +27,13 @@ class ConfiguracoesViewModel(
     private val _promocoesAtivadas = MutableStateFlow(false)
     val promocoesAtivadas: StateFlow<Boolean> = _promocoesAtivadas
 
+    private val _ultimoBackupMillis = MutableStateFlow(backupManager.getUltimoBackupMillis())
+    val ultimoBackupMillis: StateFlow<Long?> = _ultimoBackupMillis
+
     private val _eventos = Channel<UiEvento>(Channel.BUFFERED)
     val eventos = _eventos.receiveAsFlow()
+
+    private var restauracaoPendente: BackupSnapshot? = null
 
     init {
         loadConfiguracoes()
@@ -63,15 +72,60 @@ class ConfiguracoesViewModel(
             }
         }
     }
+
+    fun exportarBackup(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                backupManager.exportar(uri)
+                _ultimoBackupMillis.value = backupManager.getUltimoBackupMillis()
+                _eventos.send(UiEvento.Sucesso("Backup exportado"))
+            } catch (e: Exception) {
+                e.rethrowCancellation()
+                _eventos.send(UiEvento.Erro("Erro ao exportar backup: ${e.message}"))
+            }
+        }
+    }
+
+    fun prepararRestauracao(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val (snapshot, resumo) = backupManager.lerResumo(uri)
+                restauracaoPendente = snapshot
+                _eventos.send(
+                    UiEvento.ConfirmarRestauracao(
+                        "${resumo.clientes} clientes, ${resumo.lancamentos} lançamentos. Isso apagará os dados atuais.",
+                    ),
+                )
+            } catch (e: Exception) {
+                e.rethrowCancellation()
+                _eventos.send(UiEvento.Erro("Backup inválido: ${e.message}"))
+            }
+        }
+    }
+
+    fun confirmarRestauracao() {
+        val snapshot = restauracaoPendente ?: return
+        viewModelScope.launch {
+            try {
+                backupManager.restaurar(snapshot)
+                restauracaoPendente = null
+                _eventos.send(UiEvento.Sucesso("Backup restaurado"))
+            } catch (e: Exception) {
+                e.rethrowCancellation()
+                _eventos.send(UiEvento.Erro("Erro ao restaurar backup: ${e.message}"))
+            }
+        }
+    }
 }
 
 class ConfiguracoesViewModelFactory(
     private val repository: ConfiguracoesRepository,
+    private val backupManager: BackupManager,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ConfiguracoesViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ConfiguracoesViewModel(repository) as T
+            return ConfiguracoesViewModel(repository, backupManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
