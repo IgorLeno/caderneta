@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.example.caderneta.data.backup.BackupDao
 import com.example.caderneta.data.dao.ClienteDao
 import com.example.caderneta.data.dao.ConfiguracoesDao
 import com.example.caderneta.data.dao.ContaDao
@@ -44,6 +45,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun operacaoDao(): OperacaoDao
 
     abstract fun contaDao(): ContaDao
+
+    abstract fun backupDao(): BackupDao
 
     companion object {
         @Volatile
