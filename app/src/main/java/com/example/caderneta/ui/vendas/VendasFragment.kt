@@ -5,7 +5,6 @@ import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -265,12 +264,6 @@ class VendasFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            vendasViewModel.configuracoes.collectLatest { configuracoes ->
-                Log.d("VendasFragment", "Configurações atualizadas: $configuracoes")
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
             vendasViewModel.localSelecionado.collectLatest { local ->
                 binding.tvLocalSelecionado.text = local?.nome ?: "Todos os locais"
             }
@@ -278,11 +271,6 @@ class VendasFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             vendasViewModel.locais.collectLatest { locais ->
-                Log.d("VendasFragment", "Locais atualizados: ${locais.size}")
-                Log.d(
-                    "VendasFragment",
-                    "Locais: ${locais.map { "${it.id}:${it.nome}(${it.parentId})" }}",
-                )
                 localAdapter.updateLocais(locais)
             }
         }
@@ -304,10 +292,6 @@ class VendasFragment : Fragment() {
                 if (position != -1) {
                     clientesAdapter.notifyItemChanged(position, ClientesAdapter.Payload.ValorTotalChanged(valor))
                 }
-                Log.d(
-                    "VendasFragment",
-                    "Valor total atualizado no Fragment: clienteId=$clienteId, valor=$valor",
-                )
             }
         }
 

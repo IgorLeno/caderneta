@@ -332,7 +332,6 @@ class ConsultasFragment : Fragment() {
                         lifecycleScope.launch {
                             kotlinx.coroutines.delay(300)
                             val query = s.toString().trim()
-                            Log.d("ConsultasFragment", "Buscando clientes: '$query'")
                             viewModel.buscarClientes(query)
                         }
                 }
@@ -361,7 +360,6 @@ class ConsultasFragment : Fragment() {
 
                     override fun afterTextChanged(s: Editable?) {
                         val query = s.toString().trim()
-                        Log.d("ConsultasFragment", "Buscando locais: '$query'")
                         viewModel.buscarLocais(query)
                     }
                 },
@@ -387,20 +385,11 @@ class ConsultasFragment : Fragment() {
             launch {
                 viewModel.localSelecionado.collectLatest { local ->
                     binding.tvLocalSelecionado.text = local?.nome ?: getString(R.string.todos_locais)
-                    Log.d("ConsultasFragment", "Local selecionado atualizado: ${local?.nome}")
                 }
             }
 
             launch {
                 viewModel.clientesComSaldo.collectLatest { clientesComSaldo ->
-                    Log.d(
-                        "SaldoDebug",
-                        "Nova lista de clientes recebida: ${
-                            clientesComSaldo.map { (cliente, saldo) ->
-                                "${cliente.id}: $saldo"
-                            }
-                        }",
-                    )
                     resultadosAdapter.submitList(
                         clientesComSaldo.map { (cliente, saldo) ->
                             ResultadoConsulta.Cliente(cliente, saldo)
@@ -432,7 +421,6 @@ class ConsultasFragment : Fragment() {
                         val item = currentList[index]
                         if (item is ResultadoConsulta.Cliente) {
                             val novoSaldo = viewModel.getSaldoCliente(clienteId)
-                            Log.d(TAG, "Atualizando UI para cliente $clienteId - Novo saldo: $novoSaldo")
 
                             // Criar novo item com saldo atualizado
                             currentList[index] = ResultadoConsulta.Cliente(item.cliente, novoSaldo)

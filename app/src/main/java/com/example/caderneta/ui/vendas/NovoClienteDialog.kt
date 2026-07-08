@@ -220,14 +220,6 @@ class NovoClienteDialog(
     }
 
     private fun updateSublocal1Spinner(sublocais: List<Local>) {
-        Log.d(
-            "NovoClienteDialog",
-            """
-            Atualizando Sublocal1Spinner:
-            Sublocais: ${sublocais.joinToString { "${it.nome}(${it.id})" }}
-            Spinner atual: ${binding.spinnerSublocal1.text}
-            """.trimIndent(),
-        )
 
         sublocal1Adapter.clear()
         sublocal1Adapter.addAll(sublocais)
@@ -244,14 +236,6 @@ class NovoClienteDialog(
     }
 
     private fun updateSublocal2Spinner(sublocais: List<Local>) {
-        Log.d(
-            "NovoClienteDialog",
-            """
-            Atualizando Sublocal2Spinner:
-            Sublocais: ${sublocais.joinToString { "${it.nome}(${it.id})" }}
-            Spinner atual: ${binding.spinnerSublocal2.text}
-            """.trimIndent(),
-        )
 
         sublocal2Adapter.clear()
         sublocal2Adapter.addAll(sublocais)
@@ -275,14 +259,6 @@ class NovoClienteDialog(
     }
 
     private fun updateSublocal3Spinner(sublocais: List<Local>) {
-        Log.d(
-            "NovoClienteDialog",
-            """
-            Atualizando Sublocal3Spinner:
-            Sublocais: ${sublocais.joinToString { "${it.nome}(${it.id})" }}
-            Spinner atual: ${binding.spinnerSublocal3.text}
-            """.trimIndent(),
-        )
 
         sublocal3Adapter.clear()
         sublocal3Adapter.addAll(sublocais)
@@ -403,17 +379,6 @@ class NovoClienteDialog(
                         importedHierarchy?.getOrNull(3)?.id
                             ?: selectedSublocal3Id
 
-                    Log.d(
-                        "NovoClienteDialog",
-                        """
-                        Valores sendo enviados para cadastro:
-                        Nome: $nome
-                        Local ID: $localId
-                        Sublocal 1 ID: $sublocal1Id
-                        Sublocal 2 ID: $sublocal2Id
-                        Sublocal 3 ID: $sublocal3Id
-                        """.trimIndent(),
-                    )
 
                     onClienteAdicionado?.invoke(nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id)
                     dismiss()
@@ -425,7 +390,6 @@ class NovoClienteDialog(
     private fun setupImportButton() {
         binding.btnImportar.setOnClickListener {
             viewModel.localSelecionado.value?.let { selectedLocal ->
-                Log.d("NovoClienteDialog", "Importando local: ${selectedLocal.nome} (ID: ${selectedLocal.id})")
                 importLocalHierarchy(selectedLocal)
             }
         }
@@ -435,10 +399,6 @@ class NovoClienteDialog(
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val hierarchy = viewModel.getLocalHierarchy(selectedLocal.id)
-                Log.d(
-                    "NovoClienteDialog",
-                    "Hierarquia obtida: ${hierarchy.joinToString(" -> ") { "${it.nome}(${it.id})" }}",
-                )
 
                 if (hierarchy.isNotEmpty()) {
                     importedHierarchy = hierarchy

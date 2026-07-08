@@ -522,17 +522,6 @@ class EditarOperacaoDialog(
                 launch {
                     vendasViewModel.clienteStates.collectLatest { states ->
                         states[cliente.id]?.let { state ->
-                            Log.d(
-                                TAG,
-                                """
-                                Estado atualizado:
-                                Modo: ${state.modoOperacao}
-                                Tipo Transação: ${state.tipoTransacao}
-                                Qtd Promo1: ${state.quantidadePromo1}
-                                Qtd Promo2: ${state.quantidadePromo2}
-                                Valor Total: ${state.valorTotalCentavos}
-                                """.trimIndent(),
-                            )
 
                             if (venda.transacao != TransacaoVenda.PAGAMENTO) {
                                 updateUI(state)
@@ -639,14 +628,6 @@ class EditarOperacaoDialog(
     private fun recalcularValorTotal() {
         viewLifecycleOwner.lifecycleScope.launch {
             vendasViewModel.clienteStates.value[cliente.id]?.let { state ->
-                Log.d(
-                    TAG,
-                    """
-                    Recalculando valor final:
-                    Modo: ${state.modoOperacao}
-                    Valor: ${state.valorTotalCentavos}
-                    """.trimIndent(),
-                )
                 vendasViewModel.recalcularValorTotal(cliente.id)
             }
         }
