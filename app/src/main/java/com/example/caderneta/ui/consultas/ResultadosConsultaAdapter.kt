@@ -39,6 +39,7 @@ class ResultadosConsultaAdapter(
     private val fragmentManager: FragmentManager,
     private val onEditarCliente: (ClienteEntity) -> Unit,
     private val onExcluirCliente: (ClienteEntity) -> Unit,
+    private val onClienteCollapse: (Long) -> Unit,
 ) : ListAdapter<ResultadoConsulta, RecyclerView.ViewHolder>(ResultadoConsultaDiffCallback()) {
     private var vendasPorCliente: Map<Long, List<Venda>> = emptyMap()
     private val expandedClientes = mutableSetOf<Long>()
@@ -218,6 +219,7 @@ class ResultadosConsultaAdapter(
                 if (expandedClientes.contains(cliente.id)) {
                     collapseExtrato()
                     expandedClientes.remove(cliente.id)
+                    onClienteCollapse(cliente.id)
                 } else {
                     onClienteClick(cliente.id)
                     expandedClientes.add(cliente.id)

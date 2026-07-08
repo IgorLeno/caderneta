@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -155,6 +156,10 @@ class ConsultasViewModel(
         _clientesComExtratoAberto.update { it + clienteId }
     }
 
+    fun fecharVendasPorCliente(clienteId: Long) {
+        _clientesComExtratoAberto.update { it - clienteId }
+    }
+
     suspend fun getSaldoCliente(clienteId: Long): Long = contaRepository.getSaldoCentavos(clienteId)
 
     // ----- edição de lançamentos (delegada ao FinanceiroService) -----
@@ -177,7 +182,7 @@ class ConsultasViewModel(
                     vendaOriginal.copy(valorCentavos = clienteState.valorTotalCentavos)
                 } else {
                     val config =
-                        checkNotNull(configuracoes.value) {
+                        checkNotNull(configuracoesRepository.getConfiguracoes().first()) {
                             "Configurações não carregadas"
                         }
                     val (quantidadeSalgados, quantidadeSucos) = clienteState.calcularQuantidadesTotais(config)

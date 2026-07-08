@@ -21,6 +21,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -90,8 +91,8 @@ class VendasViewModel(
     private val _clienteStates = MutableStateFlow<Map<Long, ClienteState>>(emptyMap())
     val clienteStates: StateFlow<Map<Long, ClienteState>> = _clienteStates.asStateFlow()
 
-    private val _valorTotal = MutableStateFlow<Pair<Long, Long>>(0L to 0L)
-    val valorTotal: StateFlow<Pair<Long, Long>> = _valorTotal.asStateFlow()
+    private val _valorTotal = MutableSharedFlow<Pair<Long, Long>>(extraBufferCapacity = 1)
+    val valorTotal: SharedFlow<Pair<Long, Long>> = _valorTotal.asSharedFlow()
 
     private val _eventos = Channel<UiEvento>(Channel.BUFFERED)
     val eventos = _eventos.receiveAsFlow()
@@ -210,7 +211,7 @@ class VendasViewModel(
         val atual = _clienteStates.value[clienteId] ?: ClienteState(clienteId = clienteId)
         val novo = atual.copy(valorTotalCentavos = valorCentavos)
         _clienteStates.update { it + (clienteId to novo) }
-        _valorTotal.value = clienteId to valorCentavos
+        _valorTotal.tryEmit(clienteId to valorCentavos)
     }
 
     /**
@@ -228,7 +229,7 @@ class VendasViewModel(
             }
         val novo = state.copy(valorTotalCentavos = valor)
         _clienteStates.update { it + (state.clienteId to novo) }
-        _valorTotal.value = state.clienteId to valor
+        _valorTotal.tryEmit(state.clienteId to valor)
     }
 
     /** Recalcula a partir do estado atual (usado pela edição de operação). */
@@ -324,7 +325,7 @@ class VendasViewModel(
 
     private fun resetClienteState(clienteId: Long) {
         _clienteStates.update { it + (clienteId to ClienteState(clienteId = clienteId)) }
-        _valorTotal.value = clienteId to 0L
+        _valorTotal.tryEmit(clienteId to 0L)
         viewModelScope.launch { _clienteStateUpdates.emit(clienteId) }
     }
 

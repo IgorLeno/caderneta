@@ -181,6 +181,9 @@ class ConsultasFragment : Fragment() {
                 onExcluirCliente = { cliente ->
                     vendasViewModel.excluirCliente(cliente)
                 },
+                onClienteCollapse = { clienteId ->
+                    viewModel.fecharVendasPorCliente(clienteId)
+                },
                 localRepository = (requireActivity().application as CadernetaApplication).localRepository,
                 coroutineScope = viewLifecycleOwner.lifecycleScope,
                 fragmentManager = childFragmentManager,
