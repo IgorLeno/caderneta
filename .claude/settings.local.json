@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(cat /home/igor/.claude/debug/*.log)",
-      "Bash(claude mcp:*)"
-    ]
-  },
-  "enableAllProjectMcpServers": false
-}
