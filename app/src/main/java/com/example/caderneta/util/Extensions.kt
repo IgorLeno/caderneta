@@ -37,3 +37,7 @@ fun Context.showErrorToast(message: String) {
     snackbar.setBackgroundTint(ContextCompat.getColor(this, R.color.red))
     snackbar.show()
 }
+
+fun Throwable.rethrowCancellation() {
+    if (this is kotlinx.coroutines.CancellationException) throw this
+}

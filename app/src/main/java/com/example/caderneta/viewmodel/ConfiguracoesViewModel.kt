@@ -5,9 +5,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.repository.ConfiguracoesRepository
+import com.example.caderneta.util.rethrowCancellation
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 class ConfiguracoesViewModel(
@@ -20,8 +23,8 @@ class ConfiguracoesViewModel(
     private val _promocoesAtivadas = MutableStateFlow(false)
     val promocoesAtivadas: StateFlow<Boolean> = _promocoesAtivadas
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
+    private val _eventos = Channel<UiEvento>(Channel.BUFFERED)
+    val eventos = _eventos.receiveAsFlow()
 
     init {
         loadConfiguracoes()
@@ -32,7 +35,8 @@ class ConfiguracoesViewModel(
             repository
                 .getConfiguracoes()
                 .catch { e ->
-                    _error.value = "Erro ao carregar configurações: ${e.message}"
+                    e.rethrowCancellation()
+                    _eventos.send(UiEvento.Erro("Erro ao carregar configurações: ${e.message}"))
                 }.collect { configuracoes ->
                     _configuracoes.value = configuracoes
                     _promocoesAtivadas.value = configuracoes?.promocoesAtivadas ?: false
@@ -49,18 +53,15 @@ class ConfiguracoesViewModel(
             try {
                 if (novasConfiguracoes.isValid()) {
                     repository.salvarConfiguracoes(novasConfiguracoes)
-                    _error.value = null
+                    _eventos.send(UiEvento.Sucesso("Configurações salvas"))
                 } else {
-                    _error.value = "Configurações inválidas. Verifique os valores inseridos."
+                    _eventos.send(UiEvento.Erro("Configurações inválidas. Verifique os valores inseridos."))
                 }
             } catch (e: Exception) {
-                _error.value = "Erro ao salvar configurações: ${e.message}"
+                e.rethrowCancellation()
+                _eventos.send(UiEvento.Erro("Erro ao salvar configurações: ${e.message}"))
             }
         }
-    }
-
-    fun clearError() {
-        _error.value = null
     }
 }
 

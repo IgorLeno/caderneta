@@ -7,7 +7,9 @@ import android.view.ViewGroup
 import android.widget.EditText
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.databinding.FragmentConfiguracoesBinding
@@ -17,6 +19,7 @@ import com.example.caderneta.util.centavosParaTextoDecimal
 import com.example.caderneta.util.parseDinheiro
 import com.example.caderneta.viewmodel.ConfiguracoesViewModel
 import com.example.caderneta.viewmodel.ConfiguracoesViewModelFactory
+import com.example.caderneta.viewmodel.UiEvento
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -68,10 +71,13 @@ class ConfiguracoesFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.error.collectLatest { errorMsg ->
-                errorMsg?.let {
-                    Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
-                    viewModel.clearError()
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.eventos.collectLatest { evento ->
+                    when (evento) {
+                        is UiEvento.Erro -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
+                        is UiEvento.Sucesso -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
+                        is UiEvento.ConfirmarRestauracao -> Unit
+                    }
                 }
             }
         }

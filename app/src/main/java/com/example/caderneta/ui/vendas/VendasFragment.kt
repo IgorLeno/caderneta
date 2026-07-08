@@ -10,7 +10,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -30,6 +29,7 @@ import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.FragmentVendasBinding
 import com.example.caderneta.util.showErrorToast
 import com.example.caderneta.util.showSuccessToast
+import com.example.caderneta.viewmodel.UiEvento
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.textfield.TextInputEditText
@@ -288,15 +288,6 @@ class VendasFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            vendasViewModel.error.collectLatest { errorMessage ->
-                errorMessage?.let {
-                    Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
-                    vendasViewModel.clearError()
-                }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 vendasViewModel.clienteStateUpdates.collect { clienteId ->
                     val position = clientesAdapter.currentList.indexOfFirst { it.id == clienteId }
@@ -309,11 +300,10 @@ class VendasFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             vendasViewModel.valorTotal.collectLatest { (clienteId, valor) ->
-                // Em vez de chamar updateValorTotal diretamente, vamos usar o correto payload
-                clientesAdapter.notifyItemChanged(
-                    clientesAdapter.currentList.indexOfFirst { it.id == clienteId },
-                    ClientesAdapter.Payload.ValorTotalChanged(valor),
-                )
+                val position = clientesAdapter.currentList.indexOfFirst { it.id == clienteId }
+                if (position != -1) {
+                    clientesAdapter.notifyItemChanged(position, ClientesAdapter.Payload.ValorTotalChanged(valor))
+                }
                 Log.d(
                     "VendasFragment",
                     "Valor total atualizado no Fragment: clienteId=$clienteId, valor=$valor",
@@ -322,28 +312,13 @@ class VendasFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            vendasViewModel.operacaoConfirmada.collectLatest { operacao ->
-                when (operacao) {
-                    is VendasViewModel.OperacaoConfirmada.Venda -> {
-                        requireContext().showSuccessToast("Venda registrada com sucesso!")
-                        vendasViewModel.resetOperacaoConfirmada()
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                vendasViewModel.eventos.collectLatest { evento ->
+                    when (evento) {
+                        is UiEvento.Erro -> requireContext().showErrorToast(evento.mensagem)
+                        is UiEvento.Sucesso -> requireContext().showSuccessToast(evento.mensagem)
+                        is UiEvento.ConfirmarRestauracao -> Unit
                     }
-
-                    is VendasViewModel.OperacaoConfirmada.Pagamento -> {
-                        requireContext().showSuccessToast("Pagamento registrado com sucesso!")
-                        vendasViewModel.resetOperacaoConfirmada()
-                    }
-
-                    null -> {} // No operation confirmed
-                }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            vendasViewModel.error.collectLatest { errorMessage ->
-                errorMessage?.let {
-                    requireContext().showErrorToast(it)
-                    vendasViewModel.clearError()
                 }
             }
         }

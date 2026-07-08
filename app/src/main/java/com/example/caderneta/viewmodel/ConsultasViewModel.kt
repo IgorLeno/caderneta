@@ -15,7 +15,9 @@ import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
+import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -109,8 +112,8 @@ class ConsultasViewModel(
     private val _clienteStates = MutableStateFlow<Map<Long, ClienteState>>(emptyMap())
     val clienteStates: StateFlow<Map<Long, ClienteState>> = _clienteStates.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+    private val _eventos = Channel<UiEvento>(Channel.BUFFERED)
+    val eventos = _eventos.receiveAsFlow()
 
     private val _saldoAtualizado = MutableSharedFlow<Long>()
     val saldoAtualizado = _saldoAtualizado.asSharedFlow()
@@ -123,7 +126,7 @@ class ConsultasViewModel(
                 _localSelecionado.value = localId?.let { localRepository.getLocalById(it) }
                 _searchQuery.value = ""
             } catch (e: Exception) {
-                _error.value = "Erro ao selecionar local: ${e.message}"
+                publicarErro("Erro ao selecionar local: ${e.message}")
             }
         }
     }
@@ -202,7 +205,8 @@ class ConsultasViewModel(
             _saldoAtualizado.emit(vendaOriginal.clienteId)
             true
         } catch (e: Exception) {
-            _error.value = "Erro ao atualizar operação: ${e.message}"
+            e.rethrowCancellation()
+            publicarErro("Erro ao atualizar operação: ${e.message}")
             false
         }
     }
@@ -215,7 +219,8 @@ class ConsultasViewModel(
             financeiroService.atualizarDataOperacao(venda, novaData)
             true
         } catch (e: Exception) {
-            _error.value = "Erro ao atualizar data: ${e.message}"
+            e.rethrowCancellation()
+            publicarErro("Erro ao atualizar data: ${e.message}")
             false
         }
 
@@ -225,12 +230,13 @@ class ConsultasViewModel(
             _saldoAtualizado.emit(venda.clienteId)
             true
         } catch (e: Exception) {
-            _error.value = "Erro ao excluir operação: ${e.message}"
+            e.rethrowCancellation()
+            publicarErro("Erro ao excluir operação: ${e.message}")
             false
         }
 
-    fun clearError() {
-        _error.value = null
+    private fun publicarErro(mensagem: String) {
+        viewModelScope.launch { _eventos.send(UiEvento.Erro(mensagem)) }
     }
 }
 

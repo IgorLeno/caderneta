@@ -14,7 +14,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -26,6 +28,7 @@ import com.example.caderneta.databinding.FragmentConsultasBinding
 import com.example.caderneta.ui.vendas.NovoClienteDialog
 import com.example.caderneta.viewmodel.ConsultasViewModel
 import com.example.caderneta.viewmodel.ConsultasViewModelFactory
+import com.example.caderneta.viewmodel.UiEvento
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.snackbar.Snackbar
@@ -414,14 +417,6 @@ class ConsultasFragment : Fragment() {
             }
 
             launch {
-                viewModel.error.collectLatest { errorMessage ->
-                    errorMessage?.let { message ->
-                        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
-                    }
-                }
-            }
-
-            launch {
                 viewModel.saldoAtualizado.collectLatest { clienteId ->
                     // Força uma atualização imediata do adapter
                     val currentList = resultadosAdapter.currentList.toMutableList()
@@ -450,12 +445,14 @@ class ConsultasFragment : Fragment() {
                 }
             }
 
-            // Observar erros
             launch {
-                viewModel.error.collectLatest { errorMessage ->
-                    errorMessage?.let { message ->
-                        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
-                        viewModel.clearError()
+                viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    viewModel.eventos.collectLatest { evento ->
+                        when (evento) {
+                            is UiEvento.Erro -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
+                            is UiEvento.Sucesso -> Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
+                            is UiEvento.ConfirmarRestauracao -> Unit
+                        }
                     }
                 }
             }

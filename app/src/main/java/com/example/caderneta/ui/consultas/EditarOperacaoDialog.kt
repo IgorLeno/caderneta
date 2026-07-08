@@ -34,6 +34,7 @@ import com.example.caderneta.util.showErrorToast
 import com.example.caderneta.util.showSuccessToast
 import com.example.caderneta.viewmodel.ClienteState
 import com.example.caderneta.viewmodel.ConsultasViewModel
+import com.example.caderneta.viewmodel.UiEvento
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.button.MaterialButton
@@ -554,19 +555,21 @@ class EditarOperacaoDialog(
                 }
 
                 launch {
-                    consultasViewModel.error.collectLatest { error ->
-                        error?.let {
-                            requireContext().showErrorToast(it)
-                            consultasViewModel.clearError()
+                    consultasViewModel.eventos.collectLatest { evento ->
+                        when (evento) {
+                            is UiEvento.Erro -> requireContext().showErrorToast(evento.mensagem)
+                            is UiEvento.Sucesso -> requireContext().showSuccessToast(evento.mensagem)
+                            is UiEvento.ConfirmarRestauracao -> Unit
                         }
                     }
                 }
 
                 launch {
-                    vendasViewModel.error.collectLatest { error ->
-                        error?.let {
-                            requireContext().showErrorToast(it)
-                            vendasViewModel.clearError()
+                    vendasViewModel.eventos.collectLatest { evento ->
+                        when (evento) {
+                            is UiEvento.Erro -> requireContext().showErrorToast(evento.mensagem)
+                            is UiEvento.Sucesso -> requireContext().showSuccessToast(evento.mensagem)
+                            is UiEvento.ConfirmarRestauracao -> Unit
                         }
                     }
                 }

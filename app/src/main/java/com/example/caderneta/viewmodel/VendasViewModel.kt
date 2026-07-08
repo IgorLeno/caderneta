@@ -11,12 +11,14 @@ import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.domain.FinanceiroService
+import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -90,8 +93,8 @@ class VendasViewModel(
     private val _valorTotal = MutableStateFlow<Pair<Long, Long>>(0L to 0L)
     val valorTotal: StateFlow<Pair<Long, Long>> = _valorTotal.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+    private val _eventos = Channel<UiEvento>(Channel.BUFFERED)
+    val eventos = _eventos.receiveAsFlow()
 
     private val _saldoAtualizado = MutableSharedFlow<Long>()
     val saldoAtualizado = _saldoAtualizado.asSharedFlow()
@@ -99,17 +102,8 @@ class VendasViewModel(
     private val _clienteStateUpdates = MutableSharedFlow<Long>()
     val clienteStateUpdates = _clienteStateUpdates.asSharedFlow()
 
-    private val _operacaoConfirmada = MutableStateFlow<OperacaoConfirmada?>(null)
-    val operacaoConfirmada: StateFlow<OperacaoConfirmada?> = _operacaoConfirmada.asStateFlow()
-
     /** Guarda contra confirmação duplicada (duplo clique) por cliente. */
     private val confirmacoesEmAndamento = mutableSetOf<Long>()
-
-    sealed class OperacaoConfirmada {
-        object Venda : OperacaoConfirmada()
-
-        object Pagamento : OperacaoConfirmada()
-    }
 
     // ----- seleção de local e busca -----
 
@@ -119,7 +113,8 @@ class VendasViewModel(
                 _localSelecionado.value = localId?.let { localRepository.getLocalById(it) }
                 _searchQuery.value = ""
             } catch (e: Exception) {
-                _error.value = "Erro ao selecionar local: ${e.message}"
+                e.rethrowCancellation()
+                publicarErro("Erro ao selecionar local: ${e.message}")
             }
         }
     }
@@ -302,9 +297,9 @@ class VendasViewModel(
                 _saldoAtualizado.emit(clienteState.clienteId)
             }
             resetClienteState(clienteState.clienteId)
-            _operacaoConfirmada.value = OperacaoConfirmada.Venda
+            _eventos.send(UiEvento.Sucesso("Venda registrada com sucesso!"))
         } catch (e: Exception) {
-            _error.value = "Erro ao confirmar venda: ${e.message}"
+            publicarErro("Erro ao confirmar venda: ${e.message}")
         }
     }
 
@@ -317,9 +312,9 @@ class VendasViewModel(
             )
             _saldoAtualizado.emit(clienteState.clienteId)
             resetClienteState(clienteState.clienteId)
-            _operacaoConfirmada.value = OperacaoConfirmada.Pagamento
+            _eventos.send(UiEvento.Sucesso("Pagamento registrado com sucesso!"))
         } catch (e: Exception) {
-            _error.value = "Erro ao confirmar pagamento: ${e.message}"
+            publicarErro("Erro ao confirmar pagamento: ${e.message}")
         }
     }
 
@@ -333,12 +328,8 @@ class VendasViewModel(
         viewModelScope.launch { _clienteStateUpdates.emit(clienteId) }
     }
 
-    fun resetOperacaoConfirmada() {
-        _operacaoConfirmada.value = null
-    }
-
-    fun clearError() {
-        _error.value = null
+    private fun publicarErro(mensagem: String) {
+        viewModelScope.launch { _eventos.send(UiEvento.Erro(mensagem)) }
     }
 
     // ----- locais -----
@@ -354,7 +345,8 @@ class VendasViewModel(
                     Local(nome = nome, endereco = "", parentId = parentId, level = parentLevel + 1),
                 )
             } catch (e: Exception) {
-                _error.value = "Erro ao adicionar local: ${e.message}"
+                e.rethrowCancellation()
+                publicarErro("Erro ao adicionar local: ${e.message}")
             }
         }
     }
@@ -364,7 +356,8 @@ class VendasViewModel(
             try {
                 localRepository.updateLocal(local)
             } catch (e: Exception) {
-                _error.value = "Erro ao editar local: ${e.message}"
+                e.rethrowCancellation()
+                publicarErro("Erro ao editar local: ${e.message}")
             }
         }
     }
@@ -380,9 +373,10 @@ class VendasViewModel(
             } catch (e: SQLiteConstraintException) {
                 Log.w(TAG, "Arquivando local com referências protegidas por FK", e)
                 localRepository.updateLocal(local.copy(arquivado = true))
-                _error.value = "${local.nome} possui registros e foi arquivado em vez de excluído"
+                publicarErro("${local.nome} possui registros e foi arquivado em vez de excluído")
             } catch (e: Exception) {
-                _error.value = "Erro ao deletar local: ${e.message}"
+                e.rethrowCancellation()
+                publicarErro("Erro ao deletar local: ${e.message}")
             }
         }
     }
@@ -446,7 +440,8 @@ class VendasViewModel(
                     ),
                 )
             } catch (e: Exception) {
-                _error.value = "Erro ao adicionar cliente: ${e.message}"
+                e.rethrowCancellation()
+                publicarErro("Erro ao adicionar cliente: ${e.message}")
             }
         }
     }
@@ -475,7 +470,8 @@ class VendasViewModel(
                     ),
                 )
             } catch (e: Exception) {
-                _error.value = "Erro ao atualizar cliente: ${e.message}"
+                e.rethrowCancellation()
+                publicarErro("Erro ao atualizar cliente: ${e.message}")
             }
         }
     }
@@ -491,9 +487,10 @@ class VendasViewModel(
             } catch (e: SQLiteConstraintException) {
                 Log.w(TAG, "Arquivando cliente com histórico financeiro protegido por FK", e)
                 clienteRepository.updateCliente(cliente.copy(arquivado = true))
-                _error.value = "${cliente.nome} possui histórico e foi arquivado em vez de excluído"
+                publicarErro("${cliente.nome} possui histórico e foi arquivado em vez de excluído")
             } catch (e: Exception) {
-                _error.value = "Erro ao excluir cliente: ${e.message}"
+                e.rethrowCancellation()
+                publicarErro("Erro ao excluir cliente: ${e.message}")
             }
         }
     }
