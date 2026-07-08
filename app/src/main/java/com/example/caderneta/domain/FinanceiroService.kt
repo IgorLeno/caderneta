@@ -21,6 +21,14 @@ import java.util.Date
  * Falhas de validação lançam IllegalArgumentException/IllegalStateException
  * com mensagem para o usuário — sempre ANTES de qualquer escrita.
  */
+data class ResultadoReconciliacao(
+    val clienteId: Long,
+    val saldoAnteriorCentavos: Long,
+    val saldoHistoricoCentavos: Long,
+) {
+    val corrigido: Boolean = saldoAnteriorCentavos != saldoHistoricoCentavos
+}
+
 class FinanceiroService(
     private val db: AppDatabase,
 ) {
@@ -130,8 +138,12 @@ class FinanceiroService(
         vendaEditada: Venda,
     ) {
         require(vendaOriginal.id == vendaEditada.id) { "Edição deve manter o mesmo lançamento" }
+        require(vendaOriginal.clienteId == vendaEditada.clienteId) { "Edição deve manter o mesmo cliente" }
         require(vendaEditada.valorCentavos > 0) { "Valor deve ser maior que zero" }
         db.withTransaction {
+            val delta = efeitoNoSaldo(vendaEditada) - efeitoNoSaldo(vendaOriginal)
+            validarSaldoAposDelta(vendaOriginal.clienteId, delta)
+
             vendaDao.updateVenda(vendaEditada)
             operacaoDao.updateOperacao(
                 Operacao(
@@ -147,7 +159,6 @@ class FinanceiroService(
                     data = vendaEditada.data,
                 ),
             )
-            val delta = efeitoNoSaldo(vendaEditada) - efeitoNoSaldo(vendaOriginal)
             if (delta != 0L) ajustarSaldo(vendaOriginal.clienteId, delta)
         }
     }
@@ -155,12 +166,48 @@ class FinanceiroService(
     /** Exclui o lançamento aplicando o inverso do seu efeito no saldo. */
     suspend fun excluirOperacao(venda: Venda) {
         db.withTransaction {
+            val reverso = -efeitoNoSaldo(venda)
+            validarSaldoAposDelta(venda.clienteId, reverso)
+
             vendaDao.deleteVenda(venda)
             operacaoDao.getOperacaoById(venda.operacaoId)?.let { operacaoDao.deleteOperacao(it) }
-            val reverso = -efeitoNoSaldo(venda)
             if (reverso != 0L) ajustarSaldo(venda.clienteId, reverso)
         }
     }
+
+    suspend fun calcularSaldoDoHistorico(clienteId: Long): Long = vendaDao.calcularSaldoHistorico(clienteId)
+
+    suspend fun reconciliarConta(clienteId: Long): ResultadoReconciliacao =
+        db.withTransaction {
+            val saldoHistorico = vendaDao.calcularSaldoHistorico(clienteId)
+            val saldoAtual = contaDao.getContaByCliente(clienteId)?.saldoCentavos ?: 0L
+            if (saldoAtual != saldoHistorico) {
+                contaDao.insertConta(Conta(clienteId = clienteId, saldoCentavos = saldoHistorico))
+            }
+            ResultadoReconciliacao(
+                clienteId = clienteId,
+                saldoAnteriorCentavos = saldoAtual,
+                saldoHistoricoCentavos = saldoHistorico,
+            )
+        }
+
+    suspend fun reconciliarTodasContas(): List<ResultadoReconciliacao> =
+        db.withTransaction {
+            val clienteIds =
+                (vendaDao.getClienteIdsComHistorico() + contaDao.getAllContas().map { it.clienteId }).distinct()
+            clienteIds.map { clienteId ->
+                val saldoHistorico = vendaDao.calcularSaldoHistorico(clienteId)
+                val saldoAtual = contaDao.getContaByCliente(clienteId)?.saldoCentavos ?: 0L
+                if (saldoAtual != saldoHistorico) {
+                    contaDao.insertConta(Conta(clienteId = clienteId, saldoCentavos = saldoHistorico))
+                }
+                ResultadoReconciliacao(
+                    clienteId = clienteId,
+                    saldoAnteriorCentavos = saldoAtual,
+                    saldoHistoricoCentavos = saldoHistorico,
+                )
+            }
+        }
 
     /** Corrige a data do lançamento (venda e operação juntas). */
     suspend fun atualizarDataOperacao(
@@ -185,6 +232,17 @@ class FinanceiroService(
             TransacaoVenda.PAGAMENTO -> -venda.valorCentavos
             TransacaoVenda.A_VISTA -> 0
         }
+
+    /** Só pode ser chamado dentro de db.withTransaction. */
+    private suspend fun validarSaldoAposDelta(
+        clienteId: Long,
+        deltaCentavos: Long,
+    ) {
+        val saldoAtual = contaDao.getContaByCliente(clienteId)?.saldoCentavos ?: 0L
+        check(saldoAtual + deltaCentavos >= 0) {
+            "Operação deixaria o saldo devedor negativo"
+        }
+    }
 
     /** Só pode ser chamado dentro de db.withTransaction. */
     private suspend fun ajustarSaldo(

@@ -73,4 +73,15 @@ interface VendaDao {
         startDate: Date,
         endDate: Date,
     ): Flow<Int?>
+
+    @Query(
+        "SELECT COALESCE(SUM(CASE transacao " +
+            "WHEN 'A_PRAZO' THEN valorCentavos " +
+            "WHEN 'PAGAMENTO' THEN -valorCentavos " +
+            "ELSE 0 END), 0) FROM vendas WHERE clienteId = :clienteId",
+    )
+    suspend fun calcularSaldoHistorico(clienteId: Long): Long
+
+    @Query("SELECT DISTINCT clienteId FROM vendas")
+    suspend fun getClienteIdsComHistorico(): List<Long>
 }

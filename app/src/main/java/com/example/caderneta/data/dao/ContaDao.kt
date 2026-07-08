@@ -27,4 +27,7 @@ interface ContaDao {
 
     @Query("SELECT * FROM contas WHERE clienteId = :clienteId")
     suspend fun getContaByCliente(clienteId: Long): Conta?
+
+    @Query("SELECT * FROM contas")
+    suspend fun getAllContas(): List<Conta>
 }
