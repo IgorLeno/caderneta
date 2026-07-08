@@ -1,7 +1,5 @@
 package com.example.caderneta.viewmodel
 
-import android.database.sqlite.SQLiteConstraintException
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -11,12 +9,12 @@ import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.domain.FinanceiroService
-import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
+import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -370,11 +368,10 @@ class VendasViewModel(
     fun deleteLocal(local: Local) {
         viewModelScope.launch {
             try {
-                localRepository.deleteLocal(local)
-            } catch (e: SQLiteConstraintException) {
-                Log.w(TAG, "Arquivando local com referências protegidas por FK", e)
-                localRepository.updateLocal(local.copy(arquivado = true))
-                publicarErro("${local.nome} possui registros e foi arquivado em vez de excluído")
+                val arquivado = localRepository.deleteLocal(local)
+                if (arquivado) {
+                    publicarErro("${local.nome} possui registros e foi arquivado em vez de excluído")
+                }
             } catch (e: Exception) {
                 e.rethrowCancellation()
                 publicarErro("Erro ao deletar local: ${e.message}")
@@ -484,11 +481,10 @@ class VendasViewModel(
     fun excluirCliente(cliente: Cliente) {
         viewModelScope.launch {
             try {
-                clienteRepository.deleteCliente(cliente)
-            } catch (e: SQLiteConstraintException) {
-                Log.w(TAG, "Arquivando cliente com histórico financeiro protegido por FK", e)
-                clienteRepository.updateCliente(cliente.copy(arquivado = true))
-                publicarErro("${cliente.nome} possui histórico e foi arquivado em vez de excluído")
+                val arquivado = clienteRepository.deleteCliente(cliente)
+                if (arquivado) {
+                    publicarErro("${cliente.nome} possui histórico e foi arquivado em vez de excluído")
+                }
             } catch (e: Exception) {
                 e.rethrowCancellation()
                 publicarErro("Erro ao excluir cliente: ${e.message}")
@@ -502,22 +498,17 @@ class VendasViewModel(
         sublocal2Id: Long?,
         sublocal3Id: Long?,
     ) {
+        val ids = listOfNotNull(localId, sublocal1Id, sublocal2Id, sublocal3Id)
         val hierarquia =
-            listOfNotNull(
-                checkNotNull(localRepository.getLocalById(localId)) {
-                    "Local principal não encontrado"
-                },
-                sublocal1Id?.let { localRepository.getLocalById(it) },
-                sublocal2Id?.let { localRepository.getLocalById(it) },
-                sublocal3Id?.let { localRepository.getLocalById(it) },
-            )
+            ids.map { id ->
+                checkNotNull(localRepository.getLocalById(id)) {
+                    "Local da hierarquia não encontrado"
+                }
+            }
         hierarquia.zipWithNext().forEach { (parent, child) ->
             check(child.level > parent.level) { "Hierarquia de locais inválida" }
+            check(child.parentId == parent.id) { "Hierarquia de locais inválida" }
         }
-    }
-
-    private companion object {
-        const val TAG = "VendasViewModel"
     }
 }
 

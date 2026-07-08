@@ -1,5 +1,6 @@
 package com.example.caderneta.repository
 
+import android.database.sqlite.SQLiteConstraintException
 import com.example.caderneta.data.dao.ClienteDao
 import com.example.caderneta.data.entity.Cliente
 import kotlinx.coroutines.flow.Flow
@@ -17,8 +18,14 @@ class ClienteRepository(
         clienteDao.updateCliente(cliente)
     }
 
-    suspend fun deleteCliente(cliente: Cliente) {
-        clienteDao.deleteCliente(cliente)
+    suspend fun deleteCliente(cliente: Cliente): Boolean {
+        return try {
+            clienteDao.deleteCliente(cliente)
+            false
+        } catch (_: SQLiteConstraintException) {
+            clienteDao.updateCliente(cliente.copy(arquivado = true))
+            true
+        }
     }
 
     // Novo método para buscar clientes hierarquicamente

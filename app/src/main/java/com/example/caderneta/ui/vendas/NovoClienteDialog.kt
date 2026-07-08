@@ -34,6 +34,10 @@ class NovoClienteDialog(
 
     // Cache para manter a hierarquia importada
     private var importedHierarchy: List<Local>? = null
+    private var selectedLocalId: Long? = null
+    private var selectedSublocal1Id: Long? = null
+    private var selectedSublocal2Id: Long? = null
+    private var selectedSublocal3Id: Long? = null
 
     private var clienteExistente: Cliente? = null
 
@@ -174,6 +178,10 @@ class NovoClienteDialog(
         binding.spinnerLocal.setOnItemClickListener { _, _, position, _ ->
             val selectedLocal = localAdapter.getItem(position)
             selectedLocal?.let {
+                selectedLocalId = it.id
+                selectedSublocal1Id = null
+                selectedSublocal2Id = null
+                selectedSublocal3Id = null
                 viewLifecycleOwner.lifecycleScope.launch {
                     val sublocais = viewModel.getSublocais(it.id)
                     updateSublocal1Spinner(sublocais)
@@ -184,6 +192,9 @@ class NovoClienteDialog(
         binding.spinnerSublocal1.setOnItemClickListener { _, _, position, _ ->
             val selectedSublocal1 = sublocal1Adapter.getItem(position)
             selectedSublocal1?.let {
+                selectedSublocal1Id = it.id
+                selectedSublocal2Id = null
+                selectedSublocal3Id = null
                 viewLifecycleOwner.lifecycleScope.launch {
                     val sublocais = viewModel.getSublocais(it.id)
                     updateSublocal2Spinner(sublocais)
@@ -194,11 +205,17 @@ class NovoClienteDialog(
         binding.spinnerSublocal2.setOnItemClickListener { _, _, position, _ ->
             val selectedSublocal2 = sublocal2Adapter.getItem(position)
             selectedSublocal2?.let {
+                selectedSublocal2Id = it.id
+                selectedSublocal3Id = null
                 viewLifecycleOwner.lifecycleScope.launch {
                     val sublocais = viewModel.getSublocais(it.id)
                     updateSublocal3Spinner(sublocais)
                 }
             }
+        }
+
+        binding.spinnerSublocal3.setOnItemClickListener { _, _, position, _ ->
+            selectedSublocal3Id = sublocal3Adapter.getItem(position)?.id
         }
     }
 
@@ -311,9 +328,11 @@ class NovoClienteDialog(
             hierarchy.forEachIndexed { index, local ->
                 when (index) {
                     0 -> {
+                        selectedLocalId = local.id
                         binding.spinnerLocal.setText(local.nome)
                     }
                     1 -> {
+                        selectedSublocal1Id = local.id
                         val sublocais = viewModel.getSublocais(hierarchy[0].id)
                         sublocal1Adapter.clear()
                         sublocal1Adapter.addAll(sublocais)
@@ -327,6 +346,7 @@ class NovoClienteDialog(
                             }
                     }
                     2 -> {
+                        selectedSublocal2Id = local.id
                         val sublocais = viewModel.getSublocais(hierarchy[1].id)
                         sublocal2Adapter.clear()
                         sublocal2Adapter.addAll(sublocais)
@@ -340,6 +360,7 @@ class NovoClienteDialog(
                             }
                     }
                     3 -> {
+                        selectedSublocal3Id = local.id
                         val sublocais = viewModel.getSublocais(hierarchy[2].id)
                         sublocal3Adapter.clear()
                         sublocal3Adapter.addAll(sublocais)
@@ -367,45 +388,20 @@ class NovoClienteDialog(
 
                     val localId =
                         importedHierarchy?.firstOrNull()?.id
-                            ?: binding.spinnerLocal.text.toString().let { text ->
-                                localAdapter.getAllItems().find { it.nome == text }?.id
-                            } ?: return@setOnClickListener
+                            ?: selectedLocalId
+                            ?: return@setOnClickListener
 
                     val sublocal1Id =
                         importedHierarchy?.getOrNull(1)?.id
-                            ?: (
-                                if (binding.tilSublocal1.visibility == View.VISIBLE) {
-                                    binding.spinnerSublocal1.text.toString().let { text ->
-                                        sublocal1Adapter.getAllItems().find { it.nome == text }?.id
-                                    }
-                                } else {
-                                    null
-                                }
-                            )
+                            ?: selectedSublocal1Id
 
                     val sublocal2Id =
                         importedHierarchy?.getOrNull(2)?.id
-                            ?: (
-                                if (binding.tilSublocal2.visibility == View.VISIBLE) {
-                                    binding.spinnerSublocal2.text.toString().let { text ->
-                                        sublocal2Adapter.getAllItems().find { it.nome == text }?.id
-                                    }
-                                } else {
-                                    null
-                                }
-                            )
+                            ?: selectedSublocal2Id
 
                     val sublocal3Id =
                         importedHierarchy?.getOrNull(3)?.id
-                            ?: (
-                                if (binding.tilSublocal3.visibility == View.VISIBLE) {
-                                    binding.spinnerSublocal3.text.toString().let { text ->
-                                        sublocal3Adapter.getAllItems().find { it.nome == text }?.id
-                                    }
-                                } else {
-                                    null
-                                }
-                            )
+                            ?: selectedSublocal3Id
 
                     Log.d(
                         "NovoClienteDialog",

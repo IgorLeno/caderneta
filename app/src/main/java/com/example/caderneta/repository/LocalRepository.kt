@@ -1,5 +1,6 @@
 package com.example.caderneta.repository
 
+import android.database.sqlite.SQLiteConstraintException
 import com.example.caderneta.data.dao.LocalDao
 import com.example.caderneta.data.entity.Local
 import kotlinx.coroutines.Dispatchers
@@ -26,9 +27,15 @@ class LocalRepository(
             localDao.updateLocal(local)
         }
 
-    suspend fun deleteLocal(local: Local) =
+    suspend fun deleteLocal(local: Local): Boolean =
         withContext(Dispatchers.IO) {
-            localDao.deleteLocal(local)
+            try {
+                localDao.deleteLocal(local)
+                false
+            } catch (_: SQLiteConstraintException) {
+                localDao.updateLocal(local.copy(arquivado = true))
+                true
+            }
         }
 
     suspend fun buscarLocais(query: String): List<Local> = localDao.buscarLocais("%$query%")
