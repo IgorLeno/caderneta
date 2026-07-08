@@ -27,7 +27,9 @@ import com.example.caderneta.databinding.ItemClienteBinding
 import com.example.caderneta.util.ContadorHelper
 import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.util.centavosParaTextoDecimal
+import com.example.caderneta.util.ParseDinheiro
 import com.example.caderneta.util.decimalParaCentavos
+import com.example.caderneta.util.parseDinheiro
 import com.example.caderneta.util.showErrorToast
 import com.example.caderneta.util.showSuccessToast
 import com.example.caderneta.viewmodel.ClienteState
@@ -412,8 +414,16 @@ class EditarOperacaoDialog(
                     addTextChangedListener(
                         object : android.text.TextWatcher {
                             override fun afterTextChanged(s: android.text.Editable?) {
-                                val valor = s.toString().decimalParaCentavos() ?: 0
-                                vendasViewModel.updateValorTotal(cliente.id, valor)
+                                when (val valor = s.toString().parseDinheiro()) {
+                                    is ParseDinheiro.Valido -> {
+                                        etValorPagamento.error = null
+                                        vendasViewModel.updateValorTotal(cliente.id, valor.centavos)
+                                    }
+                                    ParseDinheiro.Vazio -> etValorPagamento.error = "Informe o valor"
+                                    ParseDinheiro.Invalido -> etValorPagamento.error = "Valor inválido"
+                                    ParseDinheiro.Negativo -> etValorPagamento.error = "Valor não pode ser negativo"
+                                    ParseDinheiro.MuitoGrande -> etValorPagamento.error = "Valor muito grande"
+                                }
                             }
 
                             override fun beforeTextChanged(

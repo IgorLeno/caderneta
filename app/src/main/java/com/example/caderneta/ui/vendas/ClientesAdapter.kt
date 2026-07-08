@@ -24,7 +24,8 @@ import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.util.ContadorHelper
 import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.util.centavosParaTextoDecimal
-import com.example.caderneta.util.decimalParaCentavos
+import com.example.caderneta.util.ParseDinheiro
+import com.example.caderneta.util.parseDinheiro
 import com.example.caderneta.viewmodel.ClienteState
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
@@ -249,7 +250,16 @@ class ClientesAdapter(
                 etValorPagamento.addTextChangedListener(
                     object : TextWatcher {
                         override fun afterTextChanged(s: Editable?) {
-                            onUpdateValorTotal(cliente.id, s.toString().decimalParaCentavos() ?: 0)
+                            when (val valor = s.toString().parseDinheiro()) {
+                                is ParseDinheiro.Valido -> {
+                                    etValorPagamento.error = null
+                                    onUpdateValorTotal(cliente.id, valor.centavos)
+                                }
+                                ParseDinheiro.Vazio -> etValorPagamento.error = "Informe o valor"
+                                ParseDinheiro.Invalido -> etValorPagamento.error = "Valor inválido"
+                                ParseDinheiro.Negativo -> etValorPagamento.error = "Valor não pode ser negativo"
+                                ParseDinheiro.MuitoGrande -> etValorPagamento.error = "Valor muito grande"
+                            }
                         }
 
                         override fun beforeTextChanged(
