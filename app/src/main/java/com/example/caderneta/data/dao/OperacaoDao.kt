@@ -17,7 +17,10 @@ interface OperacaoDao {
     fun getOperacoesByCliente(clienteId: Long): Flow<List<Operacao>>
 
     @Query("SELECT * FROM operacoes WHERE data BETWEEN :startDate AND :endDate")
-    fun getOperacoesByDateRange(startDate: Date, endDate: Date): Flow<List<Operacao>>
+    fun getOperacoesByDateRange(
+        startDate: Date,
+        endDate: Date,
+    ): Flow<List<Operacao>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOperacao(operacao: Operacao): Long

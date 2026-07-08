@@ -1,64 +1,64 @@
 package com.example.caderneta.ui.consultas
 
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
-import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.caderneta.data.entity.Cliente
-import com.example.caderneta.data.entity.Local
-import com.example.caderneta.data.entity.Venda
-import com.example.caderneta.databinding.ItemResultadoConsultaBinding
-import java.text.NumberFormat
-import java.util.Locale
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentManager
 import androidx.navigation.NavOptions
 import androidx.navigation.Navigation.findNavController
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
 import com.example.caderneta.R
+import com.example.caderneta.data.entity.Venda
+import com.example.caderneta.data.entity.Cliente as ClienteEntity
+import com.example.caderneta.databinding.ItemResultadoConsultaBinding
 import com.example.caderneta.repository.LocalRepository
+import com.example.caderneta.util.centavosParaReais
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@Suppress("LongParameterList")
 class ResultadosConsultaAdapter(
     private val onLocalClick: (Long) -> Unit,
     private val onClienteClick: (Long) -> Unit,
-    private val onExtratoItemClick: (Venda, Cliente) -> Unit,
+    private val onExtratoItemClick: (Venda, ClienteEntity) -> Unit,
     private val localRepository: LocalRepository,
     private val coroutineScope: CoroutineScope,
     private val fragmentManager: FragmentManager,
-    private val onEditarCliente: (Cliente) -> Unit,
-    private val onExcluirCliente: (Cliente) -> Unit
+    private val onEditarCliente: (ClienteEntity) -> Unit,
+    private val onExcluirCliente: (ClienteEntity) -> Unit,
 ) : ListAdapter<ResultadoConsulta, RecyclerView.ViewHolder>(ResultadoConsultaDiffCallback()) {
-
     private var vendasPorCliente: Map<Long, List<Venda>> = emptyMap()
     private val expandedClientes = mutableSetOf<Long>()
-    private val numberFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
 
-    override fun getItemViewType(position: Int): Int {
-        return when (getItem(position)) {
+    override fun getItemViewType(position: Int): Int =
+        when (getItem(position)) {
             is ResultadoConsulta.Local -> VIEW_TYPE_LOCAL
             is ResultadoConsulta.Cliente -> VIEW_TYPE_CLIENTE
         }
-    }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        val binding = ItemResultadoConsultaBinding.inflate(
-            LayoutInflater.from(parent.context),
-            parent,
-            false
-        )
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): RecyclerView.ViewHolder {
+        val binding =
+            ItemResultadoConsultaBinding.inflate(
+                LayoutInflater.from(parent.context),
+                parent,
+                false,
+            )
         return when (viewType) {
             VIEW_TYPE_LOCAL -> LocalViewHolder(binding)
             VIEW_TYPE_CLIENTE -> ClienteViewHolder(binding)
@@ -66,11 +66,15 @@ class ResultadosConsultaAdapter(
         }
     }
 
-    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: List<Any>) {
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: List<Any>,
+    ) {
         if (payloads.isNotEmpty()) {
             val payload = payloads[0] as? Bundle
             if (payload != null && holder is ClienteViewHolder) {
-                val novoSaldo = payload.getDouble("saldo")
+                val novoSaldo = payload.getLong("saldoCentavos")
                 holder.atualizarSaldo(novoSaldo)
                 return
             }
@@ -78,22 +82,25 @@ class ResultadosConsultaAdapter(
         onBindViewHolder(holder, position)
     }
 
-    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+    ) {
         when (val item = getItem(position)) {
             is ResultadoConsulta.Local -> (holder as LocalViewHolder).bind(item)
             is ResultadoConsulta.Cliente -> (holder as ClienteViewHolder).bind(item)
         }
     }
 
-    inner class ClienteViewHolder(private val binding: ItemResultadoConsultaBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-
+    inner class ClienteViewHolder(
+        private val binding: ItemResultadoConsultaBinding,
+    ) : RecyclerView.ViewHolder(binding.root) {
         private var extratoAdapter: ExtratoAdapter? = null
-        private var currentSaldo: Double = 0.0
+        private var currentSaldoCentavos: Long = 0
         private var currentClienteId: Long = -1L
 
-
         @SuppressLint("LongLogTag")
+        @Suppress("LongMethod")
         fun bind(resultado: ResultadoConsulta.Cliente) {
             val cliente = resultado.cliente
 
@@ -111,8 +118,8 @@ class ResultadosConsultaAdapter(
                 tvLocalHierarquia.visibility = View.VISIBLE
 
                 // Atualizar saldo apenas se mudou
-                if (currentSaldo != resultado.saldo) {
-                    atualizarSaldo(resultado.saldo)
+                if (currentSaldoCentavos != resultado.saldoCentavos) {
+                    atualizarSaldo(resultado.saldoCentavos)
                 }
 
                 updateExtratoVisibility(cliente)
@@ -130,21 +137,23 @@ class ResultadosConsultaAdapter(
                     onVenderClick = { clienteSelecionado ->
                         coroutineScope.launch {
                             try {
-                                val localMaisEspecifico = withContext(Dispatchers.IO) {
-                                    listOfNotNull(
-                                        localRepository.getLocalById(clienteSelecionado.localId),
-                                        clienteSelecionado.sublocal1Id?.let { localRepository.getLocalById(it) },
-                                        clienteSelecionado.sublocal2Id?.let { localRepository.getLocalById(it) },
-                                        clienteSelecionado.sublocal3Id?.let { localRepository.getLocalById(it) }
-                                    ).lastOrNull()
-                                }
+                                val localMaisEspecifico =
+                                    withContext(Dispatchers.IO) {
+                                        listOfNotNull(
+                                            localRepository.getLocalById(clienteSelecionado.localId),
+                                            clienteSelecionado.sublocal1Id?.let { localRepository.getLocalById(it) },
+                                            clienteSelecionado.sublocal2Id?.let { localRepository.getLocalById(it) },
+                                            clienteSelecionado.sublocal3Id?.let { localRepository.getLocalById(it) },
+                                        ).lastOrNull()
+                                    }
 
                                 findNavController(binding.root).navigate(
                                     R.id.vendasFragment,
                                     null,
-                                    NavOptions.Builder()
+                                    NavOptions
+                                        .Builder()
                                         .setPopUpTo(R.id.consultasFragment, true)
-                                        .build()
+                                        .build(),
                                 )
 
                                 delay(100) // Pequeno delay para garantir a navegação
@@ -157,7 +166,7 @@ class ResultadosConsultaAdapter(
                         }
                     },
                     onEditarClick = { onEditarCliente(it) },
-                    onExcluirClick = { onExcluirCliente(it) }
+                    onExcluirClick = { onExcluirCliente(it) },
                 ).show(fragmentManager, OpcoesConsultaClienteDialog.TAG)
                 true
             }
@@ -168,18 +177,18 @@ class ResultadosConsultaAdapter(
             }
         }
 
-        fun atualizarSaldo(novoSaldo: Double) {
-            if (currentSaldo != novoSaldo) {
+        fun atualizarSaldo(novoSaldoCentavos: Long) {
+            if (currentSaldoCentavos != novoSaldoCentavos) {
                 // Animar mudança do saldo
-                val valorAntigo = currentSaldo
-                currentSaldo = novoSaldo
+                val valorAntigo = currentSaldoCentavos
+                currentSaldoCentavos = novoSaldoCentavos
 
-                binding.tvValorDevido.animateValue(valorAntigo, novoSaldo)
+                binding.tvValorDevido.animateValue(valorAntigo, novoSaldoCentavos)
                 binding.tvValorDevido.setTextColor(
                     ContextCompat.getColor(
                         binding.root.context,
-                        if (novoSaldo > 0) R.color.red else R.color.green
-                    )
+                        if (novoSaldoCentavos > 0) R.color.red else R.color.green,
+                    ),
                 )
 
                 // Se o extrato estiver expandido, forçar atualização
@@ -191,12 +200,12 @@ class ResultadosConsultaAdapter(
             }
         }
 
-
-        private fun configureExtratoAdapter(cliente: Cliente) {
+        private fun configureExtratoAdapter(cliente: ClienteEntity) {
             if (extratoAdapter == null) {
-                extratoAdapter = ExtratoAdapter { venda ->
-                    onExtratoItemClick(venda, cliente)
-                }
+                extratoAdapter =
+                    ExtratoAdapter { venda ->
+                        onExtratoItemClick(venda, cliente)
+                    }
                 binding.rvExtrato.apply {
                     layoutManager = LinearLayoutManager(context)
                     adapter = extratoAdapter
@@ -204,7 +213,7 @@ class ResultadosConsultaAdapter(
             }
         }
 
-        private fun setupClickListeners(cliente: Cliente) {
+        private fun setupClickListeners(cliente: ClienteEntity) {
             binding.root.setOnClickListener {
                 if (expandedClientes.contains(cliente.id)) {
                     collapseExtrato()
@@ -220,7 +229,7 @@ class ResultadosConsultaAdapter(
             }
         }
 
-        private fun updateExtratoVisibility(cliente: Cliente) {
+        private fun updateExtratoVisibility(cliente: ClienteEntity) {
             binding.layoutExtrato.visibility =
                 if (expandedClientes.contains(cliente.id)) View.VISIBLE else View.GONE
 
@@ -232,7 +241,7 @@ class ResultadosConsultaAdapter(
         }
 
         @SuppressLint("LongLogTag")
-        private fun construirHierarquiaLocal(cliente: Cliente) {
+        private fun construirHierarquiaLocal(cliente: ClienteEntity) {
             coroutineScope.launch {
                 try {
                     val locais = mutableListOf<String>()
@@ -274,35 +283,39 @@ class ResultadosConsultaAdapter(
         }
 
         private fun collapseExtrato() {
-            binding.layoutExtrato.animate()
+            binding.layoutExtrato
+                .animate()
                 .alpha(0f)
                 .setDuration(300)
                 .setInterpolator(AccelerateDecelerateInterpolator())
                 .withEndAction {
                     binding.layoutExtrato.visibility = View.GONE
-                }
-                .start()
+                }.start()
         }
 
-        private fun TextView.animateValue(startValue: Double, endValue: Double, duration: Long = 500L) {
-            if (startValue == endValue) return  // Evita animação desnecessária
+        private fun TextView.animateValue(
+            startValue: Long,
+            endValue: Long,
+            duration: Long = 500L,
+        ) {
+            if (startValue == endValue) return // Evita animação desnecessária
 
             val valueAnimator = ValueAnimator.ofFloat(startValue.toFloat(), endValue.toFloat())
             valueAnimator.duration = duration
             valueAnimator.interpolator = AccelerateDecelerateInterpolator()
 
             valueAnimator.addUpdateListener { animator ->
-                val animatedValue = (animator.animatedValue as Float).toDouble()
-                text = numberFormat.format(animatedValue)
+                val animatedValue = (animator.animatedValue as Float).toLong()
+                text = animatedValue.centavosParaReais()
             }
 
             valueAnimator.start()
         }
     }
 
-    inner class LocalViewHolder(private val binding: ItemResultadoConsultaBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-
+    inner class LocalViewHolder(
+        private val binding: ItemResultadoConsultaBinding,
+    ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(local: ResultadoConsulta.Local) {
             binding.apply {
                 tvNomeCliente.text = local.local.nome
@@ -327,32 +340,39 @@ class ResultadosConsultaAdapter(
     }
 
     class ResultadoConsultaDiffCallback : DiffUtil.ItemCallback<ResultadoConsulta>() {
-        override fun areItemsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
-            return when {
+        override fun areItemsTheSame(
+            oldItem: ResultadoConsulta,
+            newItem: ResultadoConsulta,
+        ): Boolean =
+            when {
                 oldItem is ResultadoConsulta.Local && newItem is ResultadoConsulta.Local ->
                     oldItem.local.id == newItem.local.id
                 oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente ->
                     oldItem.cliente.id == newItem.cliente.id
                 else -> false
             }
-        }
 
-        override fun areContentsTheSame(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Boolean {
-            return when {
+        override fun areContentsTheSame(
+            oldItem: ResultadoConsulta,
+            newItem: ResultadoConsulta,
+        ): Boolean =
+            when {
                 oldItem is ResultadoConsulta.Local && newItem is ResultadoConsulta.Local ->
                     oldItem == newItem
                 oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente -> {
-                    oldItem.cliente == newItem.cliente && oldItem.saldo == newItem.saldo
+                    oldItem.cliente == newItem.cliente && oldItem.saldoCentavos == newItem.saldoCentavos
                 }
                 else -> false
             }
-        }
 
-        override fun getChangePayload(oldItem: ResultadoConsulta, newItem: ResultadoConsulta): Any? {
+        override fun getChangePayload(
+            oldItem: ResultadoConsulta,
+            newItem: ResultadoConsulta,
+        ): Any? {
             if (oldItem is ResultadoConsulta.Cliente && newItem is ResultadoConsulta.Cliente) {
-                if (oldItem.cliente == newItem.cliente && oldItem.saldo != newItem.saldo) {
+                if (oldItem.cliente == newItem.cliente && oldItem.saldoCentavos != newItem.saldoCentavos) {
                     return Bundle().apply {
-                        putDouble("saldo", newItem.saldo)
+                        putLong("saldoCentavos", newItem.saldoCentavos)
                     }
                 }
             }

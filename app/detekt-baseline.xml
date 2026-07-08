@@ -1,0 +1,148 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:ClientesAdapter.kt$ClientesAdapter.ClienteViewHolder$private fun updateLayoutVisibility(state: VendasViewModel.ClienteState)</ID>
+    <ID>CyclomaticComplexMethod:Configuracoes.kt$Configuracoes$fun isValid(): Boolean</ID>
+    <ID>CyclomaticComplexMethod:VendasViewModel.kt$VendasViewModel$suspend fun confirmarEdicaoOperacao(vendaOriginal: Venda): Boolean</ID>
+    <ID>EmptyFunctionBlock:ClientesAdapter.kt$ClientesAdapter.ClienteViewHolder.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:ConsultasFragment.kt$ConsultasFragment.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:EditarOperacaoDialog.kt$EditarOperacaoDialog.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:HistoricoVendasFragment.kt$HistoricoVendasFragment.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:NovoClienteDialog.kt$NovoClienteDialog.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:VendasFragment.kt$VendasFragment.&lt;no name provided&gt;${}</ID>
+    <ID>ImplicitDefaultLocale:ClientesAdapter.kt$ClientesAdapter.ClienteViewHolder$String.format("%.2f", payload.novoValor)</ID>
+    <ID>ImplicitDefaultLocale:ClientesAdapter.kt$ClientesAdapter.ClienteViewHolder$String.format("%.2f", state.valorTotal)</ID>
+    <ID>ImplicitDefaultLocale:EditarOperacaoDialog.kt$EditarOperacaoDialog$String.format("%.2f", saldoTotal)</ID>
+    <ID>ImplicitDefaultLocale:EditarOperacaoDialog.kt$EditarOperacaoDialog$String.format("%.2f", state.valorTotal)</ID>
+    <ID>ImplicitDefaultLocale:EditarOperacaoDialog.kt$EditarOperacaoDialog$String.format("%.2f", venda.valor)</ID>
+    <ID>ImplicitDefaultLocale:EditarOperacaoDialog.kt$EditarOperacaoDialog$String.format("R$ %.2f", saldo)</ID>
+    <ID>LargeClass:VendasViewModel.kt$VendasViewModel : ViewModel</ID>
+    <ID>LongMethod:ConsultasFragment.kt$ConsultasFragment$private fun observeViewModel()</ID>
+    <ID>LongMethod:VendasFragment.kt$VendasFragment$private fun observeViewModel()</ID>
+    <ID>LongParameterList:ClientesAdapter.kt$ClientesAdapter$( private val contaRepository: ContaRepository, private val lifecycleScope: LifecycleCoroutineScope, private val fragmentManager: androidx.fragment.app.FragmentManager, // Novo parâmetro private val getClienteState: (Long) -&gt; VendasViewModel.ClienteState?, private val getConfiguracoes: () -&gt; Configuracoes?, private val onModoOperacaoSelected: (Cliente, ModoOperacao?) -&gt; Unit, private val onTipoTransacaoSelected: (Cliente, TipoTransacao?) -&gt; Unit, private val onQuantidadeChanged: (Long, TipoQuantidade, Int) -&gt; Unit, private val onConfirmarOperacao: (Long) -&gt; Unit, private val onCancelarOperacao: (Long) -&gt; Unit, private val onUpdateValorTotal: (Long, Double) -&gt; Unit, private val observeSaldoAtualizado: ((suspend (Long) -&gt; Unit) -&gt; Unit), private val onEditarCliente: (Cliente) -&gt; Unit, private val onExcluirCliente: (Cliente) -&gt; Unit )</ID>
+    <ID>LongParameterList:ResultadosConsultaAdapter.kt$ResultadosConsultaAdapter$( private val onLocalClick: (Long) -&gt; Unit, private val onClienteClick: (Long) -&gt; Unit, private val onExtratoItemClick: (Venda, Cliente) -&gt; Unit, private val localRepository: LocalRepository, private val coroutineScope: CoroutineScope, private val fragmentManager: FragmentManager, private val onEditarCliente: (Cliente) -&gt; Unit, private val onExcluirCliente: (Cliente) -&gt; Unit )</ID>
+    <ID>LongParameterList:VendasViewModel.kt$VendasViewModel$( cliente: Cliente, novoNome: String, novoTelefone: String, novoLocalId: Long, novoSublocal1Id: Long?, novoSublocal2Id: Long?, novoSublocal3Id: Long? )</ID>
+    <ID>LongParameterList:VendasViewModel.kt$VendasViewModel$( clienteId: Long, localId: Long, clienteState: ClienteState, valorTotal: Double, quantidadeSalgados: Int, quantidadeSucos: Int, config: Configuracoes, tipoTransacao: TipoTransacao )</ID>
+    <ID>LongParameterList:VendasViewModel.kt$VendasViewModel$( nome: String, telefone: String, localId: Long, sublocal1Id: Long?, sublocal2Id: Long?, sublocal3Id: Long? )</ID>
+    <ID>LongParameterList:VendasViewModel.kt$VendasViewModel$( private val clienteRepository: ClienteRepository, private val localRepository: LocalRepository, private val produtoRepository: ProdutoRepository, private val vendaRepository: VendaRepository, private val itemVendaRepository: ItemVendaRepository, private val configuracoesRepository: ConfiguracoesRepository, private val operacaoRepository: OperacaoRepository, private val contaRepository: ContaRepository )</ID>
+    <ID>LongParameterList:VendasViewModel.kt$VendasViewModelFactory$( private val clienteRepository: ClienteRepository, private val localRepository: LocalRepository, private val produtoRepository: ProdutoRepository, private val vendaRepository: VendaRepository, private val itemVendaRepository: ItemVendaRepository, private val configuracoesRepository: ConfiguracoesRepository, private val operacaoRepository: OperacaoRepository, private val contaRepository: ContaRepository )</ID>
+    <ID>MatchingDeclarationName:OpcoesClienteConsultaDialog.kt$OpcoesConsultaClienteDialog : DialogFragment</ID>
+    <ID>MaxLineLength:DetalhesVendasAdapter.kt$DetalhesVendasAdapter$class</ID>
+    <ID>MaxLineLength:HistoricoVendasFragment.kt$HistoricoVendasFragment$HistoricoVendasViewModel.Agrupamento.PESSOA -&gt; viewModel.getClienteById(id)?.nome ?: "Cliente Desconhecido"</ID>
+    <ID>MaxLineLength:HistoricoVendasFragment.kt$HistoricoVendasFragment$HistoricoVendasViewModel.Agrupamento.PREDIO -&gt; viewModel.getLocalById(id)?.nome ?: "Local Desconhecido"</ID>
+    <ID>MaxLineLength:LocalAdapter.kt$LocalAdapter$Log.d("LocalAdapter", "Atualizando lista de locais. Tamanho original: ${locais.size}, Tamanho achatado: ${flattenedList.size}")</ID>
+    <ID>MaxLineLength:LocalAdapter.kt$LocalAdapter$Log.d("LocalAdapter", "Flattened locals: ${result.map { "${it.local.id}:${it.local.nome}(${it.local.parentId})" }}")</ID>
+    <ID>MaxLineLength:LocalAdapter.kt$LocalAdapter$Log.d("LocalAdapter", "Lista achatada: ${flattenedList.map { "${it.local.id}:${it.local.nome}(${it.local.parentId})" }}")</ID>
+    <ID>MaxLineLength:LocalAdapter.kt$LocalAdapter$private</ID>
+    <ID>MaxLineLength:LocalAdapter.kt$LocalAdapter.LocalViewHolder$Log.d("LocalAdapter", "Binding local: ${local.id}:${local.nome}(${local.parentId}), hasChildren: ${localWithChildren.hasChildren}, isExpanded: ${local.isExpanded}")</ID>
+    <ID>MaxLineLength:NovoClienteDialog.kt$NovoClienteDialog$Log.d("NovoClienteDialog", "Hierarquia obtida: ${hierarchy.joinToString(" -&gt; ") { "${it.nome}(${it.id})" }}")</ID>
+    <ID>MaxLineLength:RegistrarPagamentoDialog.kt$RegistrarPagamentoDialog$private val binding get() = requireNotNull(_binding) { "Binding should not be accessed before onCreateDialog or after onDestroyView" }</ID>
+    <ID>MaxLineLength:VendasFragment.kt$VendasFragment$binding.fabNovoCliente.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.primary_color))</ID>
+    <ID>MaxLineLength:VendasFragment.kt$VendasFragment$binding.fabNovoCliente.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.on_primary))</ID>
+    <ID>MaxLineLength:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Hierarquia de locais inválida: nível do filho não é maior que do pai")</ID>
+    <ID>NestedBlockDepth:ExtratoAdapter.kt$ExtratoAdapter.ViewHolder$fun bind(venda: Venda)</ID>
+    <ID>NewLineAtEndOfFile:AppDatabase.kt$com.example.caderneta.data.AppDatabase.kt</ID>
+    <ID>NewLineAtEndOfFile:BalancoCaixaFragment.kt$com.example.caderneta.ui.balanco.BalancoCaixaFragment.kt</ID>
+    <ID>NewLineAtEndOfFile:BalancoCaixaViewModel.kt$com.example.caderneta.viewmodel.BalancoCaixaViewModel.kt</ID>
+    <ID>NewLineAtEndOfFile:CadernetaApplication.kt$com.example.caderneta.CadernetaApplication.kt</ID>
+    <ID>NewLineAtEndOfFile:CardBalancoView.kt$com.example.caderneta.ui.components.CardBalancoView.kt</ID>
+    <ID>NewLineAtEndOfFile:Cliente.kt$com.example.caderneta.data.entity.Cliente.kt</ID>
+    <ID>NewLineAtEndOfFile:ClienteDao.kt$com.example.caderneta.data.dao.ClienteDao.kt</ID>
+    <ID>NewLineAtEndOfFile:ClienteRepository.kt$com.example.caderneta.repository.ClienteRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:ClientesAdapter.kt$com.example.caderneta.ui.vendas.ClientesAdapter.kt</ID>
+    <ID>NewLineAtEndOfFile:Configuracoes.kt$com.example.caderneta.data.entity.Configuracoes.kt</ID>
+    <ID>NewLineAtEndOfFile:ConfiguracoesDao.kt$com.example.caderneta.data.dao.ConfiguracoesDao.kt</ID>
+    <ID>NewLineAtEndOfFile:ConfiguracoesFragment.kt$com.example.caderneta.ui.configuracoes.ConfiguracoesFragment.kt</ID>
+    <ID>NewLineAtEndOfFile:ConfiguracoesRepository.kt$com.example.caderneta.repository.ConfiguracoesRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:ConfiguracoesViewModel.kt$com.example.caderneta.viewmodel.ConfiguracoesViewModel.kt</ID>
+    <ID>NewLineAtEndOfFile:ConsultasFragment.kt$com.example.caderneta.ui.consultas.ConsultasFragment.kt</ID>
+    <ID>NewLineAtEndOfFile:ConsultasViewModel.kt$com.example.caderneta.viewmodel.ConsultasViewModel.kt</ID>
+    <ID>NewLineAtEndOfFile:Conta.kt$com.example.caderneta.data.entity.Conta.kt</ID>
+    <ID>NewLineAtEndOfFile:ContaDao.kt$com.example.caderneta.data.dao.ContaDao.kt</ID>
+    <ID>NewLineAtEndOfFile:ContaRepository.kt$com.example.caderneta.repository.ContaRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:ContadorHelper.kt$com.example.caderneta.util.ContadorHelper.kt</ID>
+    <ID>NewLineAtEndOfFile:DateConverter.kt$com.example.caderneta.util.DateConverter.kt</ID>
+    <ID>NewLineAtEndOfFile:DetalhesVendasAdapter.kt$com.example.caderneta.ui.historico.DetalhesVendasAdapter.kt</ID>
+    <ID>NewLineAtEndOfFile:EditarOperacaoDialog.kt$com.example.caderneta.ui.consultas.EditarOperacaoDialog.kt</ID>
+    <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$com.example.caderneta.ExampleUnitTest.kt</ID>
+    <ID>NewLineAtEndOfFile:Extensions.kt$com.example.caderneta.util.Extensions.kt</ID>
+    <ID>NewLineAtEndOfFile:ExtratoAdapter.kt$com.example.caderneta.ui.consultas.ExtratoAdapter.kt</ID>
+    <ID>NewLineAtEndOfFile:HistoricoVendasFragment.kt$com.example.caderneta.ui.historico.HistoricoVendasFragment.kt</ID>
+    <ID>NewLineAtEndOfFile:HistoricoVendasViewModel.kt$com.example.caderneta.viewmodel.HistoricoVendasViewModel.kt</ID>
+    <ID>NewLineAtEndOfFile:ItemVenda.kt$com.example.caderneta.data.entity.ItemVenda.kt</ID>
+    <ID>NewLineAtEndOfFile:ItemVendaDao.kt$com.example.caderneta.data.dao.ItemVendaDao.kt</ID>
+    <ID>NewLineAtEndOfFile:ItemVendaRepository.kt$com.example.caderneta.repository.ItemVendaRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:Local.kt$com.example.caderneta.data.entity.Local.kt</ID>
+    <ID>NewLineAtEndOfFile:LocalAdapter.kt$com.example.caderneta.ui.vendas.LocalAdapter.kt</ID>
+    <ID>NewLineAtEndOfFile:LocalConsultaAdapter.kt$com.example.caderneta.ui.consultas.LocalConsultaAdapter.kt</ID>
+    <ID>NewLineAtEndOfFile:LocalDao.kt$com.example.caderneta.data.dao.LocalDao.kt</ID>
+    <ID>NewLineAtEndOfFile:MainActivity.kt$com.example.caderneta.MainActivity.kt</ID>
+    <ID>NewLineAtEndOfFile:ModoOperacao.kt$com.example.caderneta.data.entity.ModoOperacao.kt</ID>
+    <ID>NewLineAtEndOfFile:NovoClienteDialog.kt$com.example.caderneta.ui.vendas.NovoClienteDialog.kt</ID>
+    <ID>NewLineAtEndOfFile:OpcoesClienteConsultaDialog.kt$com.example.caderneta.ui.consultas.OpcoesClienteConsultaDialog.kt</ID>
+    <ID>NewLineAtEndOfFile:OpcoesClienteDialog.kt$com.example.caderneta.ui.vendas.OpcoesClienteDialog.kt</ID>
+    <ID>NewLineAtEndOfFile:OpcoesExtratoDialog.kt$com.example.caderneta.ui.consultas.OpcoesExtratoDialog.kt</ID>
+    <ID>NewLineAtEndOfFile:Operacao.kt$com.example.caderneta.data.entity.Operacao.kt</ID>
+    <ID>NewLineAtEndOfFile:OperacaoDao.kt$com.example.caderneta.data.dao.OperacaoDao.kt</ID>
+    <ID>NewLineAtEndOfFile:OperacaoRepository.kt$com.example.caderneta.repository.OperacaoRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:Produto.kt$com.example.caderneta.data.entity.Produto.kt</ID>
+    <ID>NewLineAtEndOfFile:ProdutoDao.kt$com.example.caderneta.data.dao.ProdutoDao.kt</ID>
+    <ID>NewLineAtEndOfFile:ProdutoRepository.kt$com.example.caderneta.repository.ProdutoRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:RegistrarPagamentoDialog.kt$com.example.caderneta.ui.vendas.RegistrarPagamentoDialog.kt</ID>
+    <ID>NewLineAtEndOfFile:ResultadoConsulta.kt$com.example.caderneta.ui.consultas.ResultadoConsulta.kt</ID>
+    <ID>NewLineAtEndOfFile:ResultadosConsultaAdapter.kt$com.example.caderneta.ui.consultas.ResultadosConsultaAdapter.kt</ID>
+    <ID>NewLineAtEndOfFile:Venda.kt$com.example.caderneta.data.entity.Venda.kt</ID>
+    <ID>NewLineAtEndOfFile:VendaDao.kt$com.example.caderneta.data.dao.VendaDao.kt</ID>
+    <ID>NewLineAtEndOfFile:VendaPersonalizadaDialog.kt$com.example.caderneta.ui.vendas.VendaPersonalizadaDialog.kt</ID>
+    <ID>NewLineAtEndOfFile:VendaRepository.kt$com.example.caderneta.repository.VendaRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:VendasFragment.kt$com.example.caderneta.ui.vendas.VendasFragment.kt</ID>
+    <ID>NewLineAtEndOfFile:VendasViewModel.kt$com.example.caderneta.viewmodel.VendasViewModel.kt</ID>
+    <ID>ReturnCount:ContaRepository.kt$ContaRepository$suspend fun processarPagamento(clienteId: Long, valorPagamento: Double): Boolean</ID>
+    <ID>SwallowedException:ContaRepository.kt$ContaRepository$e: Exception</ID>
+    <ID>ThrowsCount:VendasViewModel.kt$VendasViewModel$private fun confirmarPagamento(clienteId: Long)</ID>
+    <ID>ThrowsCount:VendasViewModel.kt$VendasViewModel$private fun confirmarVenda(clienteId: Long)</ID>
+    <ID>TooGenericExceptionCaught:ConfiguracoesViewModel.kt$ConfiguracoesViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ConsultasFragment.kt$ConsultasFragment$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ConsultasViewModel.kt$ConsultasViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ContaRepository.kt$ContaRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:EditarOperacaoDialog.kt$EditarOperacaoDialog$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:HistoricoVendasViewModel.kt$HistoricoVendasViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LocalRepository.kt$LocalRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NovoClienteDialog.kt$NovoClienteDialog$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:OpcoesClienteDialog.kt$OpcoesClienteDialog$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:OpcoesExtratoDialog.kt$OpcoesExtratoDialog$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ResultadosConsultaAdapter.kt$ResultadosConsultaAdapter.ClienteViewHolder$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:VendasViewModel.kt$VendasViewModel$e: Exception</ID>
+    <ID>TooManyFunctions:ClientesAdapter.kt$ClientesAdapter$ClienteViewHolder : ViewHolder</ID>
+    <ID>TooManyFunctions:ConsultasFragment.kt$ConsultasFragment : Fragment</ID>
+    <ID>TooManyFunctions:ConsultasViewModel.kt$ConsultasViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:EditarOperacaoDialog.kt$EditarOperacaoDialog : DialogFragment</ID>
+    <ID>TooManyFunctions:NovoClienteDialog.kt$NovoClienteDialog : DialogFragment</ID>
+    <ID>TooManyFunctions:VendasViewModel.kt$VendasViewModel : ViewModel</ID>
+    <ID>UnusedParameter:OpcoesExtratoDialog.kt$OpcoesExtratoDialog$isError: Boolean = false</ID>
+    <ID>UnusedPrivateMember:ConsultasViewModel.kt$ConsultasViewModel$private fun carregarLocais()</ID>
+    <ID>UnusedPrivateMember:ConsultasViewModel.kt$ConsultasViewModel$private fun handleError(e: Exception)</ID>
+    <ID>UnusedPrivateMember:ConsultasViewModel.kt$ConsultasViewModel$private suspend fun atualizarListaClientes()</ID>
+    <ID>UnusedPrivateMember:EditarOperacaoDialog.kt$EditarOperacaoDialog$private fun MaterialButton.insets(value: Int)</ID>
+    <ID>UnusedPrivateMember:EditarOperacaoDialog.kt$EditarOperacaoDialog$private fun resetPromoContadores()</ID>
+    <ID>UnusedPrivateMember:EditarOperacaoDialog.kt$EditarOperacaoDialog$private fun resetVendaContadores()</ID>
+    <ID>UnusedPrivateMember:EditarOperacaoDialog.kt$EditarOperacaoDialog$private fun setupButtonBase(button: MaterialButton)</ID>
+    <ID>UnusedPrivateMember:VendasViewModel.kt$VendasViewModel$private fun logHieraquiaClientes(localId: Long, clientes: List&lt;Cliente&gt;)</ID>
+    <ID>UnusedPrivateProperty:ConsultasViewModel.kt$ConsultasViewModel$private val configuracoes: StateFlow&lt;Configuracoes?&gt; = _configuracoes</ID>
+    <ID>UnusedPrivateProperty:OpcoesExtratoDialog.kt$OpcoesExtratoDialog$private val cliente: Cliente</ID>
+    <ID>UnusedPrivateProperty:OpcoesExtratoDialog.kt$OpcoesExtratoDialog$private val dateFormatter = SimpleDateFormat("dd/MM/yy", Locale.getDefault())</ID>
+    <ID>UseCheckOrError:ConsultasViewModel.kt$ConsultasViewModel$throw IllegalStateException("Modo de operação inválido")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Configurações não encontradas")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Erro ao processar pagamento")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Estado do cliente não encontrado")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Hierarquia de locais inválida")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Hierarquia de locais inválida: nível do filho não é maior que do pai")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Local não selecionado")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Local principal não encontrado")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Modo de operação inválido")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Tipo de transação não selecionado")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Valor do pagamento inválido")</ID>
+    <ID>UseCheckOrError:VendasViewModel.kt$VendasViewModel$throw IllegalStateException("Valor do pagamento maior que o saldo devedor")</ID>
+  </CurrentIssues>
+</SmellBaseline>

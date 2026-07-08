@@ -27,20 +27,22 @@ class MainActivity : AppCompatActivity() {
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
 
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+        val navHostFragment =
+            supportFragmentManager
+                .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHostFragment.navController
 
         // Configurar destinos de nível superior
-        appBarConfiguration = AppBarConfiguration(
-            setOf(
-                R.id.vendasFragment,
-                R.id.consultasFragment,
-                R.id.balancoCaixaFragment,
-                R.id.historicoVendasFragment,
-                R.id.configuracoesFragment
+        appBarConfiguration =
+            AppBarConfiguration(
+                setOf(
+                    R.id.vendasFragment,
+                    R.id.consultasFragment,
+                    R.id.balancoCaixaFragment,
+                    R.id.historicoVendasFragment,
+                    R.id.configuracoesFragment,
+                ),
             )
-        )
 
         // Setup da ActionBar e BottomNavigation
         setupActionBarWithNavController(navController, appBarConfiguration)
@@ -48,14 +50,16 @@ class MainActivity : AppCompatActivity() {
 
         // Monitorar mudanças de destino e manter visibilidade do menu
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            binding.bottomNavigation.visibility = when (destination.id) {
-                R.id.vendasFragment,
-                R.id.consultasFragment,
-                R.id.balancoCaixaFragment,
-                R.id.historicoVendasFragment,
-                R.id.configuracoesFragment -> View.VISIBLE
-                else -> View.GONE
-            }
+            binding.bottomNavigation.visibility =
+                when (destination.id) {
+                    R.id.vendasFragment,
+                    R.id.consultasFragment,
+                    R.id.balancoCaixaFragment,
+                    R.id.historicoVendasFragment,
+                    R.id.configuracoesFragment,
+                    -> View.VISIBLE
+                    else -> View.GONE
+                }
             Log.d("Navigation", "Navigated to destination: ${destination.label}")
         }
 
@@ -65,7 +69,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onSupportNavigateUp(): Boolean {
-        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
-    }
+    override fun onSupportNavigateUp(): Boolean =
+        navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
 }

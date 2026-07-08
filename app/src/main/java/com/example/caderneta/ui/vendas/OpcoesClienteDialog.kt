@@ -20,9 +20,8 @@ import kotlinx.coroutines.launch
 class OpcoesClienteDialog(
     private val cliente: Cliente,
     private val onEditarClick: (Cliente) -> Unit,
-    private val onExcluirClick: (Cliente) -> Unit
+    private val onExcluirClick: (Cliente) -> Unit,
 ) : DialogFragment() {
-
     companion object {
         const val DIALOG_TAG = "OpcoesClienteDialog"
     }
@@ -33,9 +32,11 @@ class OpcoesClienteDialog(
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogOpcoesClienteBinding.inflate(LayoutInflater.from(context))
 
-        return AlertDialog.Builder(requireContext(),
-            com.google.android.material.R.style.ThemeOverlay_MaterialComponents_Dialog_Alert)
-            .setTitle(cliente.nome)
+        return AlertDialog
+            .Builder(
+                requireContext(),
+                com.google.android.material.R.style.ThemeOverlay_MaterialComponents_Dialog_Alert,
+            ).setTitle(cliente.nome)
             .setView(binding.root)
             .setNegativeButton("Fechar") { _, _ -> dismiss() }
             .create()
@@ -47,12 +48,13 @@ class OpcoesClienteDialog(
     private suspend fun getLocalMaisEspecifico(): Local? {
         val localRepository = (requireActivity().application as CadernetaApplication).localRepository
 
-        val locais = listOfNotNull(
-            localRepository.getLocalById(cliente.localId),
-            cliente.sublocal1Id?.let { localRepository.getLocalById(it) },
-            cliente.sublocal2Id?.let { localRepository.getLocalById(it) },
-            cliente.sublocal3Id?.let { localRepository.getLocalById(it) }
-        )
+        val locais =
+            listOfNotNull(
+                localRepository.getLocalById(cliente.localId),
+                cliente.sublocal1Id?.let { localRepository.getLocalById(it) },
+                cliente.sublocal2Id?.let { localRepository.getLocalById(it) },
+                cliente.sublocal3Id?.let { localRepository.getLocalById(it) },
+            )
 
         return locais.lastOrNull { local ->
             locais.takeWhile { it != local }.zipWithNext().all { (parent, child) ->
@@ -73,24 +75,26 @@ class OpcoesClienteDialog(
                                 ConsultasFragmentArgs(
                                     clienteId = cliente.id,
                                     localId = localMaisEspecifico.id,
-                                    filtroNomeCliente = cliente.nome
-                                ).toBundle()
+                                    filtroNomeCliente = cliente.nome,
+                                ).toBundle(),
                             )
                             dismiss()
                         } else {
-                            Snackbar.make(
-                                requireView(),
-                                "Não foi possível determinar o local do cliente",
-                                Snackbar.LENGTH_LONG
-                            ).show()
+                            Snackbar
+                                .make(
+                                    requireView(),
+                                    "Não foi possível determinar o local do cliente",
+                                    Snackbar.LENGTH_LONG,
+                                ).show()
                         }
                     } catch (e: Exception) {
                         Log.e("OpcoesClienteDialog", "Erro ao navegar", e)
-                        Snackbar.make(
-                            requireView(),
-                            "Erro ao abrir consulta: ${e.message}",
-                            Snackbar.LENGTH_LONG
-                        ).show()
+                        Snackbar
+                            .make(
+                                requireView(),
+                                "Erro ao abrir consulta: ${e.message}",
+                                Snackbar.LENGTH_LONG,
+                            ).show()
                     }
                 }
             }
@@ -107,14 +111,14 @@ class OpcoesClienteDialog(
     }
 
     private fun showConfirmacaoExclusao() {
-        AlertDialog.Builder(requireContext())
+        AlertDialog
+            .Builder(requireContext())
             .setTitle("Excluir Cliente")
             .setMessage("Tem certeza que deseja excluir ${cliente.nome}?")
             .setPositiveButton("Excluir") { _, _ ->
                 onExcluirClick(cliente)
                 dismiss()
-            }
-            .setNegativeButton("Cancelar", null)
+            }.setNegativeButton("Cancelar", null)
             .show()
     }
 

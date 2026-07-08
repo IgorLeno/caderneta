@@ -1,6 +1,11 @@
 package com.example.caderneta.data.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.example.caderneta.data.entity.Local
 import kotlinx.coroutines.flow.Flow
 
@@ -23,7 +28,4 @@ interface LocalDao {
 
     @Query("SELECT * FROM locais WHERE nome LIKE :query")
     suspend fun buscarLocais(query: String): List<Local>
-
-    @Query("UPDATE locais SET isExpanded = :isExpanded WHERE id = :id")
-    suspend fun updateExpansionState(id: Long, isExpanded: Boolean)
 }

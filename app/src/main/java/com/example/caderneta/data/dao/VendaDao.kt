@@ -1,6 +1,11 @@
 package com.example.caderneta.data.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.example.caderneta.data.entity.Venda
 import kotlinx.coroutines.flow.Flow
 import java.util.Date
@@ -29,20 +34,43 @@ interface VendaDao {
     fun getVendasByLocal(localId: Long): Flow<List<Venda>>
 
     @Query("SELECT * FROM vendas WHERE data BETWEEN :startDate AND :endDate")
-    fun getVendasByDateRange(startDate: Date, endDate: Date): Flow<List<Venda>>
+    fun getVendasByDateRange(
+        startDate: Date,
+        endDate: Date,
+    ): Flow<List<Venda>>
 
     @Query("SELECT * FROM vendas WHERE clienteId = :clienteId AND data BETWEEN :startDate AND :endDate")
-    fun getVendasByClienteAndDateRange(clienteId: Long, startDate: Date, endDate: Date): Flow<List<Venda>>
+    fun getVendasByClienteAndDateRange(
+        clienteId: Long,
+        startDate: Date,
+        endDate: Date,
+    ): Flow<List<Venda>>
 
-    @Query("SELECT SUM(valor) FROM vendas WHERE data BETWEEN :startDate AND :endDate")
-    fun getTotalVendasByDateRange(startDate: Date, endDate: Date): Flow<Double?>
+    @Query("SELECT SUM(valorCentavos) FROM vendas WHERE data BETWEEN :startDate AND :endDate")
+    fun getTotalVendasByDateRange(
+        startDate: Date,
+        endDate: Date,
+    ): Flow<Long?>
 
-    @Query("SELECT SUM(valor) FROM vendas WHERE clienteId = :clienteId AND data BETWEEN :startDate AND :endDate")
-    fun getTotalVendasByClienteAndDateRange(clienteId: Long, startDate: Date, endDate: Date): Flow<Double?>
+    @Query(
+        "SELECT SUM(valorCentavos) FROM vendas " +
+            "WHERE clienteId = :clienteId AND data BETWEEN :startDate AND :endDate",
+    )
+    fun getTotalVendasByClienteAndDateRange(
+        clienteId: Long,
+        startDate: Date,
+        endDate: Date,
+    ): Flow<Long?>
 
     @Query("SELECT SUM(quantidadeSalgados) FROM vendas WHERE data BETWEEN :startDate AND :endDate")
-    fun getTotalSalgadosByDateRange(startDate: Date, endDate: Date): Flow<Int?>
+    fun getTotalSalgadosByDateRange(
+        startDate: Date,
+        endDate: Date,
+    ): Flow<Int?>
 
     @Query("SELECT SUM(quantidadeSucos) FROM vendas WHERE data BETWEEN :startDate AND :endDate")
-    fun getTotalSucosByDateRange(startDate: Date, endDate: Date): Flow<Int?>
+    fun getTotalSucosByDateRange(
+        startDate: Date,
+        endDate: Date,
+    ): Flow<Int?>
 }

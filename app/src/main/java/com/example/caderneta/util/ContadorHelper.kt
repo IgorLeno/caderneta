@@ -5,7 +5,9 @@ import android.widget.ImageButton
 import android.widget.TextView
 import com.example.caderneta.R
 
-class ContadorHelper(view: View) {
+class ContadorHelper(
+    view: View,
+) {
     private val btnMenos = view.findViewById<ImageButton>(R.id.btn_menos)
     private val btnMais = view.findViewById<ImageButton>(R.id.btn_mais)
     private val tvQuantidade = view.findViewById<TextView>(R.id.tv_quantidade)

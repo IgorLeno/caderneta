@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Caderneta</string>
+    <string name="navigation_drawer_open">Abrir navegação</string>
+    <string name="navigation_drawer_close">Fechar navegação</string>
+    <string name="add_new_local">Adicionar novo local</string>
     <string name="todos_locais">Todos os locais</string>
-</resources> 
+</resources>

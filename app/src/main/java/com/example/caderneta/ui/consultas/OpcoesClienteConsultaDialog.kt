@@ -12,16 +12,16 @@ class OpcoesConsultaClienteDialog(
     private val cliente: Cliente,
     private val onVenderClick: (Cliente) -> Unit,
     private val onEditarClick: (Cliente) -> Unit,
-    private val onExcluirClick: (Cliente) -> Unit
+    private val onExcluirClick: (Cliente) -> Unit,
 ) : DialogFragment() {
-
     private var _binding: DialogOpcoesClienteBinding? = null
     private val binding get() = _binding!!
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogOpcoesClienteBinding.inflate(LayoutInflater.from(context))
 
-        return AlertDialog.Builder(requireContext())
+        return AlertDialog
+            .Builder(requireContext())
             .setTitle(cliente.nome)
             .setView(binding.root)
             .setNegativeButton("Fechar", null)
@@ -53,14 +53,14 @@ class OpcoesConsultaClienteDialog(
     }
 
     private fun showConfirmacaoExclusao() {
-        AlertDialog.Builder(requireContext())
+        AlertDialog
+            .Builder(requireContext())
             .setTitle("Excluir Cliente")
             .setMessage("Tem certeza que deseja excluir ${cliente.nome}?")
             .setPositiveButton("Excluir") { _, _ ->
                 onExcluirClick(cliente)
                 dismiss()
-            }
-            .setNegativeButton("Cancelar", null)
+            }.setNegativeButton("Cancelar", null)
             .show()
     }
 

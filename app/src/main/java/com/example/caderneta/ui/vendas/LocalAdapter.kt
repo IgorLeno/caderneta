@@ -4,12 +4,12 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.caderneta.R
 import com.example.caderneta.data.entity.Local
-import androidx.core.content.ContextCompat
 import com.example.caderneta.databinding.ItemLocalBinding
 
 class LocalAdapter(
@@ -17,12 +17,13 @@ class LocalAdapter(
     private val onAddSubLocal: (Local) -> Unit,
     private val onEditLocal: (Local) -> Unit,
     private val onDeleteLocal: (Local) -> Unit,
-    private val onToggleExpand: (Local) -> Unit
+    private val onToggleExpand: (Local) -> Unit,
 ) : ListAdapter<LocalWithChildren, LocalAdapter.LocalViewHolder>(LocalDiffCallback()) {
-
     private var allLocals: List<LocalWithChildren> = emptyList()
 
-    inner class LocalViewHolder(private val binding: ItemLocalBinding) : RecyclerView.ViewHolder(binding.root) {
+    inner class LocalViewHolder(
+        private val binding: ItemLocalBinding,
+    ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(localWithChildren: LocalWithChildren) {
             val local = localWithChildren.local
             binding.tvNomeLocal.text = local.nome
@@ -41,34 +42,52 @@ class LocalAdapter(
             }
 
             // Define a cor de fundo com base no nível
-            val colorRes = when (local.level) {
-                0 -> R.color.level_0
-                1 -> R.color.level_1
-                2 -> R.color.level_2
-                else -> R.color.level_3
-            }
+            val colorRes =
+                when (local.level) {
+                    0 -> R.color.level_0
+                    1 -> R.color.level_1
+                    2 -> R.color.level_2
+                    else -> R.color.level_3
+                }
             itemView.setBackgroundColor(ContextCompat.getColor(itemView.context, colorRes))
 
-            Log.d("LocalAdapter", "Binding local: ${local.id}:${local.nome}(${local.parentId}), hasChildren: ${localWithChildren.hasChildren}, isExpanded: ${local.isExpanded}")
+            Log.d(
+                "LocalAdapter",
+                "Binding local: ${local.id}:${local.nome}(${local.parentId}), " +
+                    "hasChildren: ${localWithChildren.hasChildren}, isExpanded: ${local.isExpanded}",
+            )
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): LocalViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): LocalViewHolder {
         val binding = ItemLocalBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return LocalViewHolder(binding)
     }
 
-    override fun onBindViewHolder(holder: LocalViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: LocalViewHolder,
+        position: Int,
+    ) {
         holder.bind(getItem(position))
     }
 
     fun updateLocais(locais: List<Local>) {
-        allLocals = locais.map { local ->
-            LocalWithChildren(local, locais.any { it.parentId == local.id })
-        }
+        allLocals =
+            locais.map { local ->
+                LocalWithChildren(local, locais.any { it.parentId == local.id })
+            }
         val flattenedList = flattenLocals(allLocals)
-        Log.d("LocalAdapter", "Atualizando lista de locais. Tamanho original: ${locais.size}, Tamanho achatado: ${flattenedList.size}")
-        Log.d("LocalAdapter", "Lista achatada: ${flattenedList.map { "${it.local.id}:${it.local.nome}(${it.local.parentId})" }}")
+        Log.d(
+            "LocalAdapter",
+            "Atualizando lista de locais. Tamanho original: ${locais.size}, Tamanho achatado: ${flattenedList.size}",
+        )
+        Log.d(
+            "LocalAdapter",
+            "Lista achatada: ${flattenedList.map { "${it.local.id}:${it.local.nome}(${it.local.parentId})" }}",
+        )
         submitList(flattenedList)
     }
 
@@ -83,11 +102,17 @@ class LocalAdapter(
             }
         }
 
-        Log.d("LocalAdapter", "Flattened locals: ${result.map { "${it.local.id}:${it.local.nome}(${it.local.parentId})" }}")
+        Log.d(
+            "LocalAdapter",
+            "Flattened locals: ${result.map { "${it.local.id}:${it.local.nome}(${it.local.parentId})" }}",
+        )
         return result
     }
 
-    private fun getAllChildrenRecursive(parent: LocalWithChildren, allLocals: List<LocalWithChildren>): List<LocalWithChildren> {
+    private fun getAllChildrenRecursive(
+        parent: LocalWithChildren,
+        allLocals: List<LocalWithChildren>,
+    ): List<LocalWithChildren> {
         val result = mutableListOf<LocalWithChildren>()
         val directChildren = allLocals.filter { it.local.parentId == parent.local.id }
         for (child in directChildren) {
@@ -100,14 +125,19 @@ class LocalAdapter(
     }
 }
 
-data class LocalWithChildren(val local: Local, val hasChildren: Boolean)
+data class LocalWithChildren(
+    val local: Local,
+    val hasChildren: Boolean,
+)
 
 class LocalDiffCallback : DiffUtil.ItemCallback<LocalWithChildren>() {
-    override fun areItemsTheSame(oldItem: LocalWithChildren, newItem: LocalWithChildren): Boolean {
-        return oldItem.local.id == newItem.local.id
-    }
+    override fun areItemsTheSame(
+        oldItem: LocalWithChildren,
+        newItem: LocalWithChildren,
+    ): Boolean = oldItem.local.id == newItem.local.id
 
-    override fun areContentsTheSame(oldItem: LocalWithChildren, newItem: LocalWithChildren): Boolean {
-        return oldItem == newItem
-    }
+    override fun areContentsTheSame(
+        oldItem: LocalWithChildren,
+        newItem: LocalWithChildren,
+    ): Boolean = oldItem == newItem
 }

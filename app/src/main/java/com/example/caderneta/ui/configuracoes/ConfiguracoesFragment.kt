@@ -11,6 +11,8 @@ import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.databinding.FragmentConfiguracoesBinding
 import com.example.caderneta.repository.ConfiguracoesRepository
+import com.example.caderneta.util.centavosParaTextoDecimal
+import com.example.caderneta.util.decimalParaCentavos
 import com.example.caderneta.viewmodel.ConfiguracoesViewModel
 import com.example.caderneta.viewmodel.ConfiguracoesViewModelFactory
 import com.google.android.material.snackbar.Snackbar
@@ -18,24 +20,30 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class ConfiguracoesFragment : Fragment() {
-
     private var _binding: FragmentConfiguracoesBinding? = null
     private val binding get() = _binding!!
 
     private val viewModel: ConfiguracoesViewModel by viewModels {
         ConfiguracoesViewModelFactory(
             ConfiguracoesRepository(
-                (requireActivity().application as CadernetaApplication).database.configuracoesDao()
-            )
+                (requireActivity().application as CadernetaApplication).database.configuracoesDao(),
+            ),
         )
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
         _binding = FragmentConfiguracoesBinding.inflate(inflater, container, false)
         return binding.root
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
         super.onViewCreated(view, savedInstanceState)
 
         setupObservers()
@@ -68,47 +76,85 @@ class ConfiguracoesFragment : Fragment() {
 
     private fun updateUI(configuracoes: Configuracoes) {
         binding.apply {
-            etSalgadoVista.setText(configuracoes.precoSalgadoVista.toString())
-            etSalgadoPrazo.setText(configuracoes.precoSalgadoPrazo.toString())
-            etSucoVista.setText(configuracoes.precoSucoVista.toString())
-            etSucoPrazo.setText(configuracoes.precoSucoPrazo.toString())
+            etSalgadoVista.setText(configuracoes.precoSalgadoVistaCentavos.centavosParaTextoDecimal())
+            etSalgadoPrazo.setText(configuracoes.precoSalgadoPrazoCentavos.centavosParaTextoDecimal())
+            etSucoVista.setText(configuracoes.precoSucoVistaCentavos.centavosParaTextoDecimal())
+            etSucoPrazo.setText(configuracoes.precoSucoPrazoCentavos.centavosParaTextoDecimal())
             switchPromocoes.isChecked = configuracoes.promocoesAtivadas
             etPromo1Nome.setText(configuracoes.promo1Nome)
             etPromo1Salgados.setText(configuracoes.promo1Salgados.toString())
             etPromo1Sucos.setText(configuracoes.promo1Sucos.toString())
-            etPromo1Vista.setText(configuracoes.promo1Vista.toString())
-            etPromo1Prazo.setText(configuracoes.promo1Prazo.toString())
+            etPromo1Vista.setText(configuracoes.promo1VistaCentavos.centavosParaTextoDecimal())
+            etPromo1Prazo.setText(configuracoes.promo1PrazoCentavos.centavosParaTextoDecimal())
             etPromo2Nome.setText(configuracoes.promo2Nome)
             etPromo2Salgados.setText(configuracoes.promo2Salgados.toString())
             etPromo2Sucos.setText(configuracoes.promo2Sucos.toString())
-            etPromo2Vista.setText(configuracoes.promo2Vista.toString())
-            etPromo2Prazo.setText(configuracoes.promo2Prazo.toString())
+            etPromo2Vista.setText(configuracoes.promo2VistaCentavos.centavosParaTextoDecimal())
+            etPromo2Prazo.setText(configuracoes.promo2PrazoCentavos.centavosParaTextoDecimal())
         }
     }
 
+    @Suppress("LongMethod")
     private fun setupListeners() {
         binding.switchPromocoes.setOnCheckedChangeListener { _, isChecked ->
             viewModel.setPromocoesAtivadas(isChecked)
         }
 
         binding.btnSalvarConfiguracoes.setOnClickListener {
-            val novasConfiguracoes = Configuracoes(
-                precoSalgadoVista = binding.etSalgadoVista.text.toString().toDoubleOrNull() ?: 0.0,
-                precoSalgadoPrazo = binding.etSalgadoPrazo.text.toString().toDoubleOrNull() ?: 0.0,
-                precoSucoVista = binding.etSucoVista.text.toString().toDoubleOrNull() ?: 0.0,
-                precoSucoPrazo = binding.etSucoPrazo.text.toString().toDoubleOrNull() ?: 0.0,
-                promocoesAtivadas = binding.switchPromocoes.isChecked,
-                promo1Nome = binding.etPromo1Nome.text.toString(),
-                promo1Salgados = binding.etPromo1Salgados.text.toString().toIntOrNull() ?: 0,
-                promo1Sucos = binding.etPromo1Sucos.text.toString().toIntOrNull() ?: 0,
-                promo1Vista = binding.etPromo1Vista.text.toString().toDoubleOrNull() ?: 0.0,
-                promo1Prazo = binding.etPromo1Prazo.text.toString().toDoubleOrNull() ?: 0.0,
-                promo2Nome = binding.etPromo2Nome.text.toString(),
-                promo2Salgados = binding.etPromo2Salgados.text.toString().toIntOrNull() ?: 0,
-                promo2Sucos = binding.etPromo2Sucos.text.toString().toIntOrNull() ?: 0,
-                promo2Vista = binding.etPromo2Vista.text.toString().toDoubleOrNull() ?: 0.0,
-                promo2Prazo = binding.etPromo2Prazo.text.toString().toDoubleOrNull() ?: 0.0
-            )
+            val novasConfiguracoes =
+                Configuracoes(
+                    precoSalgadoVistaCentavos =
+                        binding.etSalgadoVista.text
+                            .toString()
+                            .decimalParaCentavos() ?: 0,
+                    precoSalgadoPrazoCentavos =
+                        binding.etSalgadoPrazo.text
+                            .toString()
+                            .decimalParaCentavos() ?: 0,
+                    precoSucoVistaCentavos =
+                        binding.etSucoVista.text
+                            .toString()
+                            .decimalParaCentavos() ?: 0,
+                    precoSucoPrazoCentavos =
+                        binding.etSucoPrazo.text
+                            .toString()
+                            .decimalParaCentavos() ?: 0,
+                    promocoesAtivadas = binding.switchPromocoes.isChecked,
+                    promo1Nome = binding.etPromo1Nome.text.toString(),
+                    promo1Salgados =
+                        binding.etPromo1Salgados.text
+                            .toString()
+                            .toIntOrNull() ?: 0,
+                    promo1Sucos =
+                        binding.etPromo1Sucos.text
+                            .toString()
+                            .toIntOrNull() ?: 0,
+                    promo1VistaCentavos =
+                        binding.etPromo1Vista.text
+                            .toString()
+                            .decimalParaCentavos() ?: 0,
+                    promo1PrazoCentavos =
+                        binding.etPromo1Prazo.text
+                            .toString()
+                            .decimalParaCentavos() ?: 0,
+                    promo2Nome = binding.etPromo2Nome.text.toString(),
+                    promo2Salgados =
+                        binding.etPromo2Salgados.text
+                            .toString()
+                            .toIntOrNull() ?: 0,
+                    promo2Sucos =
+                        binding.etPromo2Sucos.text
+                            .toString()
+                            .toIntOrNull() ?: 0,
+                    promo2VistaCentavos =
+                        binding.etPromo2Vista.text
+                            .toString()
+                            .decimalParaCentavos() ?: 0,
+                    promo2PrazoCentavos =
+                        binding.etPromo2Prazo.text
+                            .toString()
+                            .decimalParaCentavos() ?: 0,
+                )
             viewModel.salvarConfiguracoes(novasConfiguracoes)
         }
     }

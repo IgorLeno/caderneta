@@ -29,7 +29,6 @@ import java.text.NumberFormat
 import java.util.Locale
 
 class HistoricoVendasFragment : Fragment() {
-
     private var _binding: FragmentHistoricoVendasBinding? = null
     private val binding get() = _binding!!
 
@@ -37,19 +36,26 @@ class HistoricoVendasFragment : Fragment() {
         HistoricoVendasViewModelFactory(
             (requireActivity().application as CadernetaApplication).vendaRepository,
             (requireActivity().application as CadernetaApplication).clienteRepository,
-            (requireActivity().application as CadernetaApplication).localRepository
+            (requireActivity().application as CadernetaApplication).localRepository,
         )
     }
 
     private lateinit var detalhesVendasAdapter: DetalhesVendasAdapter
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
         _binding = FragmentHistoricoVendasBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
         super.onViewCreated(view, savedInstanceState)
 
         setupTabLayout()
@@ -60,17 +66,20 @@ class HistoricoVendasFragment : Fragment() {
     }
 
     private fun setupTabLayout() {
-        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab?) {
-                when (tab?.position) {
-                    0 -> viewModel.setPeriodoSelecionado(HistoricoVendasViewModel.Periodo.SEMANAL)
-                    1 -> viewModel.setPeriodoSelecionado(HistoricoVendasViewModel.Periodo.MENSAL)
+        binding.tabLayout.addOnTabSelectedListener(
+            object : TabLayout.OnTabSelectedListener {
+                override fun onTabSelected(tab: TabLayout.Tab?) {
+                    when (tab?.position) {
+                        0 -> viewModel.setPeriodoSelecionado(HistoricoVendasViewModel.Periodo.SEMANAL)
+                        1 -> viewModel.setPeriodoSelecionado(HistoricoVendasViewModel.Periodo.MENSAL)
+                    }
                 }
-            }
 
-            override fun onTabUnselected(tab: TabLayout.Tab?) {}
-            override fun onTabReselected(tab: TabLayout.Tab?) {}
-        })
+                override fun onTabUnselected(tab: TabLayout.Tab?) {}
+
+                override fun onTabReselected(tab: TabLayout.Tab?) {}
+            },
+        )
     }
 
     private fun setupChipGroup() {
@@ -134,56 +143,67 @@ class HistoricoVendasFragment : Fragment() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun atualizarGrafico() {
-        val entries = when (viewModel.periodoSelecionado.value) {
-            HistoricoVendasViewModel.Periodo.SEMANAL -> {
-                viewModel.calcularTotalVendasPorSemana().map { (semana, total) ->
-                    BarEntry(semana.toFloat(), total.toFloat())
+        val entries =
+            when (viewModel.periodoSelecionado.value) {
+                HistoricoVendasViewModel.Periodo.SEMANAL -> {
+                    viewModel.calcularTotalVendasPorSemana().map { (semana, total) ->
+                        BarEntry(semana.toFloat(), total.toFloat() / 100f)
+                    }
+                }
+                HistoricoVendasViewModel.Periodo.MENSAL -> {
+                    viewModel.calcularTotalVendasPorMes().map { (mes, total) ->
+                        BarEntry(mes.toFloat(), total.toFloat() / 100f)
+                    }
                 }
             }
-            HistoricoVendasViewModel.Periodo.MENSAL -> {
-                viewModel.calcularTotalVendasPorMes().map { (mes, total) ->
-                    BarEntry(mes.toFloat(), total.toFloat())
-                }
-            }
-        }
 
         val color = ContextCompat.getColor(requireContext(), R.color.primary_color)
 
-        val dataSet = BarDataSet(entries, "Vendas").apply {
-            setColors(color)
-            valueFormatter = CurrencyValueFormatter()
-        }
+        val dataSet =
+            BarDataSet(entries, "Vendas").apply {
+                setColors(color)
+                valueFormatter = CurrencyValueFormatter()
+            }
 
-        val barData = BarData(dataSet).apply {
-            barWidth = 0.9f
-        }
+        val barData =
+            BarData(dataSet).apply {
+                barWidth = 0.9f
+            }
 
         binding.chartVendas.apply {
             data = barData
-            xAxis.valueFormatter = when (viewModel.periodoSelecionado.value) {
-                HistoricoVendasViewModel.Periodo.SEMANAL -> WeekValueFormatter()
-                HistoricoVendasViewModel.Periodo.MENSAL -> MonthValueFormatter()
-            }
+            xAxis.valueFormatter =
+                when (viewModel.periodoSelecionado.value) {
+                    HistoricoVendasViewModel.Periodo.SEMANAL -> WeekValueFormatter()
+                    HistoricoVendasViewModel.Periodo.MENSAL -> MonthValueFormatter()
+                }
             invalidate()
         }
     }
 
     private fun atualizarDetalhesVendas() {
-        val detalhes = when (viewModel.agrupamentoSelecionado.value) {
-            HistoricoVendasViewModel.Agrupamento.PESSOA -> viewModel.agruparVendasPorPessoa()
-            HistoricoVendasViewModel.Agrupamento.PREDIO -> viewModel.agruparVendasPorPredio()
-        }
+        val detalhes =
+            when (viewModel.agrupamentoSelecionado.value) {
+                HistoricoVendasViewModel.Agrupamento.PESSOA -> viewModel.agruparVendasPorPessoa()
+                HistoricoVendasViewModel.Agrupamento.PREDIO -> viewModel.agruparVendasPorPredio()
+            }
 
-        val detalhesList = detalhes.map { (id, vendas) ->
-            DetalheVenda(
-                nome = when (viewModel.agrupamentoSelecionado.value) {
-                    HistoricoVendasViewModel.Agrupamento.PESSOA -> viewModel.getClienteById(id)?.nome ?: "Cliente Desconhecido"
-                    HistoricoVendasViewModel.Agrupamento.PREDIO -> viewModel.getLocalById(id)?.nome ?: "Local Desconhecido"
-                },
-                totalVendas = vendas.sumOf { it.valor },
-                quantidadeVendas = vendas.size
-            )
-        }
+        val detalhesList =
+            detalhes.map { (id, vendas) ->
+                DetalheVenda(
+                    nome =
+                        when (viewModel.agrupamentoSelecionado.value) {
+                            HistoricoVendasViewModel.Agrupamento.PESSOA ->
+                                viewModel.getClienteById(id)?.nome
+                                    ?: "Cliente Desconhecido"
+                            HistoricoVendasViewModel.Agrupamento.PREDIO ->
+                                viewModel.getLocalById(id)?.nome
+                                    ?: "Local Desconhecido"
+                        },
+                    totalVendasCentavos = vendas.sumOf { it.valorCentavos },
+                    quantidadeVendas = vendas.size,
+                )
+            }
 
         detalhesVendasAdapter.submitList(detalhesList)
     }
@@ -195,6 +215,7 @@ class HistoricoVendasFragment : Fragment() {
 
     inner class CurrencyValueFormatter : ValueFormatter() {
         private val format = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
+
         override fun getFormattedValue(value: Float): String = format.format(value)
     }
 
@@ -204,6 +225,7 @@ class HistoricoVendasFragment : Fragment() {
 
     inner class MonthValueFormatter : ValueFormatter() {
         private val months = arrayOf("Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez")
+
         override fun getFormattedValue(value: Float): String = months[value.toInt() - 1]
     }
 }
