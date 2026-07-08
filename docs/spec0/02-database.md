@@ -1,49 +1,22 @@
-# SPEC 0 - Etapa 2: banco de dados seguro
+# Banco de dados
 
-Data: 2026-07-07
+Data: 2026-07-08
 
-## Implementado
+## Estado autoritativo
 
-- Room atualizado para `version = 6` com `exportSchema = true`.
-- Schema v6 exportado em `app/schemas/com.example.caderneta.data.AppDatabase/6.json`.
-- `fallbackToDestructiveMigration()` removido para versões recuperáveis.
-- Migração `MIGRATION_5_6` adicionada.
-- Dinheiro migrado de `REAL` para centavos `INTEGER` em vendas, operações, contas e configurações.
-- `Venda.transacao` e `Operacao.tipoOperacao` normalizados para enums persistidos como texto canônico.
-- Produto/ItemVenda removidos do schema v6 e da DI, mantendo drop das tabelas na migração.
-- `Cliente` e `Local` ganharam `arquivado` para soft-delete.
-- `Venda.localId` passou a aceitar `NULL` para pagamentos sem local válido.
-- `Operacao.clienteId` passou a ter FK para clientes.
-- `Conta.saldoCentavos` tratado como cache materializado do livro financeiro.
+O app foi rebaselineado como instalação nova em Room `version = 1` depois da incorporação do SPEC 0. O projeto ainda não entrou em produção, então as migrações legadas v5 -> v6, schemas antigos e fixture de migração foram removidos como peso morto.
 
-## Fixture e teste de migração
+Schema autoritativo: `app/schemas/com.example.caderneta.data.AppDatabase/1.json`.
 
-- Fixture v5 criada em `app/src/androidTest/assets/caderneta_v5_fixture.db`.
-- A fixture contém:
-  - locais com hierarquia válida e um parent órfão;
-  - clientes;
-  - vendas à vista, a prazo, promoção e pagamento;
-  - pagamento legado com `localId = 0`;
-  - operação órfã intencional;
-  - contas e configurações em `Double`.
-- Teste instrumentado adicionado em `Migration5To6Test`.
-- O teste valida:
-  - versão final 6;
-  - contagens preservadas;
-  - operação órfã removida;
-  - tabelas mortas removidas;
-  - `PRAGMA foreign_key_check` sem linhas;
-  - strings canônicas;
-  - conversão de centavos;
-  - saldo de `contas` equivalente ao saldo derivado de `vendas`.
+## Implicação para builds de desenvolvimento
 
-## Verificação local
+Instalações locais antigas com banco v6 devem ser desinstaladas antes de instalar esta branch. Como o número de versão foi rebaixado para v1 e não há usuários em produção, não há caminho de downgrade/migração para bancos de desenvolvimento antigos.
 
-- `./gradlew assembleDebug testDebugUnitTest lint detekt ktlintCheck` passou.
-- `./gradlew :app:compileDebugAndroidTestKotlin` passou.
-- Teste instrumentado não executado localmente: `adb` não está disponível no PATH neste ambiente.
+## Decisões mantidas do SPEC 0
 
-## Observações
-
-- `ktlint_standard_backing-property-naming` foi desabilitada no `.editorconfig`; a regra conflita com o padrão Android `_binding` privado já usado pelo projeto.
-- O lint ainda reporta warnings legados, mas nenhum erro após a correção de traduções em `values-pt`.
+- Dinheiro é persistido como `INTEGER` em centavos.
+- Transações e tipos de operação usam enums canônicos persistidos como texto.
+- `Cliente` e `Local` usam soft-delete por `arquivado`.
+- `Conta.saldoCentavos` é cache materializado derivado do ledger financeiro.
+- `Venda.localId` pode ser `NULL` para pagamentos sem local.
+- FKs protegem histórico financeiro contra exclusões físicas indevidas.

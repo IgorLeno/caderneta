@@ -28,7 +28,7 @@ import com.example.caderneta.util.DateConverter
         Operacao::class,
         Conta::class,
     ],
-    version = 6,
+    version = 1,
     exportSchema = true,
 )
 @TypeConverters(DateConverter::class)
@@ -51,20 +51,13 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase =
             instance ?: synchronized(this) {
-                // Sem fallbackToDestructiveMigration geral: dados financeiros
-                // nunca podem ser descartados por falta de migração — é
-                // preferível falhar alto e corrigir. Exceção documentada:
-                // v1-v4 não têm schema exportado nem instalação conhecida em
-                // campo; apenas essas versões são recriadas.
                 val database =
                     Room
                         .databaseBuilder(
                             context.applicationContext,
                             AppDatabase::class.java,
                             "caderneta_database",
-                        ).addMigrations(MIGRATION_5_6)
-                        .fallbackToDestructiveMigrationFrom(true, 1, 2, 3, 4)
-                        .build()
+                        ).build()
                 instance = database
                 database
             }
