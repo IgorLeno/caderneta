@@ -10,6 +10,7 @@ import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
+import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -97,6 +98,7 @@ class HistoricoVendasViewModel(
                         .first()
                         .filter { it.transacao != TransacaoVenda.PAGAMENTO }
             } catch (e: Exception) {
+                e.rethrowCancellation()
                 _error.value = "Erro ao carregar histórico de vendas: ${e.message}"
             } finally {
                 _isLoading.value = false
@@ -110,6 +112,7 @@ class HistoricoVendasViewModel(
                 clientes = clienteRepository.getAllClientes().first().associateBy { it.id }
                 locais = localRepository.getAllLocais().first().associateBy { it.id }
             } catch (e: Exception) {
+                e.rethrowCancellation()
                 _error.value = "Erro ao carregar clientes e locais: ${e.message}"
             }
         }

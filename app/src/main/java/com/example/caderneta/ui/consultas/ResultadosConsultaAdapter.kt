@@ -22,6 +22,7 @@ import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.ItemResultadoConsultaBinding
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.util.centavosParaReais
+import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -162,6 +163,7 @@ class ResultadosConsultaAdapter(
                                     onLocalClick(local.id)
                                 }
                             } catch (e: Exception) {
+                                e.rethrowCancellation()
                                 Log.e("ResultadosConsultaAdapter", "Erro ao navegar para vendas", e)
                             }
                         }
@@ -264,7 +266,8 @@ class ResultadosConsultaAdapter(
                         binding.tvLocalHierarquia.text = locais.joinToString(" > ")
                     }
                 } catch (e: Exception) {
-                    Log.e("ResultadosConsultaAdapter", "Erro ao buscar hierarquia: ${e.message}")
+                    e.rethrowCancellation()
+                    Log.e("ResultadosConsultaAdapter", "Erro ao buscar hierarquia", e)
                     withContext(Dispatchers.Main) {
                         binding.tvLocalHierarquia.text = "Local não disponível"
                     }

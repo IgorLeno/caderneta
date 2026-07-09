@@ -12,9 +12,12 @@ import androidx.lifecycle.lifecycleScope
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.DialogOpcoesExtratoBinding
+import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class OpcoesExtratoDialog(
     private val venda: Venda,
@@ -77,6 +80,7 @@ class OpcoesExtratoDialog(
                             dismiss()
                         }
                     } catch (e: Exception) {
+                        e.rethrowCancellation()
                         Log.e(TAG, "Erro ao atualizar data", e)
                         showFeedback("Erro ao atualizar data: ${e.message}", isError = true)
                     }
@@ -106,6 +110,7 @@ class OpcoesExtratoDialog(
                             dismiss()
                         }
                     } catch (e: Exception) {
+                        e.rethrowCancellation()
                         Log.e(TAG, "Erro ao excluir operação", e)
                         showFeedback("Erro ao excluir operação: ${e.message}", isError = true)
                     }

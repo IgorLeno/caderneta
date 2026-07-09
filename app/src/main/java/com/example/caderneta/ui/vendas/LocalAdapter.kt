@@ -1,6 +1,5 @@
 package com.example.caderneta.ui.vendas
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -50,12 +49,6 @@ class LocalAdapter(
                     else -> R.color.level_3
                 }
             itemView.setBackgroundColor(ContextCompat.getColor(itemView.context, colorRes))
-
-            Log.d(
-                "LocalAdapter",
-                "Binding local: ${local.id}:${local.nome}(${local.parentId}), " +
-                    "hasChildren: ${localWithChildren.hasChildren}, isExpanded: ${local.isExpanded}",
-            )
         }
     }
 
@@ -80,14 +73,6 @@ class LocalAdapter(
                 LocalWithChildren(local, locais.any { it.parentId == local.id })
             }
         val flattenedList = flattenLocals(allLocals)
-        Log.d(
-            "LocalAdapter",
-            "Atualizando lista de locais. Tamanho original: ${locais.size}, Tamanho achatado: ${flattenedList.size}",
-        )
-        Log.d(
-            "LocalAdapter",
-            "Lista achatada: ${flattenedList.map { "${it.local.id}:${it.local.nome}(${it.local.parentId})" }}",
-        )
         submitList(flattenedList)
     }
 
@@ -101,11 +86,6 @@ class LocalAdapter(
                 result.addAll(getAllChildrenRecursive(local, locais))
             }
         }
-
-        Log.d(
-            "LocalAdapter",
-            "Flattened locals: ${result.map { "${it.local.id}:${it.local.nome}(${it.local.parentId})" }}",
-        )
         return result
     }
 

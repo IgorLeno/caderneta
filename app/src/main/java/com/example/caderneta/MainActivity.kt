@@ -1,7 +1,6 @@
 package com.example.caderneta
 
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -60,7 +59,6 @@ class MainActivity : AppCompatActivity() {
                     -> View.VISIBLE
                     else -> View.GONE
                 }
-            Log.d("Navigation", "Navigated to destination: ${destination.label}")
         }
 
         // Listener simplificado para navegação do BottomNav

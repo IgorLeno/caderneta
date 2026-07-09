@@ -26,6 +26,7 @@ import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.FragmentConsultasBinding
 import com.example.caderneta.ui.vendas.NovoClienteDialog
+import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.viewmodel.ConsultasViewModel
 import com.example.caderneta.viewmodel.ConsultasViewModelFactory
 import com.example.caderneta.viewmodel.UiEvento
@@ -102,6 +103,7 @@ class ConsultasFragment : Fragment() {
                     }
                     viewModel.carregarVendasPorCliente(args.clienteId)
                 } catch (e: Exception) {
+                    e.rethrowCancellation()
                     Log.e("ConsultasFragment", "Erro ao processar argumentos", e)
                 }
             }
@@ -135,6 +137,7 @@ class ConsultasFragment : Fragment() {
                     findNavController().navigateUp()
                     true
                 } catch (e: Exception) {
+                    e.rethrowCancellation()
                     Log.e("ConsultasFragment", "Erro na navegação pela toolbar", e)
                     findNavController().navigate(R.id.vendasFragment)
                     true
@@ -269,16 +272,13 @@ class ConsultasFragment : Fragment() {
                 slideOffset: Float,
             ) {}
 
-            override fun onDrawerOpened(drawerView: View) {
-                Log.d("ConsultasFragment", "Menu lateral aberto")
-            }
+            override fun onDrawerOpened(drawerView: View) = Unit
 
             override fun onDrawerClosed(drawerView: View) {
                 binding.navView
                     .findViewById<TextInputEditText>(R.id.et_pesquisar_local)
                     .text
                     ?.clear()
-                Log.d("ConsultasFragment", "Menu lateral fechado")
             }
 
             override fun onDrawerStateChanged(newState: Int) {}
@@ -377,7 +377,6 @@ class ConsultasFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.apply {
             launch {
                 viewModel.locais.collectLatest { locais ->
-                    Log.d("ConsultasFragment", "Atualizando lista de locais: ${locais.size} locais")
                     localAdapter.updateLocais(locais)
                 }
             }
@@ -400,10 +399,6 @@ class ConsultasFragment : Fragment() {
 
             launch {
                 viewModel.vendasPorCliente.collectLatest { vendasPorCliente ->
-                    Log.d(
-                        "ConsultasFragment",
-                        "Atualizando vendas por cliente: ${vendasPorCliente.size} clientes com vendas",
-                    )
                     resultadosAdapter.updateVendasPorCliente(vendasPorCliente)
                 }
             }

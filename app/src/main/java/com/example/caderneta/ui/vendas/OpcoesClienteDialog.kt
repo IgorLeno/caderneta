@@ -14,6 +14,7 @@ import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogOpcoesClienteBinding
 import com.example.caderneta.ui.consultas.ConsultasFragmentArgs
+import com.example.caderneta.util.rethrowCancellation
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 
@@ -88,6 +89,7 @@ class OpcoesClienteDialog(
                                 ).show()
                         }
                     } catch (e: Exception) {
+                        e.rethrowCancellation()
                         Log.e("OpcoesClienteDialog", "Erro ao navegar", e)
                         Snackbar
                             .make(

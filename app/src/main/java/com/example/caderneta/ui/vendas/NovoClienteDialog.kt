@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogNovoClienteBinding
+import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.viewmodel.VendasViewModel
 import kotlinx.coroutines.launch
 
@@ -401,6 +402,7 @@ class NovoClienteDialog(
                     updateAdaptersWithHierarchy(hierarchy)
                 }
             } catch (e: Exception) {
+                e.rethrowCancellation()
                 Log.e("NovoClienteDialog", "Erro ao importar hierarquia", e)
                 Toast.makeText(context, "Erro ao importar local: ${e.message}", Toast.LENGTH_LONG).show()
             }

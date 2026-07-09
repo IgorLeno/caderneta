@@ -30,6 +30,7 @@ import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.util.centavosParaTextoDecimal
 import com.example.caderneta.util.decimalParaCentavos
 import com.example.caderneta.util.parseDinheiro
+import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.util.showErrorToast
 import com.example.caderneta.util.showSuccessToast
 import com.example.caderneta.viewmodel.ClienteState
@@ -125,6 +126,7 @@ class EditarOperacaoDialog(
                                     dialog.dismiss()
                                 }
                             } catch (e: Exception) {
+                                e.rethrowCancellation()
                                 requireContext().showErrorToast("Erro ao atualizar operação: ${e.message}")
                             }
                         }
@@ -696,6 +698,7 @@ class EditarOperacaoDialog(
                     }
                 }
             } catch (e: Exception) {
+                e.rethrowCancellation()
                 Log.e(TAG, "Erro ao atualizar valores", e)
             }
         }
