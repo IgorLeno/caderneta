@@ -37,7 +37,7 @@ class LocalRepositoryTest {
                 .inMemoryDatabaseBuilder(context, AppDatabase::class.java)
                 .setTransactionExecutor(executor)
                 .build()
-        repository = LocalRepository(db.localDao(), db)
+        repository = LocalRepository(db.localDao(), db.clienteDao(), db)
     }
 
     @After
@@ -88,6 +88,7 @@ class LocalRepositoryTest {
 
             assertTrue(arquivado)
             assertTrue(requireNotNull(repository.getLocalById(localId)).arquivado)
+            assertTrue(requireNotNull(db.clienteDao().getClienteById(clienteId)).arquivado)
             assertEquals(
                 1,
                 db
@@ -98,4 +99,84 @@ class LocalRepositoryTest {
             )
             assertEquals(1000L, db.contaDao().getContaByCliente(clienteId)?.saldoCentavos)
         }
+
+    @Test
+    fun arquivarPaiArquivaClientesDaSubarvoreEPreservaOutraArvore() =
+        runTest {
+            val paiId = repository.insertLocal(Local(nome = "Pai"))
+            val filhoId = repository.insertLocal(Local(nome = "Filho", parentId = paiId, level = 1))
+            val netoId = repository.insertLocal(Local(nome = "Neto", parentId = filhoId, level = 2))
+            val outroId = repository.insertLocal(Local(nome = "Outro"))
+            val clientePai = inserirCliente("Cliente pai", paiId)
+            val clienteFilho = inserirCliente("Cliente filho", paiId, sublocal1Id = filhoId)
+            val clienteNeto = inserirCliente("Cliente neto", paiId, sublocal1Id = filhoId, sublocal2Id = netoId)
+            val clienteOutro = inserirCliente("Cliente outro", outroId)
+
+            val arquivado = repository.deleteLocal(requireNotNull(repository.getLocalById(paiId)))
+
+            assertTrue(arquivado)
+            listOf(clientePai, clienteFilho, clienteNeto).forEach { clienteId ->
+                assertTrue(requireNotNull(db.clienteDao().getClienteById(clienteId)).arquivado)
+            }
+            assertFalse(requireNotNull(db.clienteDao().getClienteById(clienteOutro)).arquivado)
+            assertTrue(
+                db
+                    .clienteDao()
+                    .getClientesByLocalHierarchy(paiId)
+                    .first()
+                    .none { !it.arquivado },
+            )
+        }
+
+    @Test
+    fun naoPermaneceClienteAtivoLigadoALocalArquivado() =
+        runTest {
+            val paiId = repository.insertLocal(Local(nome = "Pai"))
+            val filhoId = repository.insertLocal(Local(nome = "Filho", parentId = paiId, level = 1))
+            inserirCliente("Cliente filho", paiId, sublocal1Id = filhoId)
+
+            repository.deleteLocal(requireNotNull(repository.getLocalById(paiId)))
+
+            val locaisArquivados =
+                db
+                    .localDao()
+                    .getAllLocaisList()
+                    .filter { it.arquivado }
+                    .map { it.id }
+                    .toSet()
+            assertTrue(locaisArquivados.containsAll(listOf(paiId, filhoId)))
+            assertTrue(
+                db
+                    .clienteDao()
+                    .getAllClientes()
+                    .first()
+                    .none { cliente ->
+                        !cliente.arquivado &&
+                            listOf(
+                                cliente.localId,
+                                cliente.sublocal1Id,
+                                cliente.sublocal2Id,
+                                cliente.sublocal3Id,
+                            ).any { it in locaisArquivados }
+                    },
+            )
+        }
+
+    private suspend fun inserirCliente(
+        nome: String,
+        localId: Long,
+        sublocal1Id: Long? = null,
+        sublocal2Id: Long? = null,
+        sublocal3Id: Long? = null,
+    ): Long =
+        db.clienteDao().insertCliente(
+            Cliente(
+                nome = nome,
+                telefone = null,
+                localId = localId,
+                sublocal1Id = sublocal1Id,
+                sublocal2Id = sublocal2Id,
+                sublocal3Id = sublocal3Id,
+            ),
+        )
 }

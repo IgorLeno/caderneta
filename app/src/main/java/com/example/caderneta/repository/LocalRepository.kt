@@ -3,6 +3,7 @@ package com.example.caderneta.repository
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.withTransaction
 import com.example.caderneta.data.AppDatabase
+import com.example.caderneta.data.dao.ClienteDao
 import com.example.caderneta.data.dao.LocalDao
 import com.example.caderneta.data.entity.Local
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +12,7 @@ import kotlinx.coroutines.withContext
 
 class LocalRepository(
     private val localDao: LocalDao,
+    private val clienteDao: ClienteDao,
     private val db: AppDatabase,
 ) {
     fun getAllLocais(): Flow<List<Local>> = localDao.getAllLocais()
@@ -40,6 +42,7 @@ class LocalRepository(
                     val ids = subtreeAtiva(local.id, localDao.getAllLocaisList())
                     if (ids.isNotEmpty()) {
                         localDao.arquivarLocais(ids)
+                        clienteDao.arquivarClientesVinculadosAosLocais(ids)
                     }
                 }
                 true

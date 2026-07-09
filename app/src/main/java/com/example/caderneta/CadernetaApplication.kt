@@ -13,7 +13,7 @@ import com.example.caderneta.repository.VendaRepository
 class CadernetaApplication : Application() {
     val database by lazy { AppDatabase.getDatabase(this) }
     val clienteRepository by lazy { ClienteRepository(database.clienteDao()) }
-    val localRepository by lazy { LocalRepository(database.localDao(), database) }
+    val localRepository by lazy { LocalRepository(database.localDao(), database.clienteDao(), database) }
     val vendaRepository by lazy { VendaRepository(database.vendaDao()) }
     val configuracoesRepository by lazy { ConfiguracoesRepository(database.configuracoesDao()) }
     val contaRepository by lazy { ContaRepository(database.contaDao()) }

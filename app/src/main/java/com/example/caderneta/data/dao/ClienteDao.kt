@@ -18,6 +18,21 @@ interface ClienteDao {
     @Update
     suspend fun updateCliente(cliente: Cliente)
 
+    @Query(
+        """
+        UPDATE clientes
+        SET arquivado = 1
+        WHERE arquivado = 0
+        AND (
+            localId IN (:localIds)
+            OR sublocal1Id IN (:localIds)
+            OR sublocal2Id IN (:localIds)
+            OR sublocal3Id IN (:localIds)
+        )
+        """,
+    )
+    suspend fun arquivarClientesVinculadosAosLocais(localIds: List<Long>)
+
     @Delete
     suspend fun deleteCliente(cliente: Cliente)
 
