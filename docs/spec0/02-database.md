@@ -20,3 +20,10 @@ Instalações locais antigas com banco v6 devem ser desinstaladas antes de insta
 - `Conta.saldoCentavos` é cache materializado derivado do ledger financeiro.
 - `Venda.localId` pode ser `NULL` para pagamentos sem local.
 - FKs protegem histórico financeiro contra exclusões físicas indevidas.
+- `Venda.operacaoId` é FK `RESTRICT` para `Operacao.id` e possui índice único,
+  mantendo a relação 1:1 entre lançamento do extrato e operação financeira.
+
+## Workflows de teste
+
+O workflow instrumentado foi removido enquanto não existir `app/src/androidTest`.
+Ele deve ser recriado quando houver testes instrumentados reais para executar no emulador.
