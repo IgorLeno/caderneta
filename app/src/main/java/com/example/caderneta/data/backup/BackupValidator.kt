@@ -1,5 +1,6 @@
 package com.example.caderneta.data.backup
 
+import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.Operacao
@@ -30,10 +31,11 @@ class BackupValidator(
         val vendasPorOperacaoId = snapshot.vendas.associateBy { it.operacaoId }
 
         validarLocais(snapshot, locaisPorId)
-        validarClientes(snapshot, localIds)
+        validarClientes(snapshot, locaisPorId)
         validarOperacoes(snapshot, clienteIds, vendasPorOperacaoId)
         validarVendas(snapshot, localIds, clienteIds, operacaoIds, operacoesPorId)
         validarContas(snapshot, clienteIds)
+        validarSaldosReconstruidos(snapshot)
         validarConfiguracoes(snapshot)
     }
 
@@ -59,15 +61,74 @@ class BackupValidator(
 
     private fun validarClientes(
         snapshot: BackupSnapshot,
-        localIds: Set<Long>,
+        locaisPorId: Map<Long, Local>,
     ) {
         snapshot.clientes.forEach { cliente ->
             require(cliente.id > 0) { "Cliente inválido" }
-            require(cliente.localId in localIds) { "Cliente com local inexistente" }
-            listOf(cliente.sublocal1Id, cliente.sublocal2Id, cliente.sublocal3Id).forEach { localId ->
-                localId?.let { require(it in localIds) { "Cliente com sublocal inexistente" } }
+            val cadeia = validarCadeiaCliente(cliente, locaisPorId)
+            if (!cliente.arquivado) {
+                require(cadeia.none { it.arquivado }) { "Cliente ativo associado a local arquivado" }
             }
         }
+    }
+
+    private fun validarCadeiaCliente(
+        cliente: Cliente,
+        locaisPorId: Map<Long, Local>,
+    ): List<Local> {
+        val local =
+            requireNotNull(locaisPorId[cliente.localId]) {
+                "Cliente com local inexistente"
+            }
+        require(local.parentId == null) { "Local principal do cliente não é raiz da cadeia" }
+
+        val ids =
+            listOfNotNull(
+                cliente.localId,
+                cliente.sublocal1Id,
+                cliente.sublocal2Id,
+                cliente.sublocal3Id,
+            )
+        require(ids.size == ids.toSet().size) { "Cliente com local repetido na hierarquia" }
+
+        val cadeia = mutableListOf(local)
+
+        cliente.sublocal1Id?.let { sublocal1Id ->
+            val sublocal1 =
+                requireNotNull(locaisPorId[sublocal1Id]) {
+                    "Cliente com sublocal inexistente"
+                }
+            require(sublocal1.parentId == cliente.localId) { "Sublocal 1 incompatível com local principal" }
+            cadeia += sublocal1
+        }
+
+        cliente.sublocal2Id?.let { sublocal2Id ->
+            val sublocal1Id =
+                requireNotNull(cliente.sublocal1Id) {
+                    "Cliente com sublocal 2 sem sublocal 1"
+                }
+            val sublocal2 =
+                requireNotNull(locaisPorId[sublocal2Id]) {
+                    "Cliente com sublocal inexistente"
+                }
+            require(sublocal2.parentId == sublocal1Id) { "Sublocal 2 incompatível com sublocal 1" }
+            cadeia += sublocal2
+        }
+
+        cliente.sublocal3Id?.let { sublocal3Id ->
+            val sublocal2Id =
+                requireNotNull(cliente.sublocal2Id) {
+                    "Cliente com sublocal 3 sem sublocal 2"
+                }
+            val sublocal3 =
+                requireNotNull(locaisPorId[sublocal3Id]) {
+                    "Cliente com sublocal inexistente"
+                }
+            require(sublocal3.parentId == sublocal2Id) { "Sublocal 3 incompatível com sublocal 2" }
+            cadeia += sublocal3
+        }
+
+        return cadeia
     }
 
     private fun validarOperacoes(
@@ -109,6 +170,20 @@ class BackupValidator(
             require(conta.clienteId in clienteIds) { "Conta com cliente inexistente" }
             require(conta.saldoCentavos >= 0) { "Conta com saldo negativo" }
         }
+    }
+
+    private fun validarSaldosReconstruidos(snapshot: BackupSnapshot) {
+        val saldos = snapshot.clientes.associate { it.id to 0L }.toMutableMap()
+        snapshot.vendas.forEach { venda ->
+            val delta =
+                when (venda.transacao) {
+                    TransacaoVenda.A_PRAZO -> venda.valorCentavos
+                    TransacaoVenda.PAGAMENTO -> -venda.valorCentavos
+                    TransacaoVenda.A_VISTA -> 0L
+                }
+            saldos[venda.clienteId] = (saldos[venda.clienteId] ?: 0L) + delta
+        }
+        require(saldos.values.all { it >= 0L }) { "Backup geraria saldo negativo" }
     }
 
     private fun validarConfiguracoes(snapshot: BackupSnapshot) {

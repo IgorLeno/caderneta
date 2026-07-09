@@ -20,6 +20,127 @@ class BackupValidatorTest {
     }
 
     @Test
+    fun aceitaClienteComHierarquiaCompletaValida() {
+        validator.validar(snapshotComHierarquiaCompleta())
+    }
+
+    @Test
+    fun rejeitaSublocal1ComPaiIncorreto() {
+        val snapshot =
+            snapshotComLocaisECliente(
+                locais =
+                    listOf(
+                        Local(id = 1, nome = "Escola A"),
+                        Local(id = 2, nome = "Escola B"),
+                        Local(id = 3, nome = "Sala B", parentId = 2, level = 1),
+                    ),
+                cliente = cliente(sublocal1Id = 3),
+            )
+
+        assertInvalido(snapshot)
+    }
+
+    @Test
+    fun rejeitaSublocal2SemSublocal1() {
+        val snapshot =
+            snapshotComLocaisECliente(
+                locais =
+                    listOf(
+                        Local(id = 1, nome = "Escola"),
+                        Local(id = 2, nome = "Sala", parentId = 1, level = 1),
+                    ),
+                cliente = cliente(sublocal2Id = 2),
+            )
+
+        assertInvalido(snapshot)
+    }
+
+    @Test
+    fun rejeitaSublocal3SemSublocal2() {
+        val snapshot =
+            snapshotComLocaisECliente(
+                locais =
+                    listOf(
+                        Local(id = 1, nome = "Escola"),
+                        Local(id = 2, nome = "Sala", parentId = 1, level = 1),
+                        Local(id = 3, nome = "Mesa", parentId = 2, level = 2),
+                    ),
+                cliente = cliente(sublocal1Id = 2, sublocal3Id = 3),
+            )
+
+        assertInvalido(snapshot)
+    }
+
+    @Test
+    fun rejeitaLocalRepetidoNaCadeiaDoCliente() {
+        val snapshot =
+            snapshotComLocaisECliente(
+                locais = listOf(Local(id = 1, nome = "Escola")),
+                cliente = cliente(sublocal1Id = 1),
+            )
+
+        assertInvalido(snapshot)
+    }
+
+    @Test
+    fun rejeitaArvoreCruzadaNaCadeiaDoCliente() {
+        val snapshot =
+            snapshotComLocaisECliente(
+                locais =
+                    listOf(
+                        Local(id = 1, nome = "Escola A"),
+                        Local(id = 2, nome = "Sala A", parentId = 1, level = 1),
+                        Local(id = 3, nome = "Escola B"),
+                        Local(id = 4, nome = "Mesa B", parentId = 3, level = 1),
+                    ),
+                cliente = cliente(sublocal1Id = 2, sublocal2Id = 4),
+            )
+
+        assertInvalido(snapshot)
+    }
+
+    @Test
+    fun rejeitaClienteAtivoEmLocalArquivado() {
+        val snapshot =
+            snapshotComLocaisECliente(
+                locais = listOf(Local(id = 1, nome = "Escola", arquivado = true)),
+                cliente = cliente(),
+            )
+
+        assertInvalido(snapshot)
+    }
+
+    @Test
+    fun rejeitaClienteAtivoEmSublocalArquivado() {
+        val snapshot =
+            snapshotComLocaisECliente(
+                locais =
+                    listOf(
+                        Local(id = 1, nome = "Escola"),
+                        Local(id = 2, nome = "Sala", parentId = 1, level = 1, arquivado = true),
+                    ),
+                cliente = cliente(sublocal1Id = 2),
+            )
+
+        assertInvalido(snapshot)
+    }
+
+    @Test
+    fun aceitaClienteArquivadoEmHierarquiaArquivada() {
+        val snapshot =
+            snapshotComLocaisECliente(
+                locais =
+                    listOf(
+                        Local(id = 1, nome = "Escola", arquivado = true),
+                        Local(id = 2, nome = "Sala", parentId = 1, level = 1, arquivado = true),
+                    ),
+                cliente = cliente(sublocal1Id = 2, arquivado = true),
+            )
+
+        validator.validar(snapshot)
+    }
+
+    @Test
     fun rejeitaDbVersionIncompativel() {
         assertInvalido(snapshotValido().copy(dbVersion = 2))
     }
@@ -138,6 +259,44 @@ class BackupValidatorTest {
             locais = snapshot.locais + Local(id = 2, nome = "Filho", parentId = 1, level = 1),
         )
     }
+
+    private fun snapshotComHierarquiaCompleta(): BackupSnapshot =
+        snapshotComLocaisECliente(
+            locais =
+                listOf(
+                    Local(id = 1, nome = "Escola"),
+                    Local(id = 2, nome = "Sala", parentId = 1, level = 1),
+                    Local(id = 3, nome = "Mesa", parentId = 2, level = 2),
+                    Local(id = 4, nome = "Turno", parentId = 3, level = 3),
+                ),
+            cliente = cliente(sublocal1Id = 2, sublocal2Id = 3, sublocal3Id = 4),
+        )
+
+    private fun snapshotComLocaisECliente(
+        locais: List<Local>,
+        cliente: Cliente,
+    ): BackupSnapshot =
+        snapshotValido().copy(
+            locais = locais,
+            clientes = listOf(cliente),
+        )
+
+    private fun cliente(
+        sublocal1Id: Long? = null,
+        sublocal2Id: Long? = null,
+        sublocal3Id: Long? = null,
+        arquivado: Boolean = false,
+    ): Cliente =
+        Cliente(
+            id = 1,
+            nome = "Cliente",
+            telefone = null,
+            localId = 1,
+            sublocal1Id = sublocal1Id,
+            sublocal2Id = sublocal2Id,
+            sublocal3Id = sublocal3Id,
+            arquivado = arquivado,
+        )
 
     private fun snapshotValido(): BackupSnapshot =
         BackupSnapshot(

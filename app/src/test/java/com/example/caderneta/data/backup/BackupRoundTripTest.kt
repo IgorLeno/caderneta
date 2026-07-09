@@ -111,6 +111,73 @@ class BackupRoundTripTest {
             assertEquals(localId, db.localDao().getLocalById(localId)?.id)
         }
 
+    @Test
+    fun snapshotComHierarquiaClienteInvalidaNaoAlteraBanco() =
+        runTest {
+            val localAtualId = db.localDao().insertLocal(Local(nome = "Local atual"))
+            val clienteAtualId =
+                db.clienteDao().insertCliente(Cliente(nome = "Cliente atual", telefone = null, localId = localAtualId))
+            db.configuracoesDao().insertConfiguracoes(config())
+            financeiroService.registrarVenda(
+                clienteAtualId,
+                localAtualId,
+                TipoTransacao.A_PRAZO,
+                false,
+                1,
+                0,
+                1000,
+                null,
+            )
+
+            var falhou = false
+            try {
+                manager.restaurar(snapshotComHierarquiaInvalida())
+            } catch (_: IllegalArgumentException) {
+                falhou = true
+            }
+
+            assertTrue(falhou)
+            assertEquals(localAtualId, db.localDao().getLocalById(localAtualId)?.id)
+            assertEquals(clienteAtualId, db.clienteDao().getClienteById(clienteAtualId)?.id)
+            assertEquals(
+                1,
+                db
+                    .vendaDao()
+                    .getAllVendas()
+                    .first()
+                    .size,
+            )
+            assertEquals(1000L, db.contaDao().getContaByCliente(clienteAtualId)?.saldoCentavos)
+        }
+
+    private fun snapshotComHierarquiaInvalida(): BackupSnapshot {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return BackupSnapshot(
+            app = context.packageName,
+            geradoEmMillis = 1,
+            locais =
+                listOf(
+                    Local(id = 1, nome = "Escola A"),
+                    Local(id = 2, nome = "Escola B"),
+                    Local(id = 3, nome = "Sala B", parentId = 2, level = 1),
+                ),
+            clientes =
+                listOf(
+                    Cliente(
+                        id = 1,
+                        nome = "Cliente inválido",
+                        telefone = null,
+                        localId = 1,
+                        sublocal1Id = 3,
+                    ),
+                ),
+            operacoes = emptyList(),
+            vendas = emptyList(),
+            contas = emptyList(),
+            configuracoes = listOf(config()),
+        )
+    }
+
     private fun config() =
         Configuracoes(
             precoSalgadoVistaCentavos = 500,
