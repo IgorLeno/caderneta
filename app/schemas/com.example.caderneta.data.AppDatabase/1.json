@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "2c1055f26499503debe0473537cb9c8e",
+    "identityHash": "20cc19a3c60416f78a0acb1852527020",
     "entities": [
       {
         "tableName": "clientes",
@@ -216,7 +216,7 @@
       },
       {
         "tableName": "vendas",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `operacaoId` INTEGER NOT NULL, `clienteId` INTEGER NOT NULL, `localId` INTEGER, `data` INTEGER NOT NULL, `transacao` TEXT NOT NULL, `quantidadeSalgados` INTEGER NOT NULL, `quantidadeSucos` INTEGER NOT NULL, `isPromocao` INTEGER NOT NULL, `promocaoDetalhes` TEXT, `valorCentavos` INTEGER NOT NULL, FOREIGN KEY(`clienteId`) REFERENCES `clientes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`localId`) REFERENCES `locais`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `operacaoId` INTEGER NOT NULL, `clienteId` INTEGER NOT NULL, `localId` INTEGER, `data` INTEGER NOT NULL, `transacao` TEXT NOT NULL, `quantidadeSalgados` INTEGER NOT NULL, `quantidadeSucos` INTEGER NOT NULL, `isPromocao` INTEGER NOT NULL, `promocaoDetalhes` TEXT, `valorCentavos` INTEGER NOT NULL, FOREIGN KEY(`clienteId`) REFERENCES `clientes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`localId`) REFERENCES `locais`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`operacaoId`) REFERENCES `operacoes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
@@ -319,12 +319,12 @@
           },
           {
             "name": "index_vendas_operacaoId",
-            "unique": false,
+            "unique": true,
             "columnNames": [
               "operacaoId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_vendas_operacaoId` ON `${TABLE_NAME}` (`operacaoId`)"
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_vendas_operacaoId` ON `${TABLE_NAME}` (`operacaoId`)"
           }
         ],
         "foreignKeys": [
@@ -345,6 +345,17 @@
             "onUpdate": "NO ACTION",
             "columns": [
               "localId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "operacoes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "operacaoId"
             ],
             "referencedColumns": [
               "id"
@@ -566,7 +577,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2c1055f26499503debe0473537cb9c8e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '20cc19a3c60416f78a0acb1852527020')"
     ]
   }
 }

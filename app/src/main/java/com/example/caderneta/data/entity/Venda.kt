@@ -29,12 +29,18 @@ import java.util.Date
             childColumns = ["localId"],
             onDelete = ForeignKey.RESTRICT,
         ),
+        ForeignKey(
+            entity = Operacao::class,
+            parentColumns = ["id"],
+            childColumns = ["operacaoId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
     ],
     indices = [
         Index(value = ["clienteId"]),
         Index(value = ["localId"]),
         Index(value = ["data"]),
-        Index(value = ["operacaoId"]),
+        Index(value = ["operacaoId"], unique = true),
     ],
 )
 data class Venda(

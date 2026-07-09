@@ -4,12 +4,21 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.data.entity.Conta
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.Operacao
 import com.example.caderneta.data.entity.Venda
+
+data class ForeignKeyViolation(
+    val table: String,
+    val rowid: Long,
+    val parent: String,
+    val fkid: Long,
+)
 
 @Dao
 @Suppress("TooManyFunctions")
@@ -67,4 +76,7 @@ interface BackupDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConfiguracoes(configuracoes: List<Configuracoes>)
+
+    @RawQuery
+    suspend fun foreignKeyCheck(query: SupportSQLiteQuery): List<ForeignKeyViolation>
 }

@@ -3,6 +3,7 @@ package com.example.caderneta.data.backup
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.example.caderneta.data.AppDatabase
 import com.example.caderneta.data.entity.Conta
 import com.example.caderneta.data.entity.TransacaoVenda
@@ -60,6 +61,8 @@ class BackupManager(
             backupDao.insertOperacoes(snapshot.operacoes)
             backupDao.insertVendas(snapshot.vendas)
             backupDao.insertContas(recalcularContas(snapshot))
+            val violations = backupDao.foreignKeyCheck(SimpleSQLiteQuery("PRAGMA foreign_key_check"))
+            require(violations.isEmpty()) { "Backup restaurado violaria chaves estrangeiras" }
         }
     }
 

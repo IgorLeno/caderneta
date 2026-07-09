@@ -4,9 +4,7 @@ import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.data.entity.Conta
 import com.example.caderneta.data.entity.Local
-import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.Operacao
-import com.example.caderneta.data.entity.TransacaoVenda
 import com.example.caderneta.data.entity.Venda
 import org.json.JSONArray
 import org.json.JSONObject
@@ -98,7 +96,7 @@ class BackupSerializer {
         Operacao(
             id = json.getLong("id"),
             clienteId = json.getLong("clienteId"),
-            tipoOperacao = ModoOperacao.valueOf(json.getString("tipoOperacao")),
+            tipoOperacao = enumValue(json.getString("tipoOperacao"), "tipoOperacao"),
             valorCentavos = json.getLong("valorCentavos"),
             data = Date(json.getLong("data")),
         )
@@ -124,7 +122,7 @@ class BackupSerializer {
             clienteId = json.getLong("clienteId"),
             localId = json.optLongOrNull("localId"),
             data = Date(json.getLong("data")),
-            transacao = TransacaoVenda.valueOf(json.getString("transacao")),
+            transacao = enumValue(json.getString("transacao"), "transacao"),
             quantidadeSalgados = json.getInt("quantidadeSalgados"),
             quantidadeSucos = json.getInt("quantidadeSucos"),
             isPromocao = json.getBoolean("isPromocao"),
@@ -183,4 +181,13 @@ class BackupSerializer {
     private fun JSONObject.optLongOrNull(name: String): Long? = if (isNull(name)) null else getLong(name)
 
     private fun JSONObject.optStringOrNull(name: String): String? = if (isNull(name)) null else getString(name)
+
+    private inline fun <reified T : Enum<T>> enumValue(
+        value: String,
+        field: String,
+    ): T {
+        val match = enumValues<T>().firstOrNull { it.name == value }
+        require(match != null) { "Enum desconhecido em $field: $value" }
+        return match
+    }
 }
