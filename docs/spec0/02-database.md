@@ -23,6 +23,31 @@ Instalações locais antigas com banco v6 devem ser desinstaladas antes de insta
 - `Venda.operacaoId` é FK `RESTRICT` para `Operacao.id` e possui índice único,
   mantendo a relação 1:1 entre lançamento do extrato e operação financeira.
 
+## Saldo financeiro
+
+O histórico financeiro em `vendas` é a fonte de verdade do saldo devedor:
+
+- `A_PRAZO` soma `valorCentavos`.
+- `PAGAMENTO` subtrai `valorCentavos`.
+- `A_VISTA` não altera saldo.
+
+`Conta.saldoCentavos` é apenas cache materializado e reconciliável. Pagamentos
+são validados contra o saldo reconstruído do histórico dentro da mesma
+transação; se o cache divergir, ele é corrigido antes do commit válido. O cache
+anterior não autoriza pagamento, não pode propagar divergência e não pode
+produzir saldo histórico negativo.
+
+## Arquivamento
+
+`Local` e `Cliente` usam soft-delete. Quando uma subárvore de locais não pode
+ser excluída fisicamente por vínculos históricos, a subárvore é arquivada e
+todos os clientes ativos associados a qualquer nível dela (`localId`,
+`sublocal1Id`, `sublocal2Id`, `sublocal3Id`) também são arquivados na mesma
+transação.
+
+O arquivamento não remove histórico financeiro: `Venda`, `Operacao` e `Conta`
+permanecem preservados para consultas e backups.
+
 ## Workflows de teste
 
 O workflow instrumentado foi removido enquanto não existir `app/src/androidTest`.
