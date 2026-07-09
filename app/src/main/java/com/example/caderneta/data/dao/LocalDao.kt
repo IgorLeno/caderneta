@@ -14,6 +14,9 @@ interface LocalDao {
     @Query("SELECT * FROM locais")
     fun getAllLocais(): Flow<List<Local>>
 
+    @Query("SELECT * FROM locais")
+    suspend fun getAllLocaisList(): List<Local>
+
     @Query("SELECT * FROM locais WHERE id = :id")
     suspend fun getLocalById(id: Long): Local?
 
@@ -22,6 +25,9 @@ interface LocalDao {
 
     @Update
     suspend fun updateLocal(local: Local)
+
+    @Query("UPDATE locais SET arquivado = 1 WHERE id IN (:ids)")
+    suspend fun arquivarLocais(ids: List<Long>)
 
     @Delete
     suspend fun deleteLocal(local: Local)

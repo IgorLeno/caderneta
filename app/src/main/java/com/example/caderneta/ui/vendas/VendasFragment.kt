@@ -306,6 +306,14 @@ class VendasFragment : Fragment() {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                vendasViewModel.configuracoes.collectLatest {
+                    clientesAdapter.notifyDataSetChanged()
+                }
+            }
+        }
     }
 
     private fun showAddClienteDialog() {

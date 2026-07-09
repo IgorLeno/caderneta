@@ -22,12 +22,11 @@ import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.databinding.ItemClienteBinding
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.util.ContadorHelper
-import com.example.caderneta.util.ParseDinheiro
 import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.util.centavosParaTextoDecimal
-import com.example.caderneta.util.parseDinheiro
 import com.example.caderneta.viewmodel.ClienteState
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @Suppress("LongParameterList")
@@ -98,6 +97,7 @@ class ClientesAdapter(
 
     override fun onViewRecycled(holder: ClienteViewHolder) {
         super.onViewRecycled(holder)
+        holder.cancelSaldoJob()
         holder.cleanupContadores()
     }
 
@@ -108,8 +108,18 @@ class ClientesAdapter(
         private var contadorSucosHelper: ContadorHelper? = null
         private var contadorPromo1Helper: ContadorHelper? = null
         private var contadorPromo2Helper: ContadorHelper? = null
+        private var boundClienteId: Long? = null
+        private var saldoJob: Job? = null
+        private var isBindingPagamento = false
+        private val pagamentoInputController = PagamentoInputController()
+
+        init {
+            setupPagamentoWatcher()
+        }
 
         fun bind(cliente: Cliente) {
+            boundClienteId = cliente.id
+            cancelSaldoJob()
             setupBasicInfo(cliente)
             setupMainButtons(cliente)
             setupVendaButtons(cliente)
@@ -128,23 +138,34 @@ class ClientesAdapter(
             contadorPromo2Helper = null
         }
 
+        fun cancelSaldoJob() {
+            saldoJob?.cancel()
+            saldoJob = null
+        }
+
         private fun setupBasicInfo(cliente: Cliente) {
             binding.tvNomeCliente.text = cliente.nome
-            updateSaldo()
+            updateSaldo(cliente.id)
         }
 
         fun updateSaldo() {
-            lifecycleScope.launch {
-                val cliente = getItem(bindingAdapterPosition)
-                val saldo = contaRepository.getContaByCliente(cliente.id)?.saldoCentavos ?: 0
-                binding.tvValorDevido.text = saldo.centavosParaReais()
-                binding.tvValorDevido.setTextColor(
-                    ContextCompat.getColor(
-                        itemView.context,
-                        if (saldo > 0) R.color.delete_color else R.color.add_color,
-                    ),
-                )
-            }
+            boundClienteId?.let(::updateSaldo)
+        }
+
+        private fun updateSaldo(clienteId: Long) {
+            cancelSaldoJob()
+            saldoJob =
+                lifecycleScope.launch {
+                    val saldo = contaRepository.getContaByCliente(clienteId)?.saldoCentavos ?: 0
+                    if (boundClienteId != clienteId) return@launch
+                    binding.tvValorDevido.text = saldo.centavosParaReais()
+                    binding.tvValorDevido.setTextColor(
+                        ContextCompat.getColor(
+                            itemView.context,
+                            if (saldo > 0) R.color.delete_color else R.color.add_color,
+                        ),
+                    )
+                }
         }
 
         private fun setupContadores(cliente: Cliente) {
@@ -242,52 +263,63 @@ class ClientesAdapter(
                 btnTudo.setOnClickListener {
                     lifecycleScope.launch {
                         val saldo = contaRepository.getContaByCliente(cliente.id)?.saldoCentavos ?: 0
-                        etValorPagamento.setText(saldo.centavosParaTextoDecimal())
-                        onUpdateValorTotal(cliente.id, saldo)
+                        if (boundClienteId == cliente.id) {
+                            setPagamentoText(saldo.centavosParaTextoDecimal())
+                            onUpdateValorTotal(cliente.id, saldo)
+                        }
                     }
                 }
-
-                etValorPagamento.addTextChangedListener(
-                    object : TextWatcher {
-                        override fun afterTextChanged(s: Editable?) {
-                            when (val valor = s.toString().parseDinheiro()) {
-                                is ParseDinheiro.Valido -> {
-                                    etValorPagamento.error = null
-                                    onUpdateValorTotal(cliente.id, valor.centavos)
-                                }
-                                ParseDinheiro.Vazio -> etValorPagamento.error = "Informe o valor"
-                                ParseDinheiro.Invalido -> etValorPagamento.error = "Valor inválido"
-                                ParseDinheiro.Negativo -> etValorPagamento.error = "Valor não pode ser negativo"
-                                ParseDinheiro.MuitoGrande -> etValorPagamento.error = "Valor muito grande"
-                            }
-                        }
-
-                        override fun beforeTextChanged(
-                            s: CharSequence?,
-                            start: Int,
-                            count: Int,
-                            after: Int,
-                        ) {}
-
-                        override fun onTextChanged(
-                            s: CharSequence?,
-                            start: Int,
-                            before: Int,
-                            count: Int,
-                        ) {}
-                    },
-                )
 
                 btnConfirmarPagamento.setOnClickListener {
                     onConfirmarOperacao(cliente.id)
                 }
 
                 btnCancelarPagamento.setOnClickListener {
-                    etValorPagamento.text?.clear()
+                    clearPagamentoText()
                     onUpdateValorTotal(cliente.id, 0)
                     onCancelarOperacao(cliente.id)
                 }
             }
+        }
+
+        private fun setupPagamentoWatcher() {
+            binding.etValorPagamento.addTextChangedListener(
+                object : TextWatcher {
+                    override fun afterTextChanged(s: Editable?) {
+                        when (
+                            val result =
+                                pagamentoInputController.parseChange(
+                                    boundClienteId = boundClienteId,
+                                    isProgrammatic = isBindingPagamento,
+                                    text = s?.toString().orEmpty(),
+                                )
+                        ) {
+                            PagamentoInputController.Result.Ignorado -> Unit
+                            is PagamentoInputController.Result.Valido -> {
+                                binding.etValorPagamento.error = null
+                                onUpdateValorTotal(result.clienteId, result.centavos)
+                            }
+                            is PagamentoInputController.Result.Erro -> {
+                                binding.etValorPagamento.error = result.mensagem
+                            }
+                        }
+                    }
+
+                    override fun beforeTextChanged(
+                        s: CharSequence?,
+                        start: Int,
+                        count: Int,
+                        after: Int,
+                    ) {}
+
+                    override fun onTextChanged(
+                        s: CharSequence?,
+                        start: Int,
+                        before: Int,
+                        count: Int,
+                    ) {}
+                },
+            )
         }
 
         private fun setupConfirmationButtons(cliente: Cliente) {
@@ -307,13 +339,14 @@ class ClientesAdapter(
         }
 
         private fun updateButtonStates(cliente: Cliente) {
-            val state = getClienteState(cliente.id) ?: return
-            val config = getConfiguracoes() ?: return
+            val state = getClienteState(cliente.id) ?: ClienteState(clienteId = cliente.id)
+            val config = getConfiguracoes()
 
             updateButtonSelections(state)
             updateLayoutVisibility(state)
             updateContadoresState(state)
-            updatePromocoesInfo(state, config)
+            restorePagamentoText(state)
+            config?.let { updatePromocoesInfo(state, it) }
         }
 
         private fun updateButtonSelections(state: ClienteState) {
@@ -411,6 +444,10 @@ class ClientesAdapter(
         fun updateValorTotal(payload: Payload.ValorTotalChanged) {
             binding.etValorTotal.setText(payload.novoValorCentavos.centavosParaTextoDecimal())
             binding.etValorTotalPromocao.setText(payload.novoValorCentavos.centavosParaTextoDecimal())
+            val state = boundClienteId?.let(getClienteState)
+            if (state?.modoOperacao == ModoOperacao.PAGAMENTO) {
+                setPagamentoText(payload.novoValorCentavos.centavosParaTextoDecimal())
+            }
         }
 
         private fun resetContadores() {
@@ -422,7 +459,34 @@ class ClientesAdapter(
             binding.apply {
                 etValorTotal.setText("0.00")
                 etValorTotalPromocao.setText("0.00")
-                etValorPagamento.text?.clear()
+                clearPagamentoText()
+            }
+        }
+
+        private fun restorePagamentoText(state: ClienteState) {
+            if (state.modoOperacao == ModoOperacao.PAGAMENTO && state.valorTotalCentavos > 0) {
+                setPagamentoText(state.valorTotalCentavos.centavosParaTextoDecimal())
+            } else {
+                clearPagamentoText()
+            }
+        }
+
+        private fun setPagamentoText(text: String) {
+            isBindingPagamento = true
+            try {
+                binding.etValorPagamento.setText(text)
+            } finally {
+                isBindingPagamento = false
+            }
+        }
+
+        private fun clearPagamentoText() {
+            isBindingPagamento = true
+            try {
+                binding.etValorPagamento.text?.clear()
+                binding.etValorPagamento.error = null
+            } finally {
+                isBindingPagamento = false
             }
         }
 

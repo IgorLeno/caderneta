@@ -1,6 +1,8 @@
 package com.example.caderneta.repository
 
 import android.database.sqlite.SQLiteConstraintException
+import androidx.room.withTransaction
+import com.example.caderneta.data.AppDatabase
 import com.example.caderneta.data.dao.LocalDao
 import com.example.caderneta.data.entity.Local
 import kotlinx.coroutines.Dispatchers
@@ -9,6 +11,7 @@ import kotlinx.coroutines.withContext
 
 class LocalRepository(
     private val localDao: LocalDao,
+    private val db: AppDatabase,
 ) {
     fun getAllLocais(): Flow<List<Local>> = localDao.getAllLocais()
 
@@ -33,10 +36,31 @@ class LocalRepository(
                 localDao.deleteLocal(local)
                 false
             } catch (_: SQLiteConstraintException) {
-                localDao.updateLocal(local.copy(arquivado = true))
+                db.withTransaction {
+                    val ids = subtreeAtiva(local.id, localDao.getAllLocaisList())
+                    if (ids.isNotEmpty()) {
+                        localDao.arquivarLocais(ids)
+                    }
+                }
                 true
             }
         }
 
     suspend fun buscarLocais(query: String): List<Local> = localDao.buscarLocais("%$query%")
+
+    private fun subtreeAtiva(
+        rootId: Long,
+        locais: List<Local>,
+    ): List<Long> {
+        val filhosPorPai = locais.groupBy { it.parentId }
+        val resultado = mutableListOf<Long>()
+        val fila = ArrayDeque<Long>().apply { add(rootId) }
+        while (fila.isNotEmpty()) {
+            val atual = fila.removeFirst()
+            val local = locais.firstOrNull { it.id == atual } ?: continue
+            if (!local.arquivado) resultado += atual
+            filhosPorPai[atual].orEmpty().forEach { filho -> fila.add(filho.id) }
+        }
+        return resultado
+    }
 }

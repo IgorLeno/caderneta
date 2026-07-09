@@ -84,7 +84,7 @@ class VendasViewModel(
     val configuracoes: StateFlow<Configuracoes?> =
         configuracoesRepository
             .getConfiguracoes()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _clienteStates = MutableStateFlow<Map<Long, ClienteState>>(emptyMap())
     val clienteStates: StateFlow<Map<Long, ClienteState>> = _clienteStates.asStateFlow()
@@ -137,6 +137,11 @@ class VendasViewModel(
         cliente: Cliente,
         modoOperacao: ModoOperacao?,
     ) {
+        if (modoOperacao in listOf(ModoOperacao.VENDA, ModoOperacao.PROMOCAO) && configuracoes.value == null) {
+            publicarErro("Configure os preços em Configurações antes de registrar vendas")
+            return
+        }
+
         val atual = _clienteStates.value[cliente.id]
         val novo =
             if (atual == null || atual.modoOperacao != modoOperacao) {
@@ -298,6 +303,7 @@ class VendasViewModel(
             resetClienteState(clienteState.clienteId)
             _eventos.send(UiEvento.Sucesso("Venda registrada com sucesso!"))
         } catch (e: Exception) {
+            e.rethrowCancellation()
             publicarErro("Erro ao confirmar venda: ${e.message}")
         }
     }
@@ -313,6 +319,7 @@ class VendasViewModel(
             resetClienteState(clienteState.clienteId)
             _eventos.send(UiEvento.Sucesso("Pagamento registrado com sucesso!"))
         } catch (e: Exception) {
+            e.rethrowCancellation()
             publicarErro("Erro ao confirmar pagamento: ${e.message}")
         }
     }
@@ -505,6 +512,7 @@ class VendasViewModel(
                     "Local da hierarquia não encontrado"
                 }
             }
+        check(hierarquia.none { it.arquivado }) { "Hierarquia contém local arquivado" }
         hierarquia.zipWithNext().forEach { (parent, child) ->
             check(child.level > parent.level) { "Hierarquia de locais inválida" }
             check(child.parentId == parent.id) { "Hierarquia de locais inválida" }
