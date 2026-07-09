@@ -19,7 +19,6 @@ import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
@@ -213,12 +212,13 @@ class VendasViewModelTest {
         viewModel.selecionarLocal(localId)
     }
 
-    private suspend fun waitConfiguracoes() {
-        withTimeout(1_000) {
-            while (viewModel.configuracoes.value == null) {
-                delay(10)
-            }
+    private fun waitConfiguracoes() {
+        repeat(500) {
+            mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+            if (viewModel.configuracoes.value != null) return
+            Thread.sleep(10)
         }
+        assertTrue(viewModel.configuracoes.value != null)
     }
 
     private fun newViewModel(): VendasViewModel =
@@ -253,7 +253,7 @@ class VendasViewModelTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule(
-    private val dispatcher: TestDispatcher = StandardTestDispatcher(),
+    val dispatcher: TestDispatcher = StandardTestDispatcher(),
 ) : TestWatcher() {
     override fun starting(description: Description) {
         Dispatchers.setMain(dispatcher)
