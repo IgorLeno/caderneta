@@ -29,9 +29,37 @@ class PagamentoInputControllerTest {
     }
 
     @Test
-    fun retornaErroParaEntradaInvalida() {
+    fun retornaErroParaVazio() {
+        val result = controller.parseChange(boundClienteId = 42, isProgrammatic = false, text = "")
+
+        assertEquals(PagamentoInputController.Result.Erro("Informe o valor"), result)
+    }
+
+    @Test
+    fun retornaErroParaNegativo() {
         val result = controller.parseChange(boundClienteId = 42, isProgrammatic = false, text = "-1")
 
         assertEquals(PagamentoInputController.Result.Erro("Valor não pode ser negativo"), result)
+    }
+
+    @Test
+    fun retornaErroParaZeroInteiro() {
+        val result = controller.parseChange(boundClienteId = 42, isProgrammatic = false, text = "0")
+
+        assertEquals(PagamentoInputController.Result.Erro("Informe um valor maior que zero"), result)
+    }
+
+    @Test
+    fun retornaErroParaZeroDecimalComVirgula() {
+        val result = controller.parseChange(boundClienteId = 42, isProgrammatic = false, text = "0,00")
+
+        assertEquals(PagamentoInputController.Result.Erro("Informe um valor maior que zero"), result)
+    }
+
+    @Test
+    fun retornaErroParaZeroDecimalComPonto() {
+        val result = controller.parseChange(boundClienteId = 42, isProgrammatic = false, text = "0.00")
+
+        assertEquals(PagamentoInputController.Result.Erro("Informe um valor maior que zero"), result)
     }
 }

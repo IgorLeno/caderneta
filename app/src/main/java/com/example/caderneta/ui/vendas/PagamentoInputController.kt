@@ -11,7 +11,12 @@ class PagamentoInputController {
     ): Result {
         if (isProgrammatic || boundClienteId == null) return Result.Ignorado
         return when (val valor = text.parseDinheiro()) {
-            is ParseDinheiro.Valido -> Result.Valido(boundClienteId, valor.centavos)
+            is ParseDinheiro.Valido ->
+                if (valor.centavos == 0L) {
+                    Result.Erro("Informe um valor maior que zero")
+                } else {
+                    Result.Valido(boundClienteId, valor.centavos)
+                }
             ParseDinheiro.Vazio -> Result.Erro("Informe o valor")
             ParseDinheiro.Invalido -> Result.Erro("Valor inválido")
             ParseDinheiro.Negativo -> Result.Erro("Valor não pode ser negativo")
