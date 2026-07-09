@@ -95,12 +95,16 @@ class FinanceiroService(
     ): Venda {
         require(valorCentavos > 0) { "Valor do pagamento deve ser maior que zero" }
         return db.withTransaction {
-            // Validação dentro da transação: nenhuma escrita acontece se falhar.
-            val conta =
-                checkNotNull(contaDao.getContaByCliente(clienteId)) {
-                    "Cliente não possui saldo devedor"
-                }
-            check(valorCentavos <= conta.saldoCentavos) {
+            val saldoHistorico = vendaDao.calcularSaldoHistorico(clienteId)
+            val saldoCache = contaDao.getContaByCliente(clienteId)?.saldoCentavos ?: 0L
+            if (saldoCache != saldoHistorico) {
+                contaDao.insertConta(Conta(clienteId = clienteId, saldoCentavos = saldoHistorico))
+            }
+
+            check(saldoHistorico > 0) {
+                "Cliente não possui saldo devedor"
+            }
+            check(valorCentavos <= saldoHistorico) {
                 "Valor do pagamento maior que o saldo devedor"
             }
             val operacaoId =
@@ -124,7 +128,7 @@ class FinanceiroService(
                     valorCentavos = valorCentavos,
                 )
             val vendaId = vendaDao.insertVenda(venda)
-            ajustarSaldo(clienteId, -valorCentavos)
+            contaDao.insertConta(Conta(clienteId = clienteId, saldoCentavos = saldoHistorico - valorCentavos))
             venda.copy(id = vendaId)
         }
     }

@@ -7,7 +7,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.caderneta.data.AppDatabase
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Configuracoes
-import com.example.caderneta.data.entity.Conta
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
@@ -130,7 +129,16 @@ class VendasViewModelTest {
     @Test
     fun pagamentoFuncionaSemConfig() =
         runTest {
-            db.contaDao().insertConta(Conta(clienteId, saldoCentavos = 500))
+            FinanceiroService(db).registrarVenda(
+                clienteId = clienteId,
+                localId = localId,
+                tipoTransacao = TipoTransacao.A_PRAZO,
+                isPromocao = false,
+                quantidadeSalgados = 1,
+                quantidadeSucos = 0,
+                valorCentavos = 500,
+                promocaoDetalhes = null,
+            )
             val cliente = requireNotNull(db.clienteDao().getClienteById(clienteId))
 
             viewModel.selecionarModoOperacao(cliente, ModoOperacao.PAGAMENTO)
@@ -143,7 +151,7 @@ class VendasViewModelTest {
                     .vendaDao()
                     .getAllVendas()
                     .first()
-                    .single()
+                    .last()
             assertEquals(TransacaoVenda.PAGAMENTO, venda.transacao)
             assertEquals(300L, db.contaDao().getContaByCliente(clienteId)?.saldoCentavos)
         }
@@ -216,7 +224,7 @@ class VendasViewModelTest {
     private fun newViewModel(): VendasViewModel =
         VendasViewModel(
             clienteRepository = ClienteRepository(db.clienteDao()),
-            localRepository = LocalRepository(db.localDao(), db),
+            localRepository = LocalRepository(db.localDao(), db.clienteDao(), db),
             vendaRepository = VendaRepository(db.vendaDao()),
             configuracoesRepository = ConfiguracoesRepository(db.configuracoesDao()),
             contaRepository = ContaRepository(db.contaDao()),

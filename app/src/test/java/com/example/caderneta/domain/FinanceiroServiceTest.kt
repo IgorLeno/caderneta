@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -71,6 +72,30 @@ class FinanceiroServiceTest {
         }
 
     @Test
+    fun pagamentoUsaHistoricoQuandoCacheEstaAbaixo() =
+        runTest {
+            service.registrarVenda(clienteId, localId, TipoTransacao.A_PRAZO, false, 1, 0, 1000, null)
+            db.contaDao().insertConta(Conta(clienteId, saldoCentavos = 500))
+
+            service.registrarPagamento(clienteId, null, 200)
+
+            assertEquals(800L, saldoConta())
+            assertEquals(800L, service.calcularSaldoDoHistorico(clienteId))
+        }
+
+    @Test
+    fun pagamentoUsaHistoricoQuandoCacheEstaAcima() =
+        runTest {
+            service.registrarVenda(clienteId, localId, TipoTransacao.A_PRAZO, false, 1, 0, 1000, null)
+            db.contaDao().insertConta(Conta(clienteId, saldoCentavos = 1500))
+
+            service.registrarPagamento(clienteId, null, 200)
+
+            assertEquals(800L, saldoConta())
+            assertEquals(800L, service.calcularSaldoDoHistorico(clienteId))
+        }
+
+    @Test
     fun pagamentoMaiorQueSaldoFalhaSemParciais() =
         runTest {
             service.registrarVenda(clienteId, localId, TipoTransacao.A_PRAZO, false, 1, 0, 1000, null)
@@ -108,6 +133,38 @@ class FinanceiroServiceTest {
                     .first()
                     .size,
             )
+            assertEquals(1000L, service.calcularSaldoDoHistorico(clienteId))
+        }
+
+    @Test
+    fun pagamentoSemDividaFalhaSemParciais() =
+        runTest {
+            assertFalhaEstado {
+                service.registrarPagamento(clienteId, null, 1)
+            }
+
+            assertNull(db.contaDao().getContaByCliente(clienteId))
+            assertEquals(0, quantidadeVendas())
+            assertEquals(0, quantidadeOperacoes())
+            assertEquals(0L, service.calcularSaldoDoHistorico(clienteId))
+        }
+
+    @Test
+    fun pagamentoZeroOuNegativoFalhaAntesDeEscrever() =
+        runTest {
+            service.registrarVenda(clienteId, localId, TipoTransacao.A_PRAZO, false, 1, 0, 1000, null)
+
+            assertFalhaArgumento {
+                service.registrarPagamento(clienteId, null, 0)
+            }
+            assertFalhaArgumento {
+                service.registrarPagamento(clienteId, null, -1)
+            }
+
+            assertEquals(1, quantidadeVendas())
+            assertEquals(1, quantidadeOperacoes())
+            assertEquals(1000L, saldoConta())
+            assertEquals(1000L, service.calcularSaldoDoHistorico(clienteId))
         }
 
     @Test
@@ -218,6 +275,30 @@ class FinanceiroServiceTest {
         }
         assertTrue(falhou)
     }
+
+    private suspend fun assertFalhaArgumento(block: suspend () -> Unit) {
+        var falhou = false
+        try {
+            block()
+        } catch (_: IllegalArgumentException) {
+            falhou = true
+        }
+        assertTrue(falhou)
+    }
+
+    private suspend fun quantidadeVendas(): Int =
+        db
+            .vendaDao()
+            .getAllVendas()
+            .first()
+            .size
+
+    private suspend fun quantidadeOperacoes(): Int =
+        db
+            .operacaoDao()
+            .getAllOperacoes()
+            .first()
+            .size
 
     private suspend fun saldoConta(): Long = requireNotNull(db.contaDao().getContaByCliente(clienteId)).saldoCentavos
 }
