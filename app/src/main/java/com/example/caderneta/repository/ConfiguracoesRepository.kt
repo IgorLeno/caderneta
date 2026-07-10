@@ -13,7 +13,9 @@ class ConfiguracoesRepository(
      */
     fun getConfiguracoes(): Flow<Configuracoes?> = configuracoesDao.getConfiguracoes()
 
+    suspend fun getConfiguracoesOnce(): Configuracoes? = configuracoesDao.getConfiguracoesOnce()
+
     suspend fun salvarConfiguracoes(configuracoes: Configuracoes) {
-        configuracoesDao.resetAndInsertConfiguracoes(configuracoes)
+        configuracoesDao.upsertConfiguracoes(configuracoes.copy(id = 1))
     }
 }

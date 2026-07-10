@@ -29,7 +29,7 @@ import com.example.caderneta.util.DateConverter
         Operacao::class,
         Conta::class,
     ],
-    version = 1,
+    version = AppDatabase.DATABASE_VERSION,
     exportSchema = true,
 )
 @TypeConverters(DateConverter::class)
@@ -49,6 +49,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun backupDao(): BackupDao
 
     companion object {
+        const val DATABASE_VERSION = 1
+
         @Volatile
         private var instance: AppDatabase? = null
 

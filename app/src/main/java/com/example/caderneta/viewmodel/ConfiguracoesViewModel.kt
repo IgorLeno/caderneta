@@ -12,6 +12,7 @@ import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -29,6 +30,9 @@ class ConfiguracoesViewModel(
 
     private val _ultimoBackupMillis = MutableStateFlow(backupManager.getUltimoBackupMillis())
     val ultimoBackupMillis: StateFlow<Long?> = _ultimoBackupMillis
+
+    private val _salvando = MutableStateFlow(false)
+    val salvando: StateFlow<Boolean> = _salvando.asStateFlow()
 
     private val _eventos = Channel<UiEvento>(Channel.BUFFERED)
     val eventos = _eventos.receiveAsFlow()
@@ -58,10 +62,17 @@ class ConfiguracoesViewModel(
     }
 
     fun salvarConfiguracoes(novasConfiguracoes: Configuracoes) {
+        if (_salvando.value) return
         viewModelScope.launch {
             try {
+                _salvando.value = true
                 if (novasConfiguracoes.isValid()) {
                     repository.salvarConfiguracoes(novasConfiguracoes)
+                    val persistida = repository.getConfiguracoesOnce()
+                    if (persistida != novasConfiguracoes.copy(id = 1)) {
+                        _eventos.send(UiEvento.Erro("Erro ao confirmar configurações salvas"))
+                        return@launch
+                    }
                     _eventos.send(UiEvento.Sucesso("Configurações salvas"))
                 } else {
                     _eventos.send(UiEvento.Erro("Configurações inválidas. Verifique os valores inseridos."))
@@ -69,6 +80,8 @@ class ConfiguracoesViewModel(
             } catch (e: Exception) {
                 e.rethrowCancellation()
                 _eventos.send(UiEvento.Erro("Erro ao salvar configurações: ${e.message}"))
+            } finally {
+                _salvando.value = false
             }
         }
     }

@@ -9,18 +9,18 @@ interface ConfiguracoesDao {
     @Query("SELECT * FROM configuracoes LIMIT 1")
     fun getConfiguracoes(): Flow<Configuracoes?>
 
+    @Query("SELECT * FROM configuracoes WHERE id = 1 LIMIT 1")
+    suspend fun getConfiguracoesOnce(): Configuracoes?
+
+    @Query("SELECT COUNT(*) FROM configuracoes")
+    suspend fun countConfiguracoes(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConfiguracoes(configuracoes: Configuracoes)
 
-    @Update
-    suspend fun updateConfiguracoes(configuracoes: Configuracoes)
+    @Upsert
+    suspend fun upsertConfiguracoes(configuracoes: Configuracoes)
 
     @Query("DELETE FROM configuracoes")
     suspend fun deleteAllConfiguracoes()
-
-    @Transaction
-    suspend fun resetAndInsertConfiguracoes(configuracoes: Configuracoes) {
-        deleteAllConfiguracoes()
-        insertConfiguracoes(configuracoes)
-    }
 }

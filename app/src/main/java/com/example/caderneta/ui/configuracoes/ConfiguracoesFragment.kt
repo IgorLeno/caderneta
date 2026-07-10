@@ -11,13 +11,15 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.caderneta.BuildConfig
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.databinding.FragmentConfiguracoesBinding
-import com.example.caderneta.repository.ConfiguracoesRepository
-import com.example.caderneta.util.ParseDinheiro
+import com.example.caderneta.domain.configuracoes.ConfiguracoesCampo
+import com.example.caderneta.domain.configuracoes.ConfiguracoesFormResult
+import com.example.caderneta.domain.configuracoes.ConfiguracoesFormValidator
+import com.example.caderneta.domain.configuracoes.ConfiguracoesInput
 import com.example.caderneta.util.centavosParaTextoDecimal
-import com.example.caderneta.util.parseDinheiro
 import com.example.caderneta.viewmodel.ConfiguracoesViewModel
 import com.example.caderneta.viewmodel.ConfiguracoesViewModelFactory
 import com.example.caderneta.viewmodel.UiEvento
@@ -30,6 +32,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@Suppress("TooManyFunctions")
 class ConfiguracoesFragment : Fragment() {
     private var _binding: FragmentConfiguracoesBinding? = null
     private val binding get() = _binding!!
@@ -37,10 +40,8 @@ class ConfiguracoesFragment : Fragment() {
     private val viewModel: ConfiguracoesViewModel by viewModels {
         val app = requireActivity().application as CadernetaApplication
         ConfiguracoesViewModelFactory(
-            ConfiguracoesRepository(
-                app.database.configuracoesDao(),
-            ),
-            app.backupManager,
+            app.container.configuracoesRepository,
+            app.container.backupManager,
         )
     }
 
@@ -109,6 +110,14 @@ class ConfiguracoesFragment : Fragment() {
                 }
             }
         }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.salvando.collectLatest { salvando ->
+                binding.btnSalvarConfiguracoes.isEnabled = !salvando
+            }
+        }
+
+        binding.tvBuildInfo.text = buildInfo()
     }
 
     private fun updateUI(configuracoes: Configuracoes) {
@@ -164,156 +173,13 @@ class ConfiguracoesFragment : Fragment() {
         return "caderneta-backup-$data.json"
     }
 
-    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private fun lerConfiguracoesOuFocarErro(): Configuracoes? {
-        var primeiroErro: EditText? = null
-
-        fun <T> validar(
-            campo: EditText,
-            leitura: () -> T?,
-        ): T? {
-            val valor = leitura()
-            if (valor == null && primeiroErro == null) primeiroErro = campo
-            return valor
-        }
-
-        binding.apply {
-            val salgadoVista = validar(etSalgadoVista) { etSalgadoVista.lerCentavosOuErro("Informe o preço à vista") }
-            val salgadoPrazo = validar(etSalgadoPrazo) { etSalgadoPrazo.lerCentavosOuErro("Informe o preço a prazo") }
-            val sucoVista = validar(etSucoVista) { etSucoVista.lerCentavosOuErro("Informe o preço à vista") }
-            val sucoPrazo = validar(etSucoPrazo) { etSucoPrazo.lerCentavosOuErro("Informe o preço a prazo") }
-            val promocoesAtivadas = switchPromocoes.isChecked
-
-            val promo1Nome = etPromo1Nome.text.toString().trim()
-            val promo2Nome = etPromo2Nome.text.toString().trim()
-
-            if (promocoesAtivadas && promo1Nome.isBlank()) {
-                etPromo1Nome.error = "Informe o nome da promoção"
-                if (primeiroErro == null) primeiroErro = etPromo1Nome
-            } else {
-                etPromo1Nome.error = null
-            }
-
-            if (promocoesAtivadas && promo2Nome.isBlank()) {
-                etPromo2Nome.error = "Informe o nome da promoção"
-                if (primeiroErro == null) primeiroErro = etPromo2Nome
-            } else {
-                etPromo2Nome.error = null
-            }
-
-            val promo1Salgados =
-                validar(etPromo1Salgados) { etPromo1Salgados.lerInteiroOuErro(promocoesAtivadas) }
-            val promo1Sucos =
-                validar(etPromo1Sucos) { etPromo1Sucos.lerInteiroOuErro(promocoesAtivadas) }
-            val promo1Vista =
-                validar(etPromo1Vista) {
-                    etPromo1Vista.lerCentavosOuErro("Informe o valor à vista", promocoesAtivadas)
-                }
-            val promo1Prazo =
-                validar(etPromo1Prazo) {
-                    etPromo1Prazo.lerCentavosOuErro("Informe o valor a prazo", promocoesAtivadas)
-                }
-            val promo2Salgados =
-                validar(etPromo2Salgados) { etPromo2Salgados.lerInteiroOuErro(promocoesAtivadas) }
-            val promo2Sucos =
-                validar(etPromo2Sucos) { etPromo2Sucos.lerInteiroOuErro(promocoesAtivadas) }
-            val promo2Vista =
-                validar(etPromo2Vista) {
-                    etPromo2Vista.lerCentavosOuErro("Informe o valor à vista", promocoesAtivadas)
-                }
-            val promo2Prazo =
-                validar(etPromo2Prazo) {
-                    etPromo2Prazo.lerCentavosOuErro("Informe o valor a prazo", promocoesAtivadas)
-                }
-
-            primeiroErro?.let {
-                it.requestFocus()
-                return null
-            }
-
-            return Configuracoes(
-                precoSalgadoVistaCentavos = requireNotNull(salgadoVista),
-                precoSalgadoPrazoCentavos = requireNotNull(salgadoPrazo),
-                precoSucoVistaCentavos = requireNotNull(sucoVista),
-                precoSucoPrazoCentavos = requireNotNull(sucoPrazo),
-                promocoesAtivadas = promocoesAtivadas,
-                promo1Nome = promo1Nome,
-                promo1Salgados = promo1Salgados ?: 0,
-                promo1Sucos = promo1Sucos ?: 0,
-                promo1VistaCentavos = promo1Vista ?: 0,
-                promo1PrazoCentavos = promo1Prazo ?: 0,
-                promo2Nome = promo2Nome,
-                promo2Salgados = promo2Salgados ?: 0,
-                promo2Sucos = promo2Sucos ?: 0,
-                promo2VistaCentavos = promo2Vista ?: 0,
-                promo2PrazoCentavos = promo2Prazo ?: 0,
-            )
-        }
-    }
-
-    private fun EditText.lerCentavosOuErro(
-        mensagemVazio: String,
-        obrigatorio: Boolean = true,
-    ): Long? {
-        val texto = text.toString()
-        if (!obrigatorio && texto.isBlank()) {
-            error = null
-            return null
-        }
-
-        return when (val resultado = texto.parseDinheiro()) {
-            is ParseDinheiro.Valido -> {
-                if (resultado.centavos > 0) {
-                    error = null
-                    resultado.centavos
-                } else {
-                    error = "Informe um valor maior que zero"
-                    null
-                }
-            }
-            ParseDinheiro.Vazio -> {
-                error = mensagemVazio
+        limparErrosCampos()
+        return when (val resultado = ConfiguracoesFormValidator.validar(binding.toConfiguracoesInput())) {
+            is ConfiguracoesFormResult.Valida -> resultado.configuracoes
+            is ConfiguracoesFormResult.Invalida -> {
+                mostrarErros(resultado.erros)
                 null
-            }
-            ParseDinheiro.Invalido -> {
-                error = "Valor inválido"
-                null
-            }
-            ParseDinheiro.Negativo -> {
-                error = "Valor não pode ser negativo"
-                null
-            }
-            ParseDinheiro.MuitoGrande -> {
-                error = "Valor muito grande"
-                null
-            }
-        }
-    }
-
-    private fun EditText.lerInteiroOuErro(obrigatorio: Boolean): Int? {
-        val texto = text.toString().trim()
-        if (!obrigatorio && texto.isBlank()) {
-            error = null
-            return null
-        }
-
-        val valor = texto.toIntOrNull()
-        return when {
-            texto.isBlank() -> {
-                error = "Informe a quantidade"
-                null
-            }
-            valor == null -> {
-                error = "Quantidade inválida"
-                null
-            }
-            valor < 0 -> {
-                error = "Quantidade não pode ser negativa"
-                null
-            }
-            else -> {
-                error = null
-                valor
             }
         }
     }
@@ -334,6 +200,63 @@ class ConfiguracoesFragment : Fragment() {
             ).forEach { it.error = null }
         }
     }
+
+    private fun limparErrosCampos() {
+        campoViews().values.forEach { it.error = null }
+    }
+
+    private fun mostrarErros(erros: Map<ConfiguracoesCampo, String>) {
+        val views = campoViews()
+        erros.forEach { (campo, mensagem) -> views[campo]?.error = mensagem }
+        erros.keys.firstOrNull()?.let { views[it]?.requestFocus() }
+    }
+
+    private fun campoViews(): Map<ConfiguracoesCampo, EditText> =
+        binding.run {
+            mapOf(
+                ConfiguracoesCampo.SALGADO_VISTA to etSalgadoVista,
+                ConfiguracoesCampo.SALGADO_PRAZO to etSalgadoPrazo,
+                ConfiguracoesCampo.SUCO_VISTA to etSucoVista,
+                ConfiguracoesCampo.SUCO_PRAZO to etSucoPrazo,
+                ConfiguracoesCampo.PROMO1_NOME to etPromo1Nome,
+                ConfiguracoesCampo.PROMO1_SALGADOS to etPromo1Salgados,
+                ConfiguracoesCampo.PROMO1_SUCOS to etPromo1Sucos,
+                ConfiguracoesCampo.PROMO1_VISTA to etPromo1Vista,
+                ConfiguracoesCampo.PROMO1_PRAZO to etPromo1Prazo,
+                ConfiguracoesCampo.PROMO2_NOME to etPromo2Nome,
+                ConfiguracoesCampo.PROMO2_SALGADOS to etPromo2Salgados,
+                ConfiguracoesCampo.PROMO2_SUCOS to etPromo2Sucos,
+                ConfiguracoesCampo.PROMO2_VISTA to etPromo2Vista,
+                ConfiguracoesCampo.PROMO2_PRAZO to etPromo2Prazo,
+            )
+        }
+
+    private fun FragmentConfiguracoesBinding.toConfiguracoesInput(): ConfiguracoesInput =
+        ConfiguracoesInput(
+            precoSalgadoVista = etSalgadoVista.text.toString(),
+            precoSalgadoPrazo = etSalgadoPrazo.text.toString(),
+            precoSucoVista = etSucoVista.text.toString(),
+            precoSucoPrazo = etSucoPrazo.text.toString(),
+            promocoesAtivadas = switchPromocoes.isChecked,
+            promo1Nome = etPromo1Nome.text.toString(),
+            promo1Salgados = etPromo1Salgados.text.toString(),
+            promo1Sucos = etPromo1Sucos.text.toString(),
+            promo1Vista = etPromo1Vista.text.toString(),
+            promo1Prazo = etPromo1Prazo.text.toString(),
+            promo2Nome = etPromo2Nome.text.toString(),
+            promo2Salgados = etPromo2Salgados.text.toString(),
+            promo2Sucos = etPromo2Sucos.text.toString(),
+            promo2Vista = etPromo2Vista.text.toString(),
+            promo2Prazo = etPromo2Prazo.text.toString(),
+        )
+
+    private fun buildInfo(): String =
+        "Caderneta ${BuildConfig.VERSION_NAME}\n" +
+            "Código ${BuildConfig.VERSION_CODE}\n" +
+            "Build ${BuildConfig.BUILD_TYPE}\n" +
+            "Commit ${BuildConfig.GIT_SHA}\n" +
+            "Build ${BuildConfig.BUILD_TIME}\n" +
+            "Banco ${BuildConfig.DB_VERSION}"
 
     override fun onDestroyView() {
         super.onDestroyView()

@@ -2,6 +2,7 @@ package com.example.caderneta.data.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.caderneta.domain.configuracoes.ConfiguracoesRules
 import com.example.caderneta.util.centavosParaReais
 
 /**
@@ -30,31 +31,7 @@ data class Configuracoes(
     val promo2VistaCentavos: Long,
     val promo2PrazoCentavos: Long,
 ) {
-    fun isValid(): Boolean {
-        val basicValuesValid =
-            precoSalgadoVistaCentavos > 0 &&
-                precoSalgadoPrazoCentavos > 0 &&
-                precoSucoVistaCentavos > 0 &&
-                precoSucoPrazoCentavos > 0
-
-        val promocoesValid =
-            if (promocoesAtivadas) {
-                promo1Salgados >= 0 &&
-                    promo1Sucos >= 0 &&
-                    promo1VistaCentavos > 0 &&
-                    promo1PrazoCentavos > 0 &&
-                    promo2Salgados >= 0 &&
-                    promo2Sucos >= 0 &&
-                    promo2VistaCentavos > 0 &&
-                    promo2PrazoCentavos > 0 &&
-                    promo1Nome.isNotBlank() &&
-                    promo2Nome.isNotBlank()
-            } else {
-                true
-            }
-
-        return basicValuesValid && promocoesValid
-    }
+    fun isValid(): Boolean = ConfiguracoesRules.isValid(this)
 
     /** Valor total (centavos) de uma promoção para a quantidade e tipo de transação. */
     fun calcularValorPromocao(
