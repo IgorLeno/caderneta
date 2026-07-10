@@ -14,6 +14,7 @@ import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
+import com.example.caderneta.util.EspressoIdlingResource
 import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -245,6 +246,7 @@ class VendasViewModel(
     fun confirmarOperacao(clienteId: Long) {
         val clienteState = _clienteStates.value[clienteId] ?: return
         if (!confirmacoesEmAndamento.add(clienteId)) return
+        EspressoIdlingResource.increment()
         viewModelScope.launch {
             try {
                 when (clienteState.modoOperacao) {
@@ -254,6 +256,7 @@ class VendasViewModel(
                 }
             } finally {
                 confirmacoesEmAndamento.remove(clienteId)
+                EspressoIdlingResource.decrement()
             }
         }
     }

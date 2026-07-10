@@ -20,6 +20,10 @@ ktlint {
     baseline.set(file("ktlint-baseline.xml"))
 }
 
+configurations.configureEach {
+    resolutionStrategy.force("androidx.test.services:storage:1.6.0")
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
@@ -59,6 +63,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
+        testInstrumentationRunnerArguments["useTestStorageService"] = "true"
         buildConfigField("String", "GIT_SHA", "\"${gitOutput("rev-parse", "--short", "HEAD")}\"")
         buildConfigField("String", "GIT_SHA_FULL", "\"${gitOutput("rev-parse", "HEAD")}\"")
         buildConfigField("String", "BUILD_TIME", "\"${buildTimeIso()}\"")
@@ -92,6 +97,15 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         execution = "ANDROIDX_TEST_ORCHESTRATOR"
+        managedDevices {
+            localDevices {
+                create("pixelApi35") {
+                    device = "Pixel 7"
+                    apiLevel = 35
+                    systemImageSource = "aosp"
+                }
+            }
+        }
     }
     packaging {
         resources {
@@ -119,6 +133,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    implementation(libs.androidx.espresso.idling.resource)
+
     implementation(libs.material)
     implementation(libs.mpandroidchart)
 
@@ -136,10 +152,14 @@ dependencies {
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.espresso.contrib)
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.core.ktx)
+    androidTestImplementation(libs.androidx.test.storage)
+    androidTestImplementation(libs.androidx.uiautomator)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestUtil(libs.androidx.test.services)
 }

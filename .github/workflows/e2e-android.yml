@@ -2,6 +2,15 @@ name: Android E2E
 
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: E2E suite to run
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - smoke
   schedule:
     - cron: '20 6 * * *'
   push:
@@ -12,6 +21,7 @@ on:
       - 'gradle.properties'
       - 'settings.gradle.kts'
       - 'build.gradle.kts'
+      - 'scripts/**'
       - '.github/workflows/e2e-android.yml'
 
 permissions:
@@ -22,10 +32,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e-smoke:
-    name: Instrumented smoke
+  android-e2e:
+    name: GMD audit
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
 
     steps:
       - name: Checkout
@@ -46,20 +56,20 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run E2E smoke
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_atd
-          arch: x86_64
-          profile: pixel_6
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest --stacktrace --no-daemon
+      - name: Select suite
+        id: suite
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            SUITE="smoke"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SUITE="${{ inputs.suite }}"
+          else
+            SUITE="full"
+          fi
+          echo "suite=$SUITE" >> "$GITHUB_OUTPUT"
 
-      - name: Collect logcat on failure
-        if: failure()
-        run: adb logcat -d > logcat.txt || true
+      - name: Run autonomous audit on GMD
+        run: ./scripts/run-autonomous-audit.sh --suite "${{ steps.suite.outputs.suite }}"
 
       - name: Upload E2E artifacts on failure
         if: failure()
@@ -67,9 +77,10 @@ jobs:
         with:
           name: e2e-failure-artifacts
           path: |
-            logcat.txt
+            build/reports/app-audit/
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
+            app/build/outputs/managed_device_android_test_additional_output/
             app/build/outputs/connected_android_test_additional_output/
           if-no-files-found: ignore
           retention-days: 7

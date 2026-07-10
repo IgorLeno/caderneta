@@ -8,6 +8,7 @@ import com.example.caderneta.data.backup.BackupManager
 import com.example.caderneta.data.backup.BackupSnapshot
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.repository.ConfiguracoesRepository
+import com.example.caderneta.util.EspressoIdlingResource
 import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,6 +64,7 @@ class ConfiguracoesViewModel(
 
     fun salvarConfiguracoes(novasConfiguracoes: Configuracoes) {
         if (_salvando.value) return
+        EspressoIdlingResource.increment()
         viewModelScope.launch {
             try {
                 _salvando.value = true
@@ -82,6 +84,7 @@ class ConfiguracoesViewModel(
                 _eventos.send(UiEvento.Erro("Erro ao salvar configurações: ${e.message}"))
             } finally {
                 _salvando.value = false
+                EspressoIdlingResource.decrement()
             }
         }
     }

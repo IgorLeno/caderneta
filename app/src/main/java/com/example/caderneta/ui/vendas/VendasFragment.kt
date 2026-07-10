@@ -280,7 +280,11 @@ class VendasFragment : Fragment() {
                 vendasViewModel.clienteStateUpdates.collect { clienteId ->
                     val position = clientesAdapter.currentList.indexOfFirst { it.id == clienteId }
                     if (position != -1) {
-                        clientesAdapter.notifyItemChanged(position)
+                        binding.rvClientes.post {
+                            if (_binding != null && position in 0 until clientesAdapter.itemCount) {
+                                clientesAdapter.notifyItemChanged(position)
+                            }
+                        }
                     }
                 }
             }
@@ -290,7 +294,14 @@ class VendasFragment : Fragment() {
             vendasViewModel.valorTotal.collectLatest { (clienteId, valor) ->
                 val position = clientesAdapter.currentList.indexOfFirst { it.id == clienteId }
                 if (position != -1) {
-                    clientesAdapter.notifyItemChanged(position, ClientesAdapter.Payload.ValorTotalChanged(valor))
+                    binding.rvClientes.post {
+                        if (_binding != null && position in 0 until clientesAdapter.itemCount) {
+                            clientesAdapter.notifyItemChanged(
+                                position,
+                                ClientesAdapter.Payload.ValorTotalChanged(valor),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -310,7 +321,11 @@ class VendasFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 vendasViewModel.configuracoes.collectLatest {
-                    clientesAdapter.notifyDataSetChanged()
+                    binding.rvClientes.post {
+                        if (_binding != null) {
+                            clientesAdapter.notifyDataSetChanged()
+                        }
+                    }
                 }
             }
         }
