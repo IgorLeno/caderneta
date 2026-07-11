@@ -1,6 +1,7 @@
 package com.example.caderneta.e2e
 
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -25,6 +26,7 @@ class BuildIdentityE2ETest : BaseE2ETest() {
 
             assertNotEquals("unknown", BuildConfig.GIT_SHA)
             onView(withId(R.id.tv_build_info))
+                .perform(scrollTo())
                 .check(matches(isDisplayed()))
                 .check(matches(withText(allOf(containsString("Caderneta ${BuildConfig.VERSION_NAME}")))))
                 .check(matches(withText(containsString("Código ${BuildConfig.VERSION_CODE}"))))

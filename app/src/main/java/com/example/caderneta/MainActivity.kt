@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         if (BuildConfig.IS_AUDIT) {
             toolbar.subtitle = "AUDITORIA - dados ficticios"
+            toolbar.setSubtitleTextColor(ContextCompat.getColor(this, R.color.red))
         }
 
         val navHostFragment =

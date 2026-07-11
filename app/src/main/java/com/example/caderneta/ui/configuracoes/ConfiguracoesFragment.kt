@@ -261,8 +261,7 @@ class ConfiguracoesFragment : Fragment() {
         )
 
     private fun buildInfo(): String =
-        auditWarning() +
-            "Caderneta ${BuildConfig.VERSION_NAME}\n" +
+        "Caderneta ${BuildConfig.VERSION_NAME}\n" +
             "Código ${BuildConfig.VERSION_CODE}\n" +
             "Build ${BuildConfig.BUILD_TYPE}\n" +
             "Audit ${BuildConfig.IS_AUDIT}\n" +
@@ -270,13 +269,6 @@ class ConfiguracoesFragment : Fragment() {
             "Commit ${BuildConfig.GIT_SHA}\n" +
             "Build ${BuildConfig.BUILD_TIME}\n" +
             "Banco ${BuildConfig.DB_VERSION}"
-
-    private fun auditWarning(): String =
-        if (BuildConfig.IS_AUDIT) {
-            "AUDITORIA - dados ficticios\n"
-        } else {
-            ""
-        }
 
     override fun onDestroyView() {
         super.onDestroyView()
