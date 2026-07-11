@@ -11,6 +11,7 @@ import com.example.caderneta.reporting.ScreenshotCollector
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
+import java.io.Closeable
 
 abstract class BaseE2ETest {
     @get:Rule
@@ -29,9 +30,14 @@ abstract class BaseE2ETest {
         WaitConditions.unregisterIdlingResource()
     }
 
-    protected fun launch(scenario: String): ActivityScenario<MainActivity> {
+    protected fun launch(scenario: String): AuditActivityScenario {
+        val activityScenario = ActivityScenario.launch(MainActivity::class.java)
         DeviceMetadataCollector.write(scenario)
-        return ActivityScenario.launch(MainActivity::class.java)
+        return AuditActivityScenario(
+            scenario = scenario,
+            activityScenario = activityScenario,
+            audit = audit,
+        )
     }
 
     protected fun step(
@@ -45,4 +51,29 @@ abstract class BaseE2ETest {
         scenario: String,
         name: String,
     ): String = ScreenshotCollector.takeScreenshot(scenario, name)
+}
+
+class AuditActivityScenario(
+    private val scenario: String,
+    private val activityScenario: ActivityScenario<MainActivity>,
+    private val audit: AuditTestWatcher,
+) : Closeable {
+    fun recreate() {
+        activityScenario.recreate()
+    }
+
+    fun <T> use(block: (AuditActivityScenario) -> T): T {
+        try {
+            return block(this)
+        } catch (throwable: Throwable) {
+            audit.captureFailure(scenario, throwable, preClose = true)
+            throw throwable
+        } finally {
+            close()
+        }
+    }
+
+    override fun close() {
+        activityScenario.close()
+    }
 }

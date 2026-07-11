@@ -10,6 +10,7 @@ import java.io.StringWriter
 
 class AuditTestWatcher : TestWatcher() {
     private var lastStep: String = "not-started"
+    private val capturedFailures = mutableSetOf<String>()
 
     fun step(
         scenario: String,
@@ -24,9 +25,20 @@ class AuditTestWatcher : TestWatcher() {
         description: Description,
     ) {
         val scenario = description.methodName ?: description.displayName
+        if (capturedFailures.isNotEmpty()) return
+        captureFailure(scenario, e, preClose = false)
+    }
+
+    fun captureFailure(
+        scenario: String,
+        throwable: Throwable,
+        preClose: Boolean,
+    ) {
+        if (!capturedFailures.add(scenario)) return
         runCatching { ScreenshotCollector.takeScreenshot(scenario, "failure_$lastStep") }
         runCatching { dumpHierarchy(scenario) }
-        runCatching { writeFailure(scenario, e) }
+        runCatching { DeviceMetadataCollector.writeFailure(scenario, lastStep, preClose) }
+        runCatching { writeFailure(scenario, throwable, preClose) }
     }
 
     private fun dumpHierarchy(scenario: String) {
@@ -39,8 +51,9 @@ class AuditTestWatcher : TestWatcher() {
     private fun writeFailure(
         scenario: String,
         throwable: Throwable,
+        preClose: Boolean,
     ) {
         val trace = StringWriter().also { writer -> throwable.printStackTrace(PrintWriter(writer)) }.toString()
-        TestOutput.writeText("failures/${scenario}_failure.txt", "lastStep=$lastStep\n\n$trace")
+        TestOutput.writeText("failures/${scenario}_failure.txt", "lastStep=$lastStep\npreClose=$preClose\n\n$trace")
     }
 }

@@ -3,6 +3,7 @@ package com.example.caderneta.reporting
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import com.example.caderneta.BuildConfig
 import org.json.JSONObject
 import java.util.Locale
@@ -33,6 +34,43 @@ object DeviceMetadataCollector {
                 .put("gitShaFull", BuildConfig.GIT_SHA_FULL)
                 .put("buildTime", BuildConfig.BUILD_TIME)
                 .put("dbVersion", BuildConfig.DB_VERSION)
+                .put("foregroundPackage", foregroundPackage())
+                .put("foregroundActivity", foregroundActivity())
         TestOutput.writeText("metadata/${scenario}_device_build.json", json.toString(2))
+    }
+
+    fun writeFailure(
+        scenario: String,
+        lastStep: String,
+        preClose: Boolean,
+    ) {
+        val json =
+            JSONObject()
+                .put("scenario", scenario)
+                .put("lastStep", lastStep)
+                .put("preClose", preClose)
+                .put("expectedPackage", BuildConfig.APPLICATION_ID)
+                .put("foregroundPackage", foregroundPackage())
+                .put("foregroundActivity", foregroundActivity())
+        TestOutput.writeText("metadata/${scenario}_failure_device_build.json", json.toString(2))
+    }
+
+    fun foregroundPackage(): String {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        return runCatching {
+            UiDevice.getInstance(instrumentation).currentPackageName
+        }.getOrDefault("unknown")
+    }
+
+    fun foregroundActivity(): String {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        return runCatching {
+            val device = UiDevice.getInstance(instrumentation)
+            val output =
+                device.executeShellCommand(
+                    "sh -c \"dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' | head -n 2\"",
+                )
+            output.trim().ifBlank { foregroundPackage() }
+        }.getOrDefault("unknown")
     }
 }
