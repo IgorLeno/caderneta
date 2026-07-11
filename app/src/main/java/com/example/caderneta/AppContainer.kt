@@ -4,6 +4,9 @@ import android.content.Context
 import com.example.caderneta.data.AppDatabase
 import com.example.caderneta.data.backup.BackupManager
 import com.example.caderneta.domain.FinanceiroService
+import com.example.caderneta.domain.foto.ClientePhotoProcessor
+import com.example.caderneta.domain.foto.ClientePhotoRepository
+import com.example.caderneta.domain.foto.ClientePhotoStore
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
@@ -19,6 +22,7 @@ interface AppContainer {
     val contaRepository: ContaRepository
     val financeiroService: FinanceiroService
     val backupManager: BackupManager
+    val clientePhotoRepository: ClientePhotoRepository
 }
 
 class ProductionAppContainer(
@@ -36,4 +40,11 @@ class ProductionAppContainer(
     override val contaRepository: ContaRepository by lazy { ContaRepository(database.contaDao()) }
     override val financeiroService: FinanceiroService by lazy { FinanceiroService(database) }
     override val backupManager: BackupManager by lazy { BackupManager(context, database) }
+    override val clientePhotoRepository: ClientePhotoRepository by lazy {
+        ClientePhotoRepository(
+            clienteRepository = clienteRepository,
+            store = ClientePhotoStore(context),
+            processor = ClientePhotoProcessor(context),
+        )
+    }
 }

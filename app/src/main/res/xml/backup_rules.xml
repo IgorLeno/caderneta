@@ -3,4 +3,5 @@
     <!-- Auto Backup do Google é best-effort. O export JSON via SAF é o mecanismo primário. -->
     <include domain="database" path="caderneta_database" />
     <include domain="sharedpref" path="backup_prefs.xml" />
+    <include domain="file" path="client_photos/" />
 </full-backup-content>

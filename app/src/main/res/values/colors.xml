@@ -10,6 +10,8 @@
     <color name="on_secondary">#000000</color>
     <color name="on_background">#000000</color>
     <color name="on_surface">#000000</color>
+    <color name="text_muted">#5F504A</color>
+    <color name="outline_color">#E4CFC4</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="green">#4CAF50</color>
@@ -28,7 +30,7 @@
     <color name="level_3">#ffcbb0</color>
 
     <!-- Cores para os botoes -->
-    <color name="button_background_selected">#FF5722</color>
+    <color name="button_background_selected">#ff8247</color>
     <color name="button_background_unselected">#FFFFFF</color>
     <color name="button_icon_selected">#FFFFFF</color>
     <color name="button_icon_unselected">#757575</color>

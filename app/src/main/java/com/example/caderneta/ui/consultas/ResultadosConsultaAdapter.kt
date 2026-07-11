@@ -17,6 +17,8 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import coil.transform.CircleCropTransformation
 import com.example.caderneta.R
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.ItemResultadoConsultaBinding
@@ -28,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import com.example.caderneta.data.entity.Cliente as ClienteEntity
 
 @Suppress("LongParameterList")
@@ -41,6 +44,7 @@ class ResultadosConsultaAdapter(
     private val onEditarCliente: (ClienteEntity) -> Unit,
     private val onExcluirCliente: (ClienteEntity) -> Unit,
     private val onClienteCollapse: (Long) -> Unit,
+    private val getClientePhotoFile: (String?) -> File?,
 ) : ListAdapter<ResultadoConsulta, RecyclerView.ViewHolder>(ResultadoConsultaDiffCallback()) {
     private var vendasPorCliente: Map<Long, List<Venda>> = emptyMap()
     private val expandedClientes = mutableSetOf<Long>()
@@ -118,6 +122,11 @@ class ResultadosConsultaAdapter(
                 tvTelefone.text = cliente.telefone?.takeIf { it.isNotBlank() } ?: "Não informado"
                 tvTelefone.visibility = View.VISIBLE
                 tvLocalHierarquia.visibility = View.VISIBLE
+                ivClienteFoto.load(getClientePhotoFile(cliente.fotoNome)) {
+                    placeholder(R.drawable.ic_avatar)
+                    error(R.drawable.ic_avatar)
+                    transformations(CircleCropTransformation())
+                }
 
                 // Atualizar saldo apenas se mudou
                 if (currentSaldoCentavos != resultado.saldoCentavos) {

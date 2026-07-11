@@ -6,13 +6,14 @@
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
+        style="@style/Widget.Caderneta.Toolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@color/primary_color"
+        android:layout_height="wrap_content"
         android:elevation="4dp"
+        android:minHeight="?attr/actionBarSize"
         android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
-        app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light"
-        app:layout_constraintTop_toTopOf="parent"/>
+        app:layout_constraintTop_toTopOf="parent"
+        app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light" />
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/nav_host_fragment"
@@ -31,8 +32,9 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="@color/surface_color"
-        app:itemIconTint="@color/primary_color"
-        app:itemTextColor="@color/primary_color"
+        app:itemIconTint="@color/bottom_nav_item_color"
+        app:itemTextColor="@color/bottom_nav_item_color"
+        app:labelVisibilityMode="labeled"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"

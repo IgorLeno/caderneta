@@ -54,4 +54,5 @@ data class Cliente(
     val sublocal2Id: Long? = null,
     val sublocal3Id: Long? = null,
     val arquivado: Boolean = false,
+    val fotoNome: String? = null,
 )

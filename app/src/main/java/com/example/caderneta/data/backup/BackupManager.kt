@@ -71,6 +71,7 @@ class BackupManager(
     private suspend fun criarSnapshot(): BackupSnapshot =
         db.withTransaction {
             BackupSnapshot(
+                dbVersion = AppDatabase.DATABASE_VERSION,
                 app = context.packageName,
                 geradoEmMillis = System.currentTimeMillis(),
                 locais = backupDao.getAllLocais(),

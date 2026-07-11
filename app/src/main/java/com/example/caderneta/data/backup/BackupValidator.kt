@@ -6,13 +6,14 @@ import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.Operacao
 import com.example.caderneta.data.entity.TransacaoVenda
 import com.example.caderneta.data.entity.Venda
+import com.example.caderneta.domain.foto.ClientePhotoStore
 
 class BackupValidator(
     private val applicationId: String,
 ) {
     fun validar(snapshot: BackupSnapshot) {
         require(snapshot.formatVersion == 1) { "Versão de backup não suportada" }
-        require(snapshot.dbVersion == 1) { "Versão de banco não suportada" }
+        require(snapshot.dbVersion in 1..2) { "Versão de banco não suportada" }
         require(snapshot.app == applicationId) { "Backup pertence a outro aplicativo" }
         require(snapshot.configuracoes.size <= 1) { "Backup possui mais de uma configuração" }
 
@@ -65,6 +66,11 @@ class BackupValidator(
     ) {
         snapshot.clientes.forEach { cliente ->
             require(cliente.id > 0) { "Cliente inválido" }
+            cliente.fotoNome?.let { fotoNome ->
+                require(ClientePhotoStore.isValidPhotoName(fotoNome)) {
+                    "Cliente com nome de foto inválido"
+                }
+            }
             val cadeia = validarCadeiaCliente(cliente, locaisPorId)
             if (!cliente.arquivado) {
                 require(cadeia.none { it.arquivado }) { "Cliente ativo associado a local arquivado" }

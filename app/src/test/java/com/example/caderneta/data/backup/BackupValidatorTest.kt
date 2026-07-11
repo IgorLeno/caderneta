@@ -142,7 +142,7 @@ class BackupValidatorTest {
 
     @Test
     fun rejeitaDbVersionIncompativel() {
-        assertInvalido(snapshotValido().copy(dbVersion = 2))
+        assertInvalido(snapshotValido().copy(dbVersion = 3))
     }
 
     @Test

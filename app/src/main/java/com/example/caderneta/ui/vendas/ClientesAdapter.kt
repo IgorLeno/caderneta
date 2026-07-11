@@ -14,6 +14,8 @@ import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import coil.transform.CircleCropTransformation
 import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Configuracoes
@@ -28,6 +30,7 @@ import com.example.caderneta.viewmodel.ClienteState
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.io.File
 
 @Suppress("LongParameterList")
 class ClientesAdapter(
@@ -45,6 +48,7 @@ class ClientesAdapter(
     private val observeSaldoAtualizado: ((suspend (Long) -> Unit) -> Unit),
     private val onEditarCliente: (Cliente) -> Unit,
     private val onExcluirCliente: (Cliente) -> Unit,
+    private val getClientePhotoFile: (String?) -> File?,
 ) : ListAdapter<Cliente, ClientesAdapter.ClienteViewHolder>(ClienteDiffCallback()) {
     enum class TipoQuantidade {
         SALGADO,
@@ -88,6 +92,8 @@ class ClientesAdapter(
             when (payloads[0]) {
                 is Payload.ValorTotalChanged -> holder.updateValorTotal(payloads[0] as Payload.ValorTotalChanged)
                 is Payload.SaldoChanged -> holder.updateSaldo()
+                is Payload.StateChanged -> holder.updateStateFromPayload()
+                is Payload.ConfiguracoesChanged -> holder.updateStateFromPayload()
                 else -> super.onBindViewHolder(holder, position, payloads)
             }
         } else {
@@ -109,6 +115,7 @@ class ClientesAdapter(
         private var contadorPromo1Helper: ContadorHelper? = null
         private var contadorPromo2Helper: ContadorHelper? = null
         private var boundClienteId: Long? = null
+        private var boundCliente: Cliente? = null
         private var saldoJob: Job? = null
         private var isBindingPagamento = false
         private val pagamentoInputController = PagamentoInputController()
@@ -119,6 +126,7 @@ class ClientesAdapter(
 
         fun bind(cliente: Cliente) {
             boundClienteId = cliente.id
+            boundCliente = cliente
             cancelSaldoJob()
             setupBasicInfo(cliente)
             setupMainButtons(cliente)
@@ -136,6 +144,7 @@ class ClientesAdapter(
             contadorSucosHelper = null
             contadorPromo1Helper = null
             contadorPromo2Helper = null
+            boundCliente = null
         }
 
         fun cancelSaldoJob() {
@@ -145,11 +154,20 @@ class ClientesAdapter(
 
         private fun setupBasicInfo(cliente: Cliente) {
             binding.tvNomeCliente.text = cliente.nome
+            binding.ivClienteFoto.load(getClientePhotoFile(cliente.fotoNome)) {
+                placeholder(R.drawable.ic_avatar)
+                error(R.drawable.ic_avatar)
+                transformations(CircleCropTransformation())
+            }
             updateSaldo(cliente.id)
         }
 
         fun updateSaldo() {
             boundClienteId?.let(::updateSaldo)
+        }
+
+        fun updateStateFromPayload() {
+            boundCliente?.let(::updateButtonStates)
         }
 
         private fun updateSaldo(clienteId: Long) {
@@ -217,6 +235,11 @@ class ClientesAdapter(
                 }
 
                 btnPromocao.setOnClickListener {
+                    if (getConfiguracoes()?.promocoesAtivadas != true) {
+                        onModoOperacaoSelected(cliente, null)
+                        updateButtonStates(cliente)
+                        return@setOnClickListener
+                    }
                     val currentState = getClienteState(cliente.id)?.modoOperacao
                     val newModoOperacao = if (currentState == ModoOperacao.PROMOCAO) null else ModoOperacao.PROMOCAO
                     onModoOperacaoSelected(cliente, newModoOperacao)
@@ -341,18 +364,28 @@ class ClientesAdapter(
         private fun updateButtonStates(cliente: Cliente) {
             val state = getClienteState(cliente.id) ?: ClienteState(clienteId = cliente.id)
             val config = getConfiguracoes()
+            val promocoesAtivadas = config?.promocoesAtivadas == true
 
-            updateButtonSelections(state)
-            updateLayoutVisibility(state)
+            updatePromocaoActionVisibility(promocoesAtivadas)
+            updateButtonSelections(state, promocoesAtivadas)
+            updateLayoutVisibility(state, promocoesAtivadas)
             updateContadoresState(state)
             restorePagamentoText(state)
             config?.let { updatePromocoesInfo(state, it) }
         }
 
-        private fun updateButtonSelections(state: ClienteState) {
+        private fun updatePromocaoActionVisibility(promocoesAtivadas: Boolean) {
+            binding.layoutAcaoPromocao.visibility = if (promocoesAtivadas) View.VISIBLE else View.GONE
+            binding.btnPromocao.isEnabled = promocoesAtivadas
+        }
+
+        private fun updateButtonSelections(
+            state: ClienteState,
+            promocoesAtivadas: Boolean,
+        ) {
             binding.apply {
                 btnVenda.isSelected = state.modoOperacao == ModoOperacao.VENDA
-                btnPromocao.isSelected = state.modoOperacao == ModoOperacao.PROMOCAO
+                btnPromocao.isSelected = promocoesAtivadas && state.modoOperacao == ModoOperacao.PROMOCAO
                 btnPagamento.isSelected = state.modoOperacao == ModoOperacao.PAGAMENTO
 
                 val isVendaOrPromocao =
@@ -366,7 +399,11 @@ class ClientesAdapter(
         }
 
         @Suppress("CyclomaticComplexMethod")
-        private fun updateLayoutVisibility(state: ClienteState) {
+        private fun updateLayoutVisibility(
+            state: ClienteState,
+            promocoesAtivadas: Boolean,
+        ) {
+            val modoPromocaoAtivo = promocoesAtivadas && state.modoOperacao == ModoOperacao.PROMOCAO
             binding.apply {
                 layoutVenda.visibility =
                     when {
@@ -378,7 +415,7 @@ class ClientesAdapter(
                 layoutBotoesVenda.visibility =
                     when {
                         state.modoOperacao == ModoOperacao.VENDA ||
-                            state.modoOperacao == ModoOperacao.PROMOCAO -> View.VISIBLE
+                            modoPromocaoAtivo -> View.VISIBLE
                         else -> View.GONE
                     }
 
@@ -391,7 +428,7 @@ class ClientesAdapter(
 
                 layoutVendaPromocao.visibility =
                     when {
-                        state.modoOperacao == ModoOperacao.PROMOCAO &&
+                        modoPromocaoAtivo &&
                             state.tipoTransacao != null -> View.VISIBLE
                         else -> View.GONE
                     }
@@ -406,7 +443,7 @@ class ClientesAdapter(
                     when {
                         (
                             state.modoOperacao == ModoOperacao.VENDA ||
-                                state.modoOperacao == ModoOperacao.PROMOCAO
+                                modoPromocaoAtivo
                         ) &&
                             state.tipoTransacao != null -> View.VISIBLE
                         else -> View.GONE
@@ -566,6 +603,10 @@ class ClientesAdapter(
         ) : Payload()
 
         object SaldoChanged : Payload()
+
+        object StateChanged : Payload()
+
+        object ConfiguracoesChanged : Payload()
     }
 
     companion object {

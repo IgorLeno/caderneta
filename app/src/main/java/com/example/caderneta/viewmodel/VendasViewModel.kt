@@ -1,5 +1,6 @@
 package com.example.caderneta.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,7 @@ import com.example.caderneta.data.entity.Local
 import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.domain.FinanceiroService
+import com.example.caderneta.domain.foto.ClientePhotoRepository
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class VendasViewModel(
@@ -41,6 +44,7 @@ class VendasViewModel(
     private val configuracoesRepository: ConfiguracoesRepository,
     private val contaRepository: ContaRepository,
     private val financeiroService: FinanceiroService,
+    private val clientePhotoRepository: ClientePhotoRepository? = null,
 ) : ViewModel() {
     private val _localSelecionado = MutableStateFlow<Local?>(null)
     val localSelecionado: StateFlow<Local?> = _localSelecionado.asStateFlow()
@@ -105,6 +109,16 @@ class VendasViewModel(
     /** Guarda contra confirmação duplicada (duplo clique) por cliente. */
     private val confirmacoesEmAndamento = mutableSetOf<Long>()
 
+    init {
+        viewModelScope.launch {
+            configuracoes.collect { config ->
+                if (config?.promocoesAtivadas == false) {
+                    limparEstadosPromocionais()
+                }
+            }
+        }
+    }
+
     // ----- seleção de local e busca -----
 
     fun selecionarLocal(localId: Long?) {
@@ -138,8 +152,13 @@ class VendasViewModel(
         cliente: Cliente,
         modoOperacao: ModoOperacao?,
     ) {
-        if (modoOperacao in listOf(ModoOperacao.VENDA, ModoOperacao.PROMOCAO) && configuracoes.value == null) {
+        val config = configuracoes.value
+        if (modoOperacao in listOf(ModoOperacao.VENDA, ModoOperacao.PROMOCAO) && config == null) {
             publicarErro("Configure os preços em Configurações antes de registrar vendas")
+            return
+        }
+        if (modoOperacao == ModoOperacao.PROMOCAO && config?.promocoesAtivadas != true) {
+            publicarErro("Ative as promoções em Configurações antes de registrar promoção")
             return
         }
 
@@ -151,6 +170,19 @@ class VendasViewModel(
                 ClienteState(clienteId = cliente.id)
             }
         atualizarState(novo)
+    }
+
+    private fun limparEstadosPromocionais() {
+        val estadosPromocionais = _clienteStates.value.values.filter { it.modoOperacao == ModoOperacao.PROMOCAO }
+        if (estadosPromocionais.isEmpty()) return
+
+        _clienteStates.update { estados ->
+            estados + estadosPromocionais.associate { state -> state.clienteId to ClienteState(state.clienteId) }
+        }
+        estadosPromocionais.forEach { state ->
+            _valorTotal.tryEmit(state.clienteId to 0L)
+            viewModelScope.launch { _clienteStateUpdates.emit(state.clienteId) }
+        }
     }
 
     fun selecionarTipoTransacao(
@@ -433,20 +465,23 @@ class VendasViewModel(
         sublocal1Id: Long?,
         sublocal2Id: Long?,
         sublocal3Id: Long?,
+        fotoUri: Uri? = null,
     ) {
         viewModelScope.launch {
             try {
                 validarHierarquia(localId, sublocal1Id, sublocal2Id, sublocal3Id)
-                clienteRepository.insertCliente(
-                    Cliente(
-                        nome = nome,
-                        telefone = telefone,
-                        localId = localId,
-                        sublocal1Id = sublocal1Id,
-                        sublocal2Id = sublocal2Id,
-                        sublocal3Id = sublocal3Id,
-                    ),
-                )
+                val clienteId =
+                    clienteRepository.insertCliente(
+                        Cliente(
+                            nome = nome,
+                            telefone = telefone,
+                            localId = localId,
+                            sublocal1Id = sublocal1Id,
+                            sublocal2Id = sublocal2Id,
+                            sublocal3Id = sublocal3Id,
+                        ),
+                    )
+                fotoUri?.let { uri -> clientePhotoRepository?.salvarFotoCliente(clienteId, uri) }
             } catch (e: Exception) {
                 e.rethrowCancellation()
                 publicarErro("Erro ao adicionar cliente: ${e.message}")
@@ -463,6 +498,8 @@ class VendasViewModel(
         novoSublocal1Id: Long?,
         novoSublocal2Id: Long?,
         novoSublocal3Id: Long?,
+        fotoUri: Uri? = null,
+        removerFoto: Boolean = false,
     ) {
         viewModelScope.launch {
             try {
@@ -477,12 +514,18 @@ class VendasViewModel(
                         sublocal3Id = novoSublocal3Id,
                     ),
                 )
+                when {
+                    removerFoto -> clientePhotoRepository?.removerFoto(cliente.id)
+                    fotoUri != null -> clientePhotoRepository?.salvarFotoCliente(cliente.id, fotoUri)
+                }
             } catch (e: Exception) {
                 e.rethrowCancellation()
                 publicarErro("Erro ao atualizar cliente: ${e.message}")
             }
         }
     }
+
+    fun arquivoFotoCliente(fotoNome: String?): File? = clientePhotoRepository?.arquivo(fotoNome)
 
     /**
      * Cliente com histórico financeiro não pode ser apagado (FK RESTRICT):
@@ -530,6 +573,7 @@ class VendasViewModelFactory(
     private val configuracoesRepository: ConfiguracoesRepository,
     private val contaRepository: ContaRepository,
     private val financeiroService: FinanceiroService,
+    private val clientePhotoRepository: ClientePhotoRepository? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(VendasViewModel::class.java)) {
@@ -541,6 +585,7 @@ class VendasViewModelFactory(
                 configuracoesRepository,
                 contaRepository,
                 financeiroService,
+                clientePhotoRepository,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

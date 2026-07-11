@@ -2,6 +2,7 @@ package com.example.caderneta.fixtures
 
 import androidx.sqlite.db.SimpleSQLiteQuery
 import com.example.caderneta.AppContainer
+import com.example.caderneta.BuildConfig
 import com.example.caderneta.data.backup.BackupSnapshot
 import kotlinx.coroutines.runBlocking
 
@@ -37,7 +38,7 @@ object DatabaseFixture {
 
     private fun emptySnapshot(): BackupSnapshot =
         BackupSnapshot(
-            app = "com.example.caderneta",
+            app = BuildConfig.APPLICATION_ID,
             geradoEmMillis = System.currentTimeMillis(),
             locais = emptyList(),
             clientes = emptyList(),

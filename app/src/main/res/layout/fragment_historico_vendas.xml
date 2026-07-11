@@ -24,24 +24,13 @@
             android:layout_height="wrap_content"
             android:padding="16dp">
 
-            <TextView
-                android:id="@+id/tv_titulo_historico"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Histórico de Vendas"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tab_layout"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tv_titulo_historico">
+                app:layout_constraintTop_toTopOf="parent">
 
                 <com.google.android.material.tabs.TabItem
                     android:layout_width="wrap_content"

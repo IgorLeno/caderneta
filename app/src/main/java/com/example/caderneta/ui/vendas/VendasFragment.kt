@@ -50,6 +50,7 @@ class VendasFragment : Fragment() {
             (requireActivity().application as CadernetaApplication).configuracoesRepository,
             (requireActivity().application as CadernetaApplication).contaRepository,
             (requireActivity().application as CadernetaApplication).financeiroService,
+            (requireActivity().application as CadernetaApplication).clientePhotoRepository,
         )
     }
 
@@ -137,6 +138,9 @@ class VendasFragment : Fragment() {
                 onExcluirCliente = { cliente ->
                     vendasViewModel.excluirCliente(cliente)
                 },
+                getClientePhotoFile = { fotoNome ->
+                    vendasViewModel.arquivoFotoCliente(fotoNome)
+                },
             )
 
         binding.rvClientes.apply {
@@ -162,7 +166,16 @@ class VendasFragment : Fragment() {
         val dialog =
             NovoClienteDialog(vendasViewModel).apply {
                 setClienteExistente(cliente)
-                onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
+                onClienteAdicionado = {
+                    nome,
+                    telefone,
+                    localId,
+                    sublocal1Id,
+                    sublocal2Id,
+                    sublocal3Id,
+                    fotoUri,
+                    removerFoto,
+                    ->
                     vendasViewModel.editarCliente(
                         cliente = cliente,
                         novoNome = nome,
@@ -171,6 +184,8 @@ class VendasFragment : Fragment() {
                         novoSublocal1Id = sublocal1Id,
                         novoSublocal2Id = sublocal2Id,
                         novoSublocal3Id = sublocal3Id,
+                        fotoUri = fotoUri,
+                        removerFoto = removerFoto,
                     )
                 }
             }
@@ -282,7 +297,10 @@ class VendasFragment : Fragment() {
                     if (position != -1) {
                         binding.rvClientes.post {
                             if (_binding != null && position in 0 until clientesAdapter.itemCount) {
-                                clientesAdapter.notifyItemChanged(position)
+                                clientesAdapter.notifyItemChanged(
+                                    position,
+                                    ClientesAdapter.Payload.StateChanged,
+                                )
                             }
                         }
                     }
@@ -322,8 +340,12 @@ class VendasFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 vendasViewModel.configuracoes.collectLatest {
                     binding.rvClientes.post {
-                        if (_binding != null) {
-                            clientesAdapter.notifyDataSetChanged()
+                        if (_binding != null && clientesAdapter.itemCount > 0) {
+                            clientesAdapter.notifyItemRangeChanged(
+                                0,
+                                clientesAdapter.itemCount,
+                                ClientesAdapter.Payload.ConfiguracoesChanged,
+                            )
                         }
                     }
                 }
@@ -334,8 +356,8 @@ class VendasFragment : Fragment() {
     private fun showAddClienteDialog() {
         vendasViewModel.reloadLocais()
         val dialog = NovoClienteDialog(vendasViewModel)
-        dialog.onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
-            vendasViewModel.addCliente(nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id)
+        dialog.onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id, fotoUri, _ ->
+            vendasViewModel.addCliente(nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id, fotoUri)
         }
         dialog.show(childFragmentManager, "NovoClienteDialog")
     }

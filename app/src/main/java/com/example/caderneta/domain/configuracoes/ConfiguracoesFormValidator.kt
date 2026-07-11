@@ -50,7 +50,7 @@ sealed class ConfiguracoesFormResult {
 }
 
 object ConfiguracoesFormValidator {
-    @Suppress("CyclomaticComplexMethod")
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     fun validar(input: ConfiguracoesInput): ConfiguracoesFormResult {
         val erros = linkedMapOf<ConfiguracoesCampo, String>()
 
@@ -59,12 +59,13 @@ object ConfiguracoesFormValidator {
             texto: String,
             mensagemVazio: String,
             obrigatorio: Boolean,
+            exigirMaiorQueZero: Boolean = obrigatorio,
         ): Long? {
-            if (!obrigatorio) return null
+            if (!obrigatorio && texto.isBlank()) return null
 
             return when (val resultado = texto.parseDinheiro()) {
                 is ParseDinheiro.Valido ->
-                    if (resultado.centavos > 0) {
+                    if (!exigirMaiorQueZero || resultado.centavos > 0) {
                         resultado.centavos
                     } else {
                         erros[campo] = "Informe um valor maior que zero"
@@ -95,7 +96,7 @@ object ConfiguracoesFormValidator {
             obrigatorio: Boolean,
         ): Int? {
             val texto = textoOriginal.trim()
-            if (!obrigatorio) return null
+            if (!obrigatorio && texto.isBlank()) return null
 
             val valor = texto.toIntOrNull()
             return when {
@@ -115,6 +116,12 @@ object ConfiguracoesFormValidator {
             }
         }
 
+        fun temCampoPromocionalPreenchido(vararg campos: String): Boolean =
+            campos.any { campo ->
+                val texto = campo.trim()
+                texto.isNotBlank() && texto != "0"
+            }
+
         val salgadoVista =
             lerCentavos(ConfiguracoesCampo.SALGADO_VISTA, input.precoSalgadoVista, "Informe o preço à vista", true)
         val salgadoPrazo =
@@ -129,23 +136,49 @@ object ConfiguracoesFormValidator {
         if (input.promocoesAtivadas && promo1Nome.isBlank()) {
             erros[ConfiguracoesCampo.PROMO1_NOME] = "Informe o nome da promoção"
         }
-        if (input.promocoesAtivadas && promo2Nome.isBlank()) {
+        val promo2Preenchida =
+            input.promocoesAtivadas &&
+                temCampoPromocionalPreenchido(
+                    input.promo2Nome,
+                    input.promo2Salgados,
+                    input.promo2Sucos,
+                    input.promo2Vista,
+                    input.promo2Prazo,
+                )
+        if (promo2Preenchida && promo2Nome.isBlank()) {
             erros[ConfiguracoesCampo.PROMO2_NOME] = "Informe o nome da promoção"
         }
 
-        val obrigatorioPromo = input.promocoesAtivadas
-        val promo1Salgados = lerInteiro(ConfiguracoesCampo.PROMO1_SALGADOS, input.promo1Salgados, obrigatorioPromo)
-        val promo1Sucos = lerInteiro(ConfiguracoesCampo.PROMO1_SUCOS, input.promo1Sucos, obrigatorioPromo)
+        val promo1Obrigatoria = input.promocoesAtivadas
+        val promo1Salgados = lerInteiro(ConfiguracoesCampo.PROMO1_SALGADOS, input.promo1Salgados, promo1Obrigatoria)
+        val promo1Sucos = lerInteiro(ConfiguracoesCampo.PROMO1_SUCOS, input.promo1Sucos, promo1Obrigatoria)
         val promo1Vista =
-            lerCentavos(ConfiguracoesCampo.PROMO1_VISTA, input.promo1Vista, "Informe o valor à vista", obrigatorioPromo)
+            lerCentavos(
+                ConfiguracoesCampo.PROMO1_VISTA,
+                input.promo1Vista,
+                "Informe o valor à vista",
+                promo1Obrigatoria,
+            )
         val promo1Prazo =
-            lerCentavos(ConfiguracoesCampo.PROMO1_PRAZO, input.promo1Prazo, "Informe o valor a prazo", obrigatorioPromo)
-        val promo2Salgados = lerInteiro(ConfiguracoesCampo.PROMO2_SALGADOS, input.promo2Salgados, obrigatorioPromo)
-        val promo2Sucos = lerInteiro(ConfiguracoesCampo.PROMO2_SUCOS, input.promo2Sucos, obrigatorioPromo)
+            lerCentavos(
+                ConfiguracoesCampo.PROMO1_PRAZO,
+                input.promo1Prazo,
+                "Informe o valor a prazo",
+                promo1Obrigatoria,
+            )
+        val promo2Salgados = lerInteiro(ConfiguracoesCampo.PROMO2_SALGADOS, input.promo2Salgados, promo2Preenchida)
+        val promo2Sucos = lerInteiro(ConfiguracoesCampo.PROMO2_SUCOS, input.promo2Sucos, promo2Preenchida)
         val promo2Vista =
-            lerCentavos(ConfiguracoesCampo.PROMO2_VISTA, input.promo2Vista, "Informe o valor à vista", obrigatorioPromo)
+            lerCentavos(ConfiguracoesCampo.PROMO2_VISTA, input.promo2Vista, "Informe o valor à vista", promo2Preenchida)
         val promo2Prazo =
-            lerCentavos(ConfiguracoesCampo.PROMO2_PRAZO, input.promo2Prazo, "Informe o valor a prazo", obrigatorioPromo)
+            lerCentavos(ConfiguracoesCampo.PROMO2_PRAZO, input.promo2Prazo, "Informe o valor a prazo", promo2Preenchida)
+
+        if (input.promocoesAtivadas && (promo1Salgados ?: 0) + (promo1Sucos ?: 0) <= 0) {
+            erros.putIfAbsent(ConfiguracoesCampo.PROMO1_SALGADOS, "Informe ao menos um item")
+        }
+        if (promo2Preenchida && (promo2Salgados ?: 0) + (promo2Sucos ?: 0) <= 0) {
+            erros.putIfAbsent(ConfiguracoesCampo.PROMO2_SALGADOS, "Informe ao menos um item")
+        }
 
         if (erros.isNotEmpty()) return ConfiguracoesFormResult.Invalida(erros)
 

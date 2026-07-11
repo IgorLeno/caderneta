@@ -1,0 +1,588 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "4bb8d1e8950d8009197b9a88d84564b3",
+    "entities": [
+      {
+        "tableName": "clientes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nome` TEXT NOT NULL, `telefone` TEXT, `localId` INTEGER NOT NULL, `sublocal1Id` INTEGER, `sublocal2Id` INTEGER, `sublocal3Id` INTEGER, `arquivado` INTEGER NOT NULL, `fotoNome` TEXT, FOREIGN KEY(`localId`) REFERENCES `locais`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`sublocal1Id`) REFERENCES `locais`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`sublocal2Id`) REFERENCES `locais`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`sublocal3Id`) REFERENCES `locais`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nome",
+            "columnName": "nome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "telefone",
+            "columnName": "telefone",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sublocal1Id",
+            "columnName": "sublocal1Id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sublocal2Id",
+            "columnName": "sublocal2Id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sublocal3Id",
+            "columnName": "sublocal3Id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "arquivado",
+            "columnName": "arquivado",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fotoNome",
+            "columnName": "fotoNome",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_clientes_localId",
+            "unique": false,
+            "columnNames": [
+              "localId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clientes_localId` ON `${TABLE_NAME}` (`localId`)"
+          },
+          {
+            "name": "index_clientes_sublocal1Id",
+            "unique": false,
+            "columnNames": [
+              "sublocal1Id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clientes_sublocal1Id` ON `${TABLE_NAME}` (`sublocal1Id`)"
+          },
+          {
+            "name": "index_clientes_sublocal2Id",
+            "unique": false,
+            "columnNames": [
+              "sublocal2Id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clientes_sublocal2Id` ON `${TABLE_NAME}` (`sublocal2Id`)"
+          },
+          {
+            "name": "index_clientes_sublocal3Id",
+            "unique": false,
+            "columnNames": [
+              "sublocal3Id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_clientes_sublocal3Id` ON `${TABLE_NAME}` (`sublocal3Id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "locais",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "localId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "locais",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sublocal1Id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "locais",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sublocal2Id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "locais",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sublocal3Id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "locais",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nome` TEXT NOT NULL, `endereco` TEXT, `parentId` INTEGER, `level` INTEGER NOT NULL, `arquivado` INTEGER NOT NULL, FOREIGN KEY(`parentId`) REFERENCES `locais`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nome",
+            "columnName": "nome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endereco",
+            "columnName": "endereco",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "parentId",
+            "columnName": "parentId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "level",
+            "columnName": "level",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "arquivado",
+            "columnName": "arquivado",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_locais_parentId",
+            "unique": false,
+            "columnNames": [
+              "parentId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_locais_parentId` ON `${TABLE_NAME}` (`parentId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "locais",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "parentId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "vendas",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `operacaoId` INTEGER NOT NULL, `clienteId` INTEGER NOT NULL, `localId` INTEGER, `data` INTEGER NOT NULL, `transacao` TEXT NOT NULL, `quantidadeSalgados` INTEGER NOT NULL, `quantidadeSucos` INTEGER NOT NULL, `isPromocao` INTEGER NOT NULL, `promocaoDetalhes` TEXT, `valorCentavos` INTEGER NOT NULL, FOREIGN KEY(`clienteId`) REFERENCES `clientes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`localId`) REFERENCES `locais`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`operacaoId`) REFERENCES `operacoes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operacaoId",
+            "columnName": "operacaoId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clienteId",
+            "columnName": "clienteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "data",
+            "columnName": "data",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transacao",
+            "columnName": "transacao",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quantidadeSalgados",
+            "columnName": "quantidadeSalgados",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quantidadeSucos",
+            "columnName": "quantidadeSucos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPromocao",
+            "columnName": "isPromocao",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promocaoDetalhes",
+            "columnName": "promocaoDetalhes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "valorCentavos",
+            "columnName": "valorCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_vendas_clienteId",
+            "unique": false,
+            "columnNames": [
+              "clienteId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_vendas_clienteId` ON `${TABLE_NAME}` (`clienteId`)"
+          },
+          {
+            "name": "index_vendas_localId",
+            "unique": false,
+            "columnNames": [
+              "localId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_vendas_localId` ON `${TABLE_NAME}` (`localId`)"
+          },
+          {
+            "name": "index_vendas_data",
+            "unique": false,
+            "columnNames": [
+              "data"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_vendas_data` ON `${TABLE_NAME}` (`data`)"
+          },
+          {
+            "name": "index_vendas_operacaoId",
+            "unique": true,
+            "columnNames": [
+              "operacaoId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_vendas_operacaoId` ON `${TABLE_NAME}` (`operacaoId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "clientes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "clienteId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "locais",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "localId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "operacoes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "operacaoId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "configuracoes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `precoSalgadoVistaCentavos` INTEGER NOT NULL, `precoSalgadoPrazoCentavos` INTEGER NOT NULL, `precoSucoVistaCentavos` INTEGER NOT NULL, `precoSucoPrazoCentavos` INTEGER NOT NULL, `promocoesAtivadas` INTEGER NOT NULL, `promo1Nome` TEXT NOT NULL, `promo1Salgados` INTEGER NOT NULL, `promo1Sucos` INTEGER NOT NULL, `promo1VistaCentavos` INTEGER NOT NULL, `promo1PrazoCentavos` INTEGER NOT NULL, `promo2Nome` TEXT NOT NULL, `promo2Salgados` INTEGER NOT NULL, `promo2Sucos` INTEGER NOT NULL, `promo2VistaCentavos` INTEGER NOT NULL, `promo2PrazoCentavos` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "precoSalgadoVistaCentavos",
+            "columnName": "precoSalgadoVistaCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "precoSalgadoPrazoCentavos",
+            "columnName": "precoSalgadoPrazoCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "precoSucoVistaCentavos",
+            "columnName": "precoSucoVistaCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "precoSucoPrazoCentavos",
+            "columnName": "precoSucoPrazoCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promocoesAtivadas",
+            "columnName": "promocoesAtivadas",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo1Nome",
+            "columnName": "promo1Nome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo1Salgados",
+            "columnName": "promo1Salgados",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo1Sucos",
+            "columnName": "promo1Sucos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo1VistaCentavos",
+            "columnName": "promo1VistaCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo1PrazoCentavos",
+            "columnName": "promo1PrazoCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo2Nome",
+            "columnName": "promo2Nome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo2Salgados",
+            "columnName": "promo2Salgados",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo2Sucos",
+            "columnName": "promo2Sucos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo2VistaCentavos",
+            "columnName": "promo2VistaCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promo2PrazoCentavos",
+            "columnName": "promo2PrazoCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "operacoes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `clienteId` INTEGER NOT NULL, `tipoOperacao` TEXT NOT NULL, `valorCentavos` INTEGER NOT NULL, `data` INTEGER NOT NULL, FOREIGN KEY(`clienteId`) REFERENCES `clientes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clienteId",
+            "columnName": "clienteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipoOperacao",
+            "columnName": "tipoOperacao",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "valorCentavos",
+            "columnName": "valorCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "data",
+            "columnName": "data",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_operacoes_clienteId",
+            "unique": false,
+            "columnNames": [
+              "clienteId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_operacoes_clienteId` ON `${TABLE_NAME}` (`clienteId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "clientes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "clienteId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "contas",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`clienteId` INTEGER NOT NULL, `saldoCentavos` INTEGER NOT NULL, PRIMARY KEY(`clienteId`), FOREIGN KEY(`clienteId`) REFERENCES `clientes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "clienteId",
+            "columnName": "clienteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "saldoCentavos",
+            "columnName": "saldoCentavos",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "clienteId"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "clientes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "clienteId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4bb8d1e8950d8009197b9a88d84564b3')"
+    ]
+  }
+}

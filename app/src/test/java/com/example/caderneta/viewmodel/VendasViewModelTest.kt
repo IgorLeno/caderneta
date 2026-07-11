@@ -182,6 +182,42 @@ class VendasViewModelTest {
         }
 
     @Test
+    fun promocaoDesativadaPublicaErroENaoAplicaSelecao() =
+        runTest {
+            salvarConfigESelecionarLocal(config(promocoesAtivadas = false))
+            waitConfiguracoes()
+            advanceUntilIdle()
+            val cliente = requireNotNull(db.clienteDao().getClienteById(clienteId))
+
+            viewModel.selecionarModoOperacao(cliente, ModoOperacao.PROMOCAO)
+
+            val evento = withTimeout(1_000) { viewModel.eventos.first() }
+            assertTrue(evento is UiEvento.Erro)
+            assertNull(viewModel.getClienteState(clienteId))
+        }
+
+    @Test
+    fun desativarPromocoesLimpaEstadoPromocionalAberto() =
+        runTest {
+            salvarConfigESelecionarLocal(config(promocoesAtivadas = true))
+            waitConfiguracoes()
+            advanceUntilIdle()
+            val cliente = requireNotNull(db.clienteDao().getClienteById(clienteId))
+            viewModel.selecionarModoOperacao(cliente, ModoOperacao.PROMOCAO)
+            viewModel.selecionarTipoTransacao(cliente, TipoTransacao.A_VISTA)
+            viewModel.updateQuantidadePromo1(clienteId, 1)
+
+            db.configuracoesDao().upsertConfiguracoes(config(promocoesAtivadas = false))
+            waitPromocoesDesativadas()
+            advanceUntilIdle()
+
+            val state = requireNotNull(viewModel.getClienteState(clienteId))
+            assertNull(state.modoOperacao)
+            assertEquals(0L, state.valorTotalCentavos)
+            assertEquals(0, state.quantidadePromo1)
+        }
+
+    @Test
     fun confirmacaoDuplicadaRegistraUmaVenda() =
         runTest {
             salvarConfigESelecionarLocal()
@@ -219,6 +255,15 @@ class VendasViewModelTest {
             Thread.sleep(10)
         }
         assertTrue(viewModel.configuracoes.value != null)
+    }
+
+    private fun waitPromocoesDesativadas() {
+        repeat(500) {
+            mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+            if (viewModel.configuracoes.value?.promocoesAtivadas == false) return
+            Thread.sleep(10)
+        }
+        assertEquals(false, viewModel.configuracoes.value?.promocoesAtivadas)
     }
 
     private fun newViewModel(): VendasViewModel =

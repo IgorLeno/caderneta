@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Widget.Caderneta.Card" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">@color/surface_color</item>
+        <item name="cardCornerRadius">@dimen/corner_card</item>
+        <item name="cardElevation">@dimen/elevation_card</item>
+    </style>
+
+    <style name="Widget.Caderneta.Button.Primary" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/primary_color</item>
+        <item name="android:textColor">@color/on_primary</item>
+        <item name="cornerRadius">@dimen/corner_button</item>
+    </style>
+
+    <style name="Widget.Caderneta.Button.Secondary" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="backgroundTint">@color/surface_color</item>
+        <item name="strokeColor">@color/button_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/on_surface</item>
+        <item name="cornerRadius">@dimen/corner_button</item>
+    </style>
+
+    <style name="Widget.Caderneta.Button.Destructive" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="backgroundTint">@color/surface_color</item>
+        <item name="strokeColor">@color/red</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/red</item>
+        <item name="cornerRadius">@dimen/corner_button</item>
+    </style>
+
+    <style name="Widget.Caderneta.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/primary_color</item>
+        <item name="hintTextColor">@color/text_muted</item>
+        <item name="boxCornerRadiusTopStart">@dimen/space_2</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/space_2</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/space_2</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/space_2</item>
+    </style>
+
+    <style name="Widget.Caderneta.Toolbar" parent="Widget.AppCompat.Toolbar">
+        <item name="android:background">@color/primary_color</item>
+        <item name="titleTextColor">@color/on_primary</item>
+        <item name="subtitleTextColor">@color/on_primary</item>
+    </style>
+
+    <style name="TextAppearance.Caderneta.PageTitle" parent="TextAppearance.MaterialComponents.Headline5">
+        <item name="android:textSize">@dimen/text_page_title</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/on_background</item>
+    </style>
+
+    <style name="TextAppearance.Caderneta.SectionTitle" parent="TextAppearance.MaterialComponents.Subtitle1">
+        <item name="android:textSize">@dimen/text_section_title</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/on_background</item>
+    </style>
+
+    <style name="TextAppearance.Caderneta.Body" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:textSize">@dimen/text_body</item>
+        <item name="android:textColor">@color/on_surface</item>
+    </style>
+
+    <style name="TextAppearance.Caderneta.Caption" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="android:textSize">@dimen/text_caption</item>
+        <item name="android:textColor">@color/text_muted</item>
+    </style>
+
+    <style name="TextAppearance.Caderneta.EmptyState" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:textColor">@color/text_muted</item>
+        <item name="android:gravity">center</item>
+    </style>
+</resources>

@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.caderneta.data.backup.BackupDao
 import com.example.caderneta.data.dao.ClienteDao
 import com.example.caderneta.data.dao.ConfiguracoesDao
@@ -49,7 +51,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun backupDao(): BackupDao
 
     companion object {
-        const val DATABASE_VERSION = 1
+        const val DATABASE_VERSION = 2
+
+        val MIGRATION_1_2 =
+            object : Migration(1, 2) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE clientes ADD COLUMN fotoNome TEXT DEFAULT NULL")
+                }
+            }
 
         @Volatile
         private var instance: AppDatabase? = null
@@ -62,7 +71,8 @@ abstract class AppDatabase : RoomDatabase() {
                             context.applicationContext,
                             AppDatabase::class.java,
                             "caderneta_database",
-                        ).build()
+                        ).addMigrations(MIGRATION_1_2)
+                        .build()
                 instance = database
                 database
             }

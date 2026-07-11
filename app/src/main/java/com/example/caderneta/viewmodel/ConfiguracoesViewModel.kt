@@ -68,10 +68,11 @@ class ConfiguracoesViewModel(
         viewModelScope.launch {
             try {
                 _salvando.value = true
-                if (novasConfiguracoes.isValid()) {
-                    repository.salvarConfiguracoes(novasConfiguracoes)
+                val configuracoesParaSalvar = preservarPromocoesQuandoDesativadas(novasConfiguracoes)
+                if (configuracoesParaSalvar.isValid()) {
+                    repository.salvarConfiguracoes(configuracoesParaSalvar)
                     val persistida = repository.getConfiguracoesOnce()
-                    if (persistida != novasConfiguracoes.copy(id = 1)) {
+                    if (persistida != configuracoesParaSalvar.copy(id = 1)) {
                         _eventos.send(UiEvento.Erro("Erro ao confirmar configurações salvas"))
                         return@launch
                     }
@@ -88,6 +89,42 @@ class ConfiguracoesViewModel(
             }
         }
     }
+
+    private suspend fun preservarPromocoesQuandoDesativadas(novasConfiguracoes: Configuracoes): Configuracoes {
+        val devePreservar =
+            !novasConfiguracoes.promocoesAtivadas &&
+                !novasConfiguracoes.temDadosPromocionais()
+        val atuais = if (devePreservar) _configuracoes.value ?: repository.getConfiguracoesOnce() else null
+
+        return if (atuais?.temDadosPromocionais() == true) {
+            novasConfiguracoes.copy(
+                promo1Nome = atuais.promo1Nome,
+                promo1Salgados = atuais.promo1Salgados,
+                promo1Sucos = atuais.promo1Sucos,
+                promo1VistaCentavos = atuais.promo1VistaCentavos,
+                promo1PrazoCentavos = atuais.promo1PrazoCentavos,
+                promo2Nome = atuais.promo2Nome,
+                promo2Salgados = atuais.promo2Salgados,
+                promo2Sucos = atuais.promo2Sucos,
+                promo2VistaCentavos = atuais.promo2VistaCentavos,
+                promo2PrazoCentavos = atuais.promo2PrazoCentavos,
+            )
+        } else {
+            novasConfiguracoes
+        }
+    }
+
+    private fun Configuracoes.temDadosPromocionais(): Boolean =
+        promo1Nome.isNotBlank() ||
+            promo1Salgados != 0 ||
+            promo1Sucos != 0 ||
+            promo1VistaCentavos != 0L ||
+            promo1PrazoCentavos != 0L ||
+            promo2Nome.isNotBlank() ||
+            promo2Salgados != 0 ||
+            promo2Sucos != 0 ||
+            promo2VistaCentavos != 0L ||
+            promo2PrazoCentavos != 0L
 
     fun exportarBackup(uri: Uri) {
         viewModelScope.launch {

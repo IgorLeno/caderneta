@@ -24,24 +24,13 @@
             android:layout_height="wrap_content"
             android:padding="16dp">
 
-            <TextView
-                android:id="@+id/tv_titulo_balanco"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Balanço de Caixa"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
             <com.example.caderneta.ui.components.CardBalancoView
                 android:id="@+id/card_vendas_diarias"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tv_titulo_balanco" />
+                app:layout_constraintTop_toTopOf="parent" />
 
             <com.example.caderneta.ui.components.CardBalancoView
                 android:id="@+id/card_vendas_semanais"

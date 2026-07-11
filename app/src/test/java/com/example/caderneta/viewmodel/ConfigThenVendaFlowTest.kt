@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -104,6 +105,42 @@ class ConfigThenVendaFlowTest {
             assertEquals(1200L, db.contaDao().getContaByCliente(clienteId)?.saldoCentavos)
         }
 
+    @Test
+    fun salvarPromocoesDesativadasPreservaDadosPromocionaisAnteriores() =
+        runTest {
+            configuracoesRepository.salvarConfiguracoes(configComPromocoes(promocoesAtivadas = true))
+            val configuracoesViewModel =
+                ConfiguracoesViewModel(
+                    repository = configuracoesRepository,
+                    backupManager = BackupManager(context, db),
+                )
+            advanceUntilIdle()
+
+            configuracoesViewModel.salvarConfiguracoes(
+                config().copy(
+                    precoSalgadoVistaCentavos = 550,
+                    promocoesAtivadas = false,
+                ),
+            )
+            advanceUntilIdle()
+
+            val evento = withTimeout(1_000) { configuracoesViewModel.eventos.first() }
+            assertTrue(evento is UiEvento.Sucesso)
+            val persistida = requireNotNull(configuracoesRepository.getConfiguracoesOnce())
+            assertFalse(persistida.promocoesAtivadas)
+            assertEquals(550L, persistida.precoSalgadoVistaCentavos)
+            assertEquals("Promo 1", persistida.promo1Nome)
+            assertEquals(1, persistida.promo1Salgados)
+            assertEquals(1, persistida.promo1Sucos)
+            assertEquals(700L, persistida.promo1VistaCentavos)
+            assertEquals(800L, persistida.promo1PrazoCentavos)
+            assertEquals("Promo 2", persistida.promo2Nome)
+            assertEquals(2, persistida.promo2Salgados)
+            assertEquals(2, persistida.promo2Sucos)
+            assertEquals(900L, persistida.promo2VistaCentavos)
+            assertEquals(1000L, persistida.promo2PrazoCentavos)
+        }
+
     private fun newVendasViewModel(): VendasViewModel =
         VendasViewModel(
             clienteRepository = ClienteRepository(db.clienteDao()),
@@ -131,5 +168,20 @@ class ConfigThenVendaFlowTest {
             promo2Sucos = 0,
             promo2VistaCentavos = 0,
             promo2PrazoCentavos = 0,
+        )
+
+    private fun configComPromocoes(promocoesAtivadas: Boolean) =
+        config().copy(
+            promocoesAtivadas = promocoesAtivadas,
+            promo1Nome = "Promo 1",
+            promo1Salgados = 1,
+            promo1Sucos = 1,
+            promo1VistaCentavos = 700,
+            promo1PrazoCentavos = 800,
+            promo2Nome = "Promo 2",
+            promo2Salgados = 2,
+            promo2Sucos = 2,
+            promo2VistaCentavos = 900,
+            promo2PrazoCentavos = 1000,
         )
 }

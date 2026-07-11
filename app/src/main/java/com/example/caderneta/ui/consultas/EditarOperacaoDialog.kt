@@ -66,6 +66,7 @@ class EditarOperacaoDialog(
             (requireActivity().application as CadernetaApplication).configuracoesRepository,
             (requireActivity().application as CadernetaApplication).contaRepository,
             (requireActivity().application as CadernetaApplication).financeiroService,
+            (requireActivity().application as CadernetaApplication).clientePhotoRepository,
         )
     }
 

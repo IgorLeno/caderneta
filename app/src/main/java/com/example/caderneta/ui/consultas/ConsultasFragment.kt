@@ -62,6 +62,7 @@ class ConsultasFragment : Fragment() {
             (requireActivity().application as CadernetaApplication).configuracoesRepository,
             (requireActivity().application as CadernetaApplication).contaRepository,
             (requireActivity().application as CadernetaApplication).financeiroService,
+            (requireActivity().application as CadernetaApplication).clientePhotoRepository,
         )
     }
 
@@ -187,6 +188,9 @@ class ConsultasFragment : Fragment() {
                 onClienteCollapse = { clienteId ->
                     viewModel.fecharVendasPorCliente(clienteId)
                 },
+                getClientePhotoFile = { fotoNome ->
+                    vendasViewModel.arquivoFotoCliente(fotoNome)
+                },
                 localRepository = (requireActivity().application as CadernetaApplication).localRepository,
                 coroutineScope = viewLifecycleOwner.lifecycleScope,
                 fragmentManager = childFragmentManager,
@@ -203,7 +207,16 @@ class ConsultasFragment : Fragment() {
         val dialog =
             NovoClienteDialog(vendasViewModel).apply {
                 setClienteExistente(cliente)
-                onClienteAdicionado = { nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id ->
+                onClienteAdicionado = {
+                    nome,
+                    telefone,
+                    localId,
+                    sublocal1Id,
+                    sublocal2Id,
+                    sublocal3Id,
+                    fotoUri,
+                    removerFoto,
+                    ->
                     vendasViewModel.editarCliente(
                         cliente = cliente,
                         novoNome = nome,
@@ -212,6 +225,8 @@ class ConsultasFragment : Fragment() {
                         novoSublocal1Id = sublocal1Id,
                         novoSublocal2Id = sublocal2Id,
                         novoSublocal3Id = sublocal3Id,
+                        fotoUri = fotoUri,
+                        removerFoto = removerFoto,
                     )
                 }
             }
@@ -420,8 +435,6 @@ class ConsultasFragment : Fragment() {
                             // Criar novo item com saldo atualizado
                             currentList[index] = ResultadoConsulta.Cliente(item.cliente, novoSaldo)
 
-                            // Força atualização da RecyclerView
-                            resultadosAdapter.submitList(null)
                             resultadosAdapter.submitList(currentList)
                         }
                     }

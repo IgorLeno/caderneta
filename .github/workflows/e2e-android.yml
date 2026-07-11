@@ -71,11 +71,11 @@ jobs:
       - name: Run autonomous audit on GMD
         run: ./scripts/run-autonomous-audit.sh --suite "${{ steps.suite.outputs.suite }}"
 
-      - name: Upload E2E artifacts on failure
-        if: failure()
+      - name: Upload E2E artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-failure-artifacts
+          name: e2e-audit-${{ github.sha }}-${{ github.run_id }}
           path: |
             build/reports/app-audit/
             app/build/reports/androidTests/
@@ -83,4 +83,4 @@ jobs:
             app/build/outputs/managed_device_android_test_additional_output/
             app/build/outputs/connected_android_test_additional_output/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14

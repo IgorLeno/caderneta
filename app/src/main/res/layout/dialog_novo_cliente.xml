@@ -5,15 +5,62 @@
     android:layout_height="wrap_content"
     android:padding="16dp">
 
+    <LinearLayout
+        android:id="@+id/layout_foto_cliente"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/iv_cliente_foto"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:background="@drawable/bg_oval"
+            android:contentDescription="Foto do cliente"
+            android:padding="10dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_avatar" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_adicionar_foto"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Adicionar foto" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_remover_foto"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Remover foto"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/til_nome"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         android:hint="Nome do cliente"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layout_foto_cliente"
         app:startIconDrawable="@drawable/ic_person">
 
         <com.google.android.material.textfield.TextInputEditText

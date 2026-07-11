@@ -71,6 +71,7 @@ class BackupSerializer {
             .putOpt("sublocal2Id", cliente.sublocal2Id)
             .putOpt("sublocal3Id", cliente.sublocal3Id)
             .put("arquivado", cliente.arquivado)
+            .putOpt("fotoNome", cliente.fotoNome)
 
     private fun clienteFromJson(json: JSONObject) =
         Cliente(
@@ -82,6 +83,7 @@ class BackupSerializer {
             sublocal2Id = json.optLongOrNull("sublocal2Id"),
             sublocal3Id = json.optLongOrNull("sublocal3Id"),
             arquivado = json.getBoolean("arquivado"),
+            fotoNome = json.optStringOrNull("fotoNome"),
         )
 
     private fun operacaoJson(operacao: Operacao) =

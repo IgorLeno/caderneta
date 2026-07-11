@@ -1,5 +1,6 @@
 package com.example.caderneta.data.backup
 
+import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.data.entity.Local
 import org.junit.Assert.assertEquals
@@ -15,7 +16,16 @@ class BackupSerializerTest {
                 app = "com.example.caderneta",
                 geradoEmMillis = 123,
                 locais = listOf(Local(id = 1, nome = "Local")),
-                clientes = emptyList(),
+                clientes =
+                    listOf(
+                        Cliente(
+                            id = 1,
+                            nome = "Cliente",
+                            telefone = null,
+                            localId = 1,
+                            fotoNome = "cliente_1.jpg",
+                        ),
+                    ),
                 operacoes = emptyList(),
                 vendas = emptyList(),
                 contas = emptyList(),
@@ -26,6 +36,7 @@ class BackupSerializerTest {
 
         assertEquals(snapshot.app, restaurado.app)
         assertEquals(snapshot.locais, restaurado.locais)
+        assertEquals(snapshot.clientes, restaurado.clientes)
         assertEquals(snapshot.configuracoes, restaurado.configuracoes)
     }
 

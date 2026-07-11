@@ -1,8 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
-APP_ID="com.example.caderneta"
-APK="app/build/outputs/apk/debug/app-debug.apk"
+REAL_APP_ID="com.example.caderneta"
+APP_ID="${AUDIT_APP_ID:-com.example.caderneta.audit}"
+APK="app/build/outputs/apk/audit/app-audit.apk"
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 JAVA_HOME="${JAVA_HOME:-$HOME/.jdks/jbr-17.0.14}"
 export JAVA_HOME
@@ -12,13 +13,16 @@ KEEP_DEVICE="0"
 PHYSICAL_SERIAL=""
 WIPE="0"
 MODE="gmd"
+ALLOW_DIRTY="0"
+DRY_RUN="0"
 
 usage() {
   cat <<USAGE
-Usage: $0 [--suite smoke|full] [--keep-device] [--physical SERIAL] [--wipe]
+Usage: $0 [--suite smoke|full] [--keep-device] [--physical SERIAL] [--wipe] [--allow-dirty] [--dry-run]
 
-Default mode runs Gradle Managed Device pixelApi35.
-Physical mode requires --physical SERIAL and never clears app data unless --wipe is present.
+Default mode runs Gradle Managed Device pixelApi35 on the audit buildType.
+Physical mode requires --physical SERIAL and only operates on com.example.caderneta.audit.
+The script refuses a dirty worktree unless --allow-dirty is present.
 USAGE
 }
 
@@ -43,6 +47,14 @@ while [ "$#" -gt 0 ]; do
       WIPE="1"
       shift
       ;;
+    --allow-dirty)
+      ALLOW_DIRTY="1"
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN="1"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -58,6 +70,18 @@ done
 case "$SUITE" in
   smoke|full) ;;
   *) echo "Erro: suite invalida: $SUITE" >&2; exit 2 ;;
+esac
+
+case "$APP_ID" in
+  "$REAL_APP_ID")
+    echo "Erro: auditoria recusou operar no pacote real $REAL_APP_ID" >&2
+    exit 2
+    ;;
+  *.audit) ;;
+  *)
+    echo "Erro: pacote de auditoria deve terminar com .audit: $APP_ID" >&2
+    exit 2
+    ;;
 esac
 
 require_cmd() {
@@ -114,12 +138,27 @@ flatten_test_artifacts() {
 }
 
 require_cmd git
-require_cmd sha256sum
-require_cmd wc
-require_cmd python3
-require_cmd zip
 
-ADB="$(resolve_adb)"
+cd "$ROOT_DIR"
+
+GIT_STATUS_SHORT="$(git status --short)"
+if [ -n "$GIT_STATUS_SHORT" ] && [ "$ALLOW_DIRTY" != "1" ]; then
+  echo "Erro: a arvore de trabalho esta suja. Commit/stash antes da auditoria." >&2
+  echo "Use --allow-dirty somente para diagnostico nao-reprodutivel." >&2
+  git status --short >&2
+  exit 1
+fi
+
+if [ "$DRY_RUN" = "0" ]; then
+  require_cmd sha256sum
+  require_cmd wc
+  require_cmd python3
+  require_cmd zip
+  ADB="$(resolve_adb)"
+else
+  ADB=""
+fi
+
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 REPORT_DIR="build/reports/app-audit/$TIMESTAMP"
 mkdir -p \
@@ -134,8 +173,24 @@ mkdir -p \
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 HEAD_SHA="$(git rev-parse HEAD)"
 HEAD_SHORT="$(git rev-parse --short HEAD)"
+REPRODUCIBLE="true"
+if [ -n "$GIT_STATUS_SHORT" ]; then
+  REPRODUCIBLE="false"
+fi
+ALLOW_DIRTY_JSON="false"
+if [ "$ALLOW_DIRTY" = "1" ]; then
+  ALLOW_DIRTY_JSON="true"
+fi
+DRY_RUN_JSON="false"
+if [ "$DRY_RUN" = "1" ]; then
+  DRY_RUN_JSON="true"
+fi
+
 GIT_STATUS_FILE="$REPORT_DIR/git-status.txt"
 git status --short --branch > "$GIT_STATUS_FILE"
+if [ "$REPRODUCIBLE" = "false" ]; then
+  git diff --binary > "$REPORT_DIR/git-diff.patch"
+fi
 
 cat > "$REPORT_DIR/run-context.json" <<JSON
 {
@@ -144,20 +199,41 @@ cat > "$REPORT_DIR/run-context.json" <<JSON
   "headShort": "$HEAD_SHORT",
   "mode": "$MODE",
   "suite": "$SUITE",
-  "timestamp": "$TIMESTAMP"
+  "timestamp": "$TIMESTAMP",
+  "appId": "$APP_ID",
+  "realAppId": "$REAL_APP_ID",
+  "buildType": "audit",
+  "reproducible": $REPRODUCIBLE,
+  "allowDirty": $ALLOW_DIRTY_JSON,
+  "dryRun": $DRY_RUN_JSON
 }
 JSON
+
+if [ "$REPRODUCIBLE" = "false" ]; then
+  cat > "$REPORT_DIR/NON_REPRODUCIBLE.txt" <<TXT
+Auditoria executada com arvore suja por --allow-dirty.
+Este resultado nao deve ser usado como baseline reprodutivel.
+Veja git-status.txt e git-diff.patch.
+TXT
+fi
 
 echo "Audit dir: $REPORT_DIR"
 echo "Branch: $BRANCH"
 echo "Commit: $HEAD_SHA"
 echo "Mode: $MODE"
 echo "Suite: $SUITE"
+echo "App ID: $APP_ID"
+echo "Reproducible: $REPRODUCIBLE"
 
-./gradlew :app:assembleDebug --stacktrace --no-daemon
+if [ "$DRY_RUN" = "1" ]; then
+  echo "Dry-run: auditoria usaria :app:assembleAudit e pacote $APP_ID"
+  exit 0
+fi
+
+./gradlew :app:assembleAudit --stacktrace --no-daemon
 
 if [ ! -f "$APK" ]; then
-  echo "Erro: APK nao encontrado em $APK" >&2
+  echo "Erro: APK audit nao encontrado em $APK" >&2
   exit 1
 fi
 APK_SIZE="$(wc -c < "$APK" | tr -d ' ')"
@@ -167,7 +243,10 @@ cat > "$REPORT_DIR/app-build.json" <<JSON
   "apk": "$APK",
   "sizeBytes": $APK_SIZE,
   "sha256": "$APK_SHA256",
-  "gitSha": "$HEAD_SHA"
+  "gitSha": "$HEAD_SHA",
+  "appId": "$APP_ID",
+  "buildType": "audit",
+  "reproducible": $REPRODUCIBLE
 }
 JSON
 
@@ -196,7 +275,11 @@ if [ "$MODE" = "physical" ]; then
   "$ADB" -s "$PHYSICAL_SERIAL" logcat -c
   "$ADB" -s "$PHYSICAL_SERIAL" shell getprop > "$REPORT_DIR/device-info.txt"
   "$ADB" -s "$PHYSICAL_SERIAL" shell dumpsys package "$APP_ID" > "$REPORT_DIR/installed-package.txt"
-  GRADLE_TASK=":app:connectedDebugAndroidTest"
+  if ! grep "Package \[$APP_ID\]" "$REPORT_DIR/installed-package.txt" >/dev/null 2>&1; then
+    echo "Erro: pacote audit $APP_ID nao confirmado no device" >&2
+    exit 1
+  fi
+  GRADLE_TASK=":app:connectedAuditAndroidTest"
   set +e
   ANDROID_SERIAL="$PHYSICAL_SERIAL" ./gradlew $GRADLE_TASK $TEST_ARGS --stacktrace --no-daemon
   TEST_EXIT_CODE="$?"
@@ -207,7 +290,7 @@ if [ "$MODE" = "physical" ]; then
     echo "Aviso: falha ao coletar logcat" > "$REPORT_DIR/logcat/logcat-error.txt"
   fi
 else
-  GRADLE_TASK=":app:pixelApi35DebugAndroidTest"
+  GRADLE_TASK=":app:pixelApi35AuditAndroidTest"
   set +e
   ./gradlew $GRADLE_TASK $TEST_ARGS --stacktrace --no-daemon
   TEST_EXIT_CODE="$?"
@@ -231,10 +314,10 @@ python3 scripts/audit/gen_report.py \
   --apk-sha256 "$APK_SHA256" \
   --apk-size "$APK_SIZE"
 
-ZIP_PATH="$REPORT_DIR/app-audit-$TIMESTAMP.zip"
+ZIP_PATH="$REPORT_DIR/app-audit-$TIMESTAMP-$HEAD_SHORT.zip"
 (
   cd "$REPORT_DIR"
-  zip -qr "app-audit-$TIMESTAMP.zip" .
+  zip -qr "app-audit-$TIMESTAMP-$HEAD_SHORT.zip" .
 )
 
 echo "Report: $REPORT_DIR/report.md"

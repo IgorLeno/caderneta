@@ -1,6 +1,7 @@
 package com.example.caderneta.ui.vendas
 
 import android.app.Dialog
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -9,16 +10,25 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
+import coil.load
+import coil.transform.CircleCropTransformation
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogNovoClienteBinding
 import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.viewmodel.VendasViewModel
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
+import java.io.File
 
 class NovoClienteDialog(
     private val viewModel: VendasViewModel,
@@ -26,7 +36,7 @@ class NovoClienteDialog(
     private var _binding: DialogNovoClienteBinding? = null
     private val binding get() = _binding!!
 
-    var onClienteAdicionado: ((String, String, Long, Long?, Long?, Long?) -> Unit)? = null
+    var onClienteAdicionado: ((String, String, Long, Long?, Long?, Long?, Uri?, Boolean) -> Unit)? = null
 
     private lateinit var localAdapter: ArrayAdapter<Local>
     private lateinit var sublocal1Adapter: ArrayAdapter<Local>
@@ -41,6 +51,22 @@ class NovoClienteDialog(
     private var selectedSublocal3Id: Long? = null
 
     private var clienteExistente: Cliente? = null
+    private var selectedPhotoUri: Uri? = null
+    private var capturePhotoUri: Uri? = null
+    private var removerFoto = false
+
+    private val pickPhotoLauncher =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let(::selecionarFoto)
+        }
+
+    private val takePictureLauncher =
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val uri = capturePhotoUri
+            if (success && uri != null) {
+                selecionarFoto(uri)
+            }
+        }
 
     fun setClienteExistente(cliente: Cliente) {
         clienteExistente = cliente
@@ -73,6 +99,7 @@ class NovoClienteDialog(
         setupSpinners()
         setupDialogButtons()
         setupImportButton()
+        setupPhotoActions()
 
         // Preencher campos se for edição
         clienteExistente?.let { cliente ->
@@ -90,12 +117,105 @@ class NovoClienteDialog(
             binding.tilSublocal1.visibility = View.GONE
             binding.tilSublocal2.visibility = View.GONE
             binding.tilSublocal3.visibility = View.GONE
+
+            viewModel.arquivoFotoCliente(cliente.fotoNome)?.let { foto ->
+                binding.ivClienteFoto.load(foto) {
+                    placeholder(com.example.caderneta.R.drawable.ic_avatar)
+                    error(com.example.caderneta.R.drawable.ic_avatar)
+                    transformations(CircleCropTransformation())
+                }
+                binding.btnRemoverFoto.visibility = View.VISIBLE
+                binding.btnAdicionarFoto.text = "Trocar foto"
+            }
         }
 
         // Alterar título se for edição
         (dialog as? AlertDialog)?.setTitle(
             if (clienteExistente != null) "Editar Cliente" else "Novo Cliente",
         )
+    }
+
+    private fun setupPhotoActions() {
+        binding.btnAdicionarFoto.setOnClickListener {
+            showPhotoOptions()
+        }
+        binding.btnRemoverFoto.setOnClickListener {
+            selectedPhotoUri = null
+            removerFoto = true
+            binding.ivClienteFoto.load(com.example.caderneta.R.drawable.ic_avatar) {
+                transformations(CircleCropTransformation())
+            }
+            binding.btnRemoverFoto.visibility = View.GONE
+            binding.btnAdicionarFoto.text = "Adicionar foto"
+        }
+    }
+
+    private fun showPhotoOptions() {
+        val sheet = BottomSheetDialog(requireContext())
+        val content =
+            LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(32, 24, 32, 24)
+            }
+        content.addView(
+            photoOptionButton("Tirar foto") {
+                sheet.dismiss()
+                launchCamera()
+            },
+        )
+        content.addView(
+            photoOptionButton("Escolher imagem") {
+                sheet.dismiss()
+                pickPhotoLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+        )
+        content.addView(photoOptionButton("Cancelar") { sheet.dismiss() })
+        sheet.setContentView(content)
+        sheet.show()
+    }
+
+    private fun photoOptionButton(
+        text: String,
+        onClick: () -> Unit,
+    ): MaterialButton =
+        MaterialButton(requireContext()).apply {
+            this.text = text
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                )
+            setOnClickListener { onClick() }
+        }
+
+    private fun launchCamera() {
+        val uri = createCaptureUri()
+        capturePhotoUri = uri
+        takePictureLauncher.launch(uri)
+    }
+
+    private fun createCaptureUri(): Uri {
+        val dir = File(requireContext().cacheDir, "photo_capture").apply { mkdirs() }
+        val file = File.createTempFile("cliente_", ".jpg", dir)
+        return FileProvider.getUriForFile(
+            requireContext(),
+            "${requireContext().packageName}.fileprovider",
+            file,
+        )
+    }
+
+    private fun selecionarFoto(uri: Uri) {
+        selectedPhotoUri = uri
+        removerFoto = false
+        binding.ivClienteFoto.load(uri) {
+            placeholder(com.example.caderneta.R.drawable.ic_avatar)
+            error(com.example.caderneta.R.drawable.ic_avatar)
+            transformations(CircleCropTransformation())
+        }
+        binding.btnRemoverFoto.visibility = View.VISIBLE
+        binding.btnAdicionarFoto.text = "Trocar foto"
     }
 
     private fun setupInputValidation() {
@@ -377,7 +497,16 @@ class NovoClienteDialog(
                         importedHierarchy?.getOrNull(3)?.id
                             ?: selectedSublocal3Id
 
-                    onClienteAdicionado?.invoke(nome, telefone, localId, sublocal1Id, sublocal2Id, sublocal3Id)
+                    onClienteAdicionado?.invoke(
+                        nome,
+                        telefone,
+                        localId,
+                        sublocal1Id,
+                        sublocal2Id,
+                        sublocal3Id,
+                        selectedPhotoUri,
+                        removerFoto,
+                    )
                     dismiss()
                 }
             }

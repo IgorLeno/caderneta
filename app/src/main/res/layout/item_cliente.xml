@@ -15,14 +15,27 @@
         android:layout_height="wrap_content"
         android:padding="16dp">
 
+        <ImageView
+            android:id="@+id/iv_cliente_foto"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_oval"
+            android:contentDescription="Foto do cliente"
+            android:padding="6dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_avatar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <TextView
             android:id="@+id/tv_nome_cliente"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="@color/on_surface"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@id/iv_cliente_foto"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/tv_valor_devido"
             tools:text="Nome do Cliente" />
@@ -80,6 +93,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/layout_acao_promocao"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -309,7 +323,7 @@
                         android:layout_height="66dp"
                         android:enabled="false"
                         android:inputType="numberDecimal"
-                        android:textColor="@color/material_dynamic_neutral20"
+                        android:textColor="@color/on_surface"
                         android:textSize="18dp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
@@ -387,7 +401,7 @@
                         android:layout_height="66dp"
                         android:enabled="false"
                         android:inputType="numberDecimal"
-                        android:textColor="@color/material_dynamic_neutral20"
+                        android:textColor="@color/on_surface"
                         android:textSize="18dp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
@@ -410,7 +424,7 @@
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     android:text="Confirmar"
-                    android:textColor="@color/material_dynamic_neutral50"
+                    android:textColor="@color/text_muted"
                     android:textSize="14sp"
                     app:icon="@drawable/ic_check"
                     app:iconGravity="textStart"
@@ -424,7 +438,7 @@
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="Cancelar"
-                    android:textColor="@color/material_dynamic_neutral50"
+                    android:textColor="@color/text_muted"
                     android:textSize="14sp"
                     app:icon="@drawable/ic_close"
                     app:iconGravity="textStart"
@@ -494,7 +508,7 @@
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     android:text="Confirmar"
-                    android:textColor="@color/material_dynamic_neutral50"
+                    android:textColor="@color/text_muted"
                     android:textSize="14sp"
                     app:icon="@drawable/ic_check"
                     app:iconGravity="textStart"
@@ -508,7 +522,7 @@
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="Cancelar"
-                    android:textColor="@color/material_dynamic_neutral50"
+                    android:textColor="@color/text_muted"
                     android:textSize="14sp"
                     app:icon="@drawable/ic_close"
                     app:iconGravity="textStart"

@@ -29,6 +29,8 @@ class BuildIdentityE2ETest : BaseE2ETest() {
                 .check(matches(withText(allOf(containsString("Caderneta ${BuildConfig.VERSION_NAME}")))))
                 .check(matches(withText(containsString("Código ${BuildConfig.VERSION_CODE}"))))
                 .check(matches(withText(containsString("Build ${BuildConfig.BUILD_TYPE}"))))
+                .check(matches(withText(containsString("Audit ${BuildConfig.IS_AUDIT}"))))
+                .check(matches(withText(containsString("Dirty ${BuildConfig.GIT_DIRTY}"))))
                 .check(matches(withText(containsString("Commit ${BuildConfig.GIT_SHA}"))))
                 .check(matches(withText(not(containsString("Commit unknown")))))
                 .check(matches(withText(containsString("Banco ${BuildConfig.DB_VERSION}"))))

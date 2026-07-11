@@ -27,10 +27,12 @@
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/til_busca"
+            style="@style/Widget.Caderneta.TextInputLayout"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_margin="16dp"
             android:hint="Buscar cliente"
+            app:endIconMode="clear_text"
             app:startIconDrawable="@drawable/ic_search"
             app:layout_constraintTop_toBottomOf="@id/tv_local_selecionado"
             app:layout_constraintStart_toStartOf="parent"
