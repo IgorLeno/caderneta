@@ -24,6 +24,7 @@ import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.data.entity.TransacaoVenda
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.ItemClienteBinding
+import com.example.caderneta.ui.common.FeedbackPresenter
 import com.example.caderneta.util.ContadorHelper
 import com.example.caderneta.util.ParseDinheiro
 import com.example.caderneta.util.centavosParaReais
@@ -31,8 +32,6 @@ import com.example.caderneta.util.centavosParaTextoDecimal
 import com.example.caderneta.util.decimalParaCentavos
 import com.example.caderneta.util.parseDinheiro
 import com.example.caderneta.util.rethrowCancellation
-import com.example.caderneta.util.showErrorToast
-import com.example.caderneta.util.showSuccessToast
 import com.example.caderneta.viewmodel.ClienteState
 import com.example.caderneta.viewmodel.ConsultasViewModel
 import com.example.caderneta.viewmodel.UiEvento
@@ -119,7 +118,8 @@ class EditarOperacaoDialog(
                                         }
                                     }
 
-                                    requireContext().showSuccessToast(
+                                    FeedbackPresenter.sucesso(
+                                        conteudoActivity(),
                                         when (venda.transacao) {
                                             TransacaoVenda.PAGAMENTO -> "Pagamento atualizado com sucesso"
                                             else -> "Operação atualizada com sucesso"
@@ -129,7 +129,7 @@ class EditarOperacaoDialog(
                                 }
                             } catch (e: Exception) {
                                 e.rethrowCancellation()
-                                requireContext().showErrorToast("Erro ao atualizar operação: ${e.message}")
+                                FeedbackPresenter.erro(conteudoActivity(), "Erro ao atualizar operação: ${e.message}")
                             }
                         }
                     }
@@ -143,6 +143,13 @@ class EditarOperacaoDialog(
             venda.isPromocao -> "Editar Promoção"
             else -> "Editar Venda"
         }
+
+    /**
+     * Ancora o feedback no conteúdo da Activity (não no root do diálogo):
+     * este diálogo pode se fechar (`dialog.dismiss()`) logo após disparar
+     * o evento, o que destruiria um Snackbar ancorado à própria view dele.
+     */
+    private fun conteudoActivity(): View = requireActivity().findViewById(android.R.id.content)
 
     private fun updateDialogTitle(modoOperacao: ModoOperacao?) {
         alertDialog?.setTitle(
@@ -550,8 +557,8 @@ class EditarOperacaoDialog(
                 launch {
                     consultasViewModel.eventos.collectLatest { evento ->
                         when (evento) {
-                            is UiEvento.Erro -> requireContext().showErrorToast(evento.mensagem)
-                            is UiEvento.Sucesso -> requireContext().showSuccessToast(evento.mensagem)
+                            is UiEvento.Erro -> FeedbackPresenter.erro(conteudoActivity(), evento.mensagem)
+                            is UiEvento.Sucesso -> FeedbackPresenter.sucesso(conteudoActivity(), evento.mensagem)
                             is UiEvento.ConfirmarRestauracao -> Unit
                         }
                     }
@@ -560,8 +567,8 @@ class EditarOperacaoDialog(
                 launch {
                     vendasViewModel.eventos.collectLatest { evento ->
                         when (evento) {
-                            is UiEvento.Erro -> requireContext().showErrorToast(evento.mensagem)
-                            is UiEvento.Sucesso -> requireContext().showSuccessToast(evento.mensagem)
+                            is UiEvento.Erro -> FeedbackPresenter.erro(conteudoActivity(), evento.mensagem)
+                            is UiEvento.Sucesso -> FeedbackPresenter.sucesso(conteudoActivity(), evento.mensagem)
                             is UiEvento.ConfirmarRestauracao -> Unit
                         }
                     }

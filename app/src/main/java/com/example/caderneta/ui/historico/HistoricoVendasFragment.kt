@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.R
 import com.example.caderneta.databinding.FragmentHistoricoVendasBinding
+import com.example.caderneta.ui.common.FeedbackPresenter
 import com.example.caderneta.viewmodel.HistoricoVendasViewModel
 import com.example.caderneta.viewmodel.HistoricoVendasViewModelFactory
 import com.github.mikephil.charting.components.XAxis
@@ -21,7 +22,6 @@ import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.formatter.ValueFormatter
-import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -130,7 +130,7 @@ class HistoricoVendasFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { errorMessage ->
                 errorMessage?.let {
-                    Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
+                    FeedbackPresenter.erro(binding.root, it)
                 }
             }
         }

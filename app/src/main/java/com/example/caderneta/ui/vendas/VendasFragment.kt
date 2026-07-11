@@ -26,8 +26,7 @@ import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.FragmentVendasBinding
-import com.example.caderneta.util.showErrorToast
-import com.example.caderneta.util.showSuccessToast
+import com.example.caderneta.ui.common.FeedbackPresenter
 import com.example.caderneta.viewmodel.UiEvento
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
@@ -329,8 +328,8 @@ class VendasFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 vendasViewModel.eventos.collectLatest { evento ->
                     when (evento) {
-                        is UiEvento.Erro -> requireContext().showErrorToast(evento.mensagem)
-                        is UiEvento.Sucesso -> requireContext().showSuccessToast(evento.mensagem)
+                        is UiEvento.Erro -> FeedbackPresenter.erro(binding.root, evento.mensagem)
+                        is UiEvento.Sucesso -> FeedbackPresenter.sucesso(binding.root, evento.mensagem)
                         is UiEvento.ConfirmarRestauracao -> Unit
                     }
                 }

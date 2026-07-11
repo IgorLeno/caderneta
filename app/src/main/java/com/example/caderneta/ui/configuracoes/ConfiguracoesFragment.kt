@@ -19,12 +19,12 @@ import com.example.caderneta.domain.configuracoes.ConfiguracoesCampo
 import com.example.caderneta.domain.configuracoes.ConfiguracoesFormResult
 import com.example.caderneta.domain.configuracoes.ConfiguracoesFormValidator
 import com.example.caderneta.domain.configuracoes.ConfiguracoesInput
+import com.example.caderneta.ui.common.FeedbackPresenter
 import com.example.caderneta.util.centavosParaTextoDecimal
 import com.example.caderneta.viewmodel.ConfiguracoesViewModel
 import com.example.caderneta.viewmodel.ConfiguracoesViewModelFactory
 import com.example.caderneta.viewmodel.UiEvento
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -106,10 +106,8 @@ class ConfiguracoesFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.eventos.collectLatest { evento ->
                     when (evento) {
-                        is UiEvento.Erro ->
-                            Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
-                        is UiEvento.Sucesso ->
-                            Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
+                        is UiEvento.Erro -> FeedbackPresenter.erro(binding.root, evento.mensagem)
+                        is UiEvento.Sucesso -> FeedbackPresenter.sucesso(binding.root, evento.mensagem)
                         is UiEvento.ConfirmarRestauracao -> confirmarRestauracao(evento.resumo)
                     }
                 }

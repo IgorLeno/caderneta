@@ -26,6 +26,7 @@ import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Venda
 import com.example.caderneta.databinding.FragmentConsultasBinding
+import com.example.caderneta.ui.common.FeedbackPresenter
 import com.example.caderneta.ui.vendas.NovoClienteDialog
 import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.viewmodel.ConsultasViewModel
@@ -33,7 +34,6 @@ import com.example.caderneta.viewmodel.ConsultasViewModelFactory
 import com.example.caderneta.viewmodel.UiEvento
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
-import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -451,10 +451,8 @@ class ConsultasFragment : Fragment() {
                 viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                     viewModel.eventos.collectLatest { evento ->
                         when (evento) {
-                            is UiEvento.Erro ->
-                                Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_LONG).show()
-                            is UiEvento.Sucesso ->
-                                Snackbar.make(binding.root, evento.mensagem, Snackbar.LENGTH_SHORT).show()
+                            is UiEvento.Erro -> FeedbackPresenter.erro(binding.root, evento.mensagem)
+                            is UiEvento.Sucesso -> FeedbackPresenter.sucesso(binding.root, evento.mensagem)
                             is UiEvento.ConfirmarRestauracao -> Unit
                         }
                     }

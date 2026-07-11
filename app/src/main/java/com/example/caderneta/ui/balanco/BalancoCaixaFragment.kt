@@ -10,10 +10,10 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.databinding.FragmentBalancoCaixaBinding
+import com.example.caderneta.ui.common.FeedbackPresenter
 import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.viewmodel.BalancoCaixaViewModel
 import com.example.caderneta.viewmodel.BalancoCaixaViewModelFactory
-import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -61,7 +61,7 @@ class BalancoCaixaFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { errorMessage ->
                 errorMessage?.let {
-                    Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
+                    FeedbackPresenter.erro(binding.root, it)
                 }
             }
         }

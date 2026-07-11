@@ -13,9 +13,9 @@ import com.example.caderneta.R
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogOpcoesClienteBinding
+import com.example.caderneta.ui.common.FeedbackPresenter
 import com.example.caderneta.ui.consultas.ConsultasFragmentArgs
 import com.example.caderneta.util.rethrowCancellation
-import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 
 class OpcoesClienteDialog(
@@ -81,22 +81,12 @@ class OpcoesClienteDialog(
                             )
                             dismiss()
                         } else {
-                            Snackbar
-                                .make(
-                                    requireView(),
-                                    "Não foi possível determinar o local do cliente",
-                                    Snackbar.LENGTH_LONG,
-                                ).show()
+                            FeedbackPresenter.erro(requireView(), "Não foi possível determinar o local do cliente")
                         }
                     } catch (e: Exception) {
                         e.rethrowCancellation()
                         Log.e("OpcoesClienteDialog", "Erro ao navegar", e)
-                        Snackbar
-                            .make(
-                                requireView(),
-                                "Erro ao abrir consulta: ${e.message}",
-                                Snackbar.LENGTH_LONG,
-                            ).show()
+                        FeedbackPresenter.erro(requireView(), "Erro ao abrir consulta: ${e.message}")
                     }
                 }
             }
