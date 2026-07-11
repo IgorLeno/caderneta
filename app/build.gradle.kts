@@ -82,6 +82,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
         testInstrumentationRunnerArguments["useTestStorageService"] = "true"
+        // e2e.processdeath só roda via scripts/audit/process_death_check.sh (adb shell am
+        // instrument direto, sem passar pelos argumentos do Gradle abaixo). Na suite padrão
+        // orquestrada pelo Gradle/GMD, ProcessDeathVerifyE2ETest falharia sempre: o Orchestrator
+        // limpa os dados do app entre testes, então o estado semeado pela fase anterior nunca
+        // chegaria até ele.
+        testInstrumentationRunnerArguments["notPackage"] = "com.example.caderneta.e2e.processdeath"
         buildConfigField("String", "GIT_SHA", "\"${gitOutput("rev-parse", "--short", "HEAD")}\"")
         buildConfigField("String", "GIT_SHA_FULL", "\"${gitOutput("rev-parse", "HEAD")}\"")
         buildConfigField("String", "BUILD_TIME", "\"${buildTimeIso()}\"")
