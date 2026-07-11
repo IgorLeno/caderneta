@@ -14,4 +14,5 @@ open class CadernetaApplication : Application() {
     val financeiroService get() = container.financeiroService
     val backupManager get() = container.backupManager
     val clientePhotoRepository get() = container.clientePhotoRepository
+    val clientePhotoSource get() = container.clientePhotoSource
 }

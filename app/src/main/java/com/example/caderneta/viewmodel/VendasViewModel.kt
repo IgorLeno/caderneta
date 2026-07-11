@@ -11,6 +11,8 @@ import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.domain.FinanceiroService
 import com.example.caderneta.domain.foto.ClientePhotoRepository
+import com.example.caderneta.domain.foto.ClientePhotoSource
+import com.example.caderneta.domain.foto.ProductionClientePhotoSource
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
@@ -45,6 +47,7 @@ class VendasViewModel(
     private val contaRepository: ContaRepository,
     private val financeiroService: FinanceiroService,
     private val clientePhotoRepository: ClientePhotoRepository? = null,
+    val clientePhotoSource: ClientePhotoSource = ProductionClientePhotoSource,
 ) : ViewModel() {
     private val _localSelecionado = MutableStateFlow<Local?>(null)
     val localSelecionado: StateFlow<Local?> = _localSelecionado.asStateFlow()
@@ -576,6 +579,7 @@ class VendasViewModelFactory(
     private val contaRepository: ContaRepository,
     private val financeiroService: FinanceiroService,
     private val clientePhotoRepository: ClientePhotoRepository? = null,
+    private val clientePhotoSource: ClientePhotoSource = ProductionClientePhotoSource,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(VendasViewModel::class.java)) {
@@ -588,6 +592,7 @@ class VendasViewModelFactory(
                 contaRepository,
                 financeiroService,
                 clientePhotoRepository,
+                clientePhotoSource,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

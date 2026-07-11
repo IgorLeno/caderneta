@@ -51,6 +51,7 @@ class VendasFragment : Fragment() {
             (requireActivity().application as CadernetaApplication).contaRepository,
             (requireActivity().application as CadernetaApplication).financeiroService,
             (requireActivity().application as CadernetaApplication).clientePhotoRepository,
+            (requireActivity().application as CadernetaApplication).clientePhotoSource,
         )
     }
 

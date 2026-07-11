@@ -4,9 +4,12 @@ import android.content.Context
 import com.example.caderneta.data.AppDatabase
 import com.example.caderneta.data.backup.BackupManager
 import com.example.caderneta.domain.FinanceiroService
+import com.example.caderneta.domain.foto.AuditClientePhotoSource
 import com.example.caderneta.domain.foto.ClientePhotoProcessor
 import com.example.caderneta.domain.foto.ClientePhotoRepository
+import com.example.caderneta.domain.foto.ClientePhotoSource
 import com.example.caderneta.domain.foto.ClientePhotoStore
+import com.example.caderneta.domain.foto.ProductionClientePhotoSource
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
@@ -23,6 +26,7 @@ interface AppContainer {
     val financeiroService: FinanceiroService
     val backupManager: BackupManager
     val clientePhotoRepository: ClientePhotoRepository
+    val clientePhotoSource: ClientePhotoSource
 }
 
 class ProductionAppContainer(
@@ -46,5 +50,8 @@ class ProductionAppContainer(
             store = ClientePhotoStore(context),
             processor = ClientePhotoProcessor(context),
         )
+    }
+    override val clientePhotoSource: ClientePhotoSource by lazy {
+        if (BuildConfig.IS_AUDIT) AuditClientePhotoSource() else ProductionClientePhotoSource
     }
 }

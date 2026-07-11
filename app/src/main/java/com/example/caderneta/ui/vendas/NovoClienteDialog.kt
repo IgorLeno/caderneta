@@ -164,15 +164,29 @@ class NovoClienteDialog(
         content.addView(
             photoOptionButton("Tirar foto") {
                 sheet.dismiss()
-                launchCamera()
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val sourceUri = viewModel.clientePhotoSource.captureImage(requireContext())
+                    if (sourceUri != null) {
+                        selecionarFoto(sourceUri)
+                    } else {
+                        launchCamera()
+                    }
+                }
             },
         )
         content.addView(
             photoOptionButton("Escolher imagem") {
                 sheet.dismiss()
-                pickPhotoLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                )
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val sourceUri = viewModel.clientePhotoSource.pickImage(requireContext())
+                    if (sourceUri != null) {
+                        selecionarFoto(sourceUri)
+                    } else {
+                        pickPhotoLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    }
+                }
             },
         )
         content.addView(photoOptionButton("Cancelar") { sheet.dismiss() })
