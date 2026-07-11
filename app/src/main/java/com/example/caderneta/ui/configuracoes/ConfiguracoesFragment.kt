@@ -46,7 +46,7 @@ class ConfiguracoesFragment : Fragment() {
     }
 
     private val criarBackupLauncher =
-        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
             uri?.let { viewModel.exportarBackup(it) }
         }
 
@@ -160,7 +160,14 @@ class ConfiguracoesFragment : Fragment() {
         }
 
         binding.btnRestaurarBackup.setOnClickListener {
-            abrirBackupLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/plain"))
+            abrirBackupLauncher.launch(
+                arrayOf(
+                    "application/zip",
+                    "application/json",
+                    "application/octet-stream",
+                    "text/plain",
+                ),
+            )
         }
     }
 
@@ -175,7 +182,7 @@ class ConfiguracoesFragment : Fragment() {
 
     private fun nomeArquivoBackup(): String {
         val data = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
-        return "caderneta-backup-$data.json"
+        return "caderneta-backup-$data.zip"
     }
 
     private fun lerConfiguracoesOuFocarErro(): Configuracoes? {

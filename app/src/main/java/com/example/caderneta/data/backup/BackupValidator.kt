@@ -12,7 +12,7 @@ class BackupValidator(
     private val applicationId: String,
 ) {
     fun validar(snapshot: BackupSnapshot) {
-        require(snapshot.formatVersion == 1) { "Versão de backup não suportada" }
+        require(snapshot.formatVersion in 1..BackupArchive.FORMAT_VERSION_ZIP) { "Versão de backup não suportada" }
         require(snapshot.dbVersion in 1..2) { "Versão de banco não suportada" }
         require(snapshot.app == applicationId) { "Backup pertence a outro aplicativo" }
         require(snapshot.configuracoes.size <= 1) { "Backup possui mais de uma configuração" }

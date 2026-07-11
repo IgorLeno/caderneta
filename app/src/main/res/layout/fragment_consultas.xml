@@ -58,6 +58,20 @@
             app:layout_constraintEnd_toEndOf="parent"
             tools:listitem="@layout/item_resultado_consulta"/>
 
+        <TextView
+            android:id="@+id/tv_empty_resultados"
+            style="@style/TextAppearance.Caderneta.EmptyState"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/space_6"
+            android:text="@string/consultas_sem_resultados"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/til_busca"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:visibility="visible"/>
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <com.google.android.material.navigation.NavigationView

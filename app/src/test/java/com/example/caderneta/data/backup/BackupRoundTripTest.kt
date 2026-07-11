@@ -60,10 +60,10 @@ class BackupRoundTripTest {
 
             val output = ByteArrayOutputStream()
             manager.exportar(output)
-            val (snapshot) = manager.lerResumo(ByteArrayInputStream(output.toByteArray()))
+            val (payload) = manager.lerResumo(ByteArrayInputStream(output.toByteArray()))
 
             db.localDao().insertLocal(Local(nome = "Ruido"))
-            manager.restaurar(snapshot.copy(contas = emptyList()))
+            manager.restaurar(payload.snapshot.copy(contas = emptyList()))
 
             assertEquals(
                 1,

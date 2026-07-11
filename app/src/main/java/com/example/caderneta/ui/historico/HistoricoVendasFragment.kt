@@ -99,6 +99,8 @@ class HistoricoVendasFragment : Fragment() {
     private fun setupChart() {
         binding.chartVendas.apply {
             description.isEnabled = false
+            setNoDataText(getString(R.string.grafico_sem_dados))
+            setNoDataTextColor(ContextCompat.getColor(requireContext(), R.color.text_muted))
             setDrawValueAboveBar(true)
             setDrawGridBackground(false)
             setPinchZoom(false)
@@ -157,6 +159,12 @@ class HistoricoVendasFragment : Fragment() {
                 }
             }
 
+        if (entries.isEmpty()) {
+            binding.chartVendas.clear()
+            binding.chartVendas.invalidate()
+            return
+        }
+
         val color = ContextCompat.getColor(requireContext(), R.color.primary_color)
 
         val dataSet =
@@ -205,6 +213,7 @@ class HistoricoVendasFragment : Fragment() {
                 )
             }
 
+        binding.tvEmptyDetalhes.isVisible = detalhesList.isEmpty()
         detalhesVendasAdapter.submitList(detalhesList)
     }
 

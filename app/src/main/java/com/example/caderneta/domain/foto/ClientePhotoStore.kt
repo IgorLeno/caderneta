@@ -42,6 +42,18 @@ class ClientePhotoStore(
         photoFile(fotoNome)?.delete()
     }
 
+    /**
+     * Remove fotos órfãs após uma restauração: apaga apenas arquivos com nome de foto válido
+     * que não estejam em [referenciadas]. Arquivos com nomes fora do padrão nunca são tocados.
+     */
+    fun deleteUnreferenced(referenciadas: Set<String>) {
+        photosDir.listFiles()?.forEach { file ->
+            if (PHOTO_NAME_REGEX.matches(file.name) && file.name !in referenciadas) {
+                file.delete()
+            }
+        }
+    }
+
     companion object {
         const val PHOTO_DIR = "client_photos"
         private val PHOTO_NAME_REGEX = Regex("cliente_[1-9][0-9]*\\.jpg")

@@ -12,6 +12,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -404,6 +405,7 @@ class ConsultasFragment : Fragment() {
 
             launch {
                 viewModel.clientesComSaldo.collectLatest { clientesComSaldo ->
+                    binding.tvEmptyResultados.isVisible = clientesComSaldo.isEmpty()
                     resultadosAdapter.submitList(
                         clientesComSaldo.map { (cliente, saldo) ->
                             ResultadoConsulta.Cliente(cliente, saldo)

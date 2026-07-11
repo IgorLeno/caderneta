@@ -5,4 +5,7 @@
     <string name="navigation_drawer_close">Fechar navegação</string>
     <string name="add_new_local">Adicionar novo local</string>
     <string name="todos_locais">Todos os locais</string>
+    <string name="consultas_sem_resultados">Nenhum cliente para exibir. Selecione um local ou busque pelo nome.</string>
+    <string name="historico_sem_vendas">Sem vendas no período selecionado.</string>
+    <string name="grafico_sem_dados">Sem dados para exibir.</string>
 </resources>

@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.caderneta.data.backup.BackupManager
-import com.example.caderneta.data.backup.BackupSnapshot
+import com.example.caderneta.data.backup.BackupPayload
 import com.example.caderneta.data.entity.Configuracoes
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.util.EspressoIdlingResource
@@ -38,7 +38,7 @@ class ConfiguracoesViewModel(
     private val _eventos = Channel<UiEvento>(Channel.BUFFERED)
     val eventos = _eventos.receiveAsFlow()
 
-    private var restauracaoPendente: BackupSnapshot? = null
+    private var restauracaoPendente: BackupPayload? = null
 
     init {
         loadConfiguracoes()
@@ -142,8 +142,8 @@ class ConfiguracoesViewModel(
     fun prepararRestauracao(uri: Uri) {
         viewModelScope.launch {
             try {
-                val (snapshot, resumo) = backupManager.lerResumo(uri)
-                restauracaoPendente = snapshot
+                val (payload, resumo) = backupManager.lerResumo(uri)
+                restauracaoPendente = payload
                 _eventos.send(
                     UiEvento.ConfirmarRestauracao(
                         "${resumo.clientes} clientes, ${resumo.lancamentos} lançamentos. Isso apagará os dados atuais.",
@@ -157,10 +157,10 @@ class ConfiguracoesViewModel(
     }
 
     fun confirmarRestauracao() {
-        val snapshot = restauracaoPendente ?: return
+        val payload = restauracaoPendente ?: return
         viewModelScope.launch {
             try {
-                backupManager.restaurar(snapshot)
+                backupManager.restaurar(payload)
                 restauracaoPendente = null
                 _eventos.send(UiEvento.Sucesso("Backup restaurado"))
             } catch (e: Exception) {

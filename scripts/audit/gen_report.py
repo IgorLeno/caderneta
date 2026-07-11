@@ -69,6 +69,162 @@ def read_json_files(root: pathlib.Path, directory: str) -> list[dict]:
     return result
 
 
+LOGCAT_CRASH_MARKERS = ("FATAL EXCEPTION", "E AndroidRuntime", "ANR in ", "signal 11 (SIGSEGV)")
+
+
+def finding(
+    severity: str,
+    category: str,
+    screen: str,
+    component: str,
+    description: str,
+    impact: str,
+    recommendation: str,
+    confidence: str,
+    evidence: str = "",
+) -> dict:
+    return {
+        "severity": severity,
+        "category": category,
+        "screen": screen,
+        "component": component,
+        "description": description,
+        "impact": impact,
+        "recommendation": recommendation,
+        "confidence": confidence,
+        "nature": "determinística",
+        "evidence": evidence,
+    }
+
+
+def scan_logcat(root: pathlib.Path, logcat_paths: list[str]) -> list[tuple[str, int]]:
+    hits = []
+    for rel_path in logcat_paths:
+        path = root / rel_path
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        count = sum(text.count(marker) for marker in LOGCAT_CRASH_MARKERS)
+        if count:
+            hits.append((rel_path, count))
+    return hits
+
+
+def run_deterministic_checks(root: pathlib.Path, summary: dict) -> list[dict]:
+    findings: list[dict] = []
+    junit = summary["junit"]
+
+    if summary["testExitCode"] != 0:
+        findings.append(
+            finding(
+                "P0", "test-exec", "-", "instrumentation",
+                f"Instrumentation terminou com exit code {summary['testExitCode']}.",
+                "Suíte de auditoria não passou integralmente.",
+                "Investigar falhas nos artefatos de teste e no logcat.",
+                "alta",
+            )
+        )
+
+    for case in junit["cases"]:
+        if case["status"] in ("failed", "error"):
+            findings.append(
+                finding(
+                    "P0", "test-failure", "-", f"{case['class']}#{case['name']}",
+                    f"Teste {case['status']}: {case['class']}#{case['name']}.",
+                    "Comportamento verificado divergiu do esperado.",
+                    "Abrir o stacktrace correspondente em failures/ e corrigir a causa raiz.",
+                    "alta", case["file"],
+                )
+            )
+
+    if not summary["screenshots"]:
+        findings.append(
+            finding(
+                "P1", "evidence", "-", "screenshots",
+                "Nenhum screenshot coletado na execução.",
+                "Auditoria visual fica sem evidência de estado das telas.",
+                "Confirmar que os testes chamam screenshot() e que TestStorage está ativo.",
+                "alta",
+            )
+        )
+
+    for rel_path, count in scan_logcat(root, summary["logcat"]):
+        findings.append(
+            finding(
+                "P0", "stability", "-", rel_path,
+                f"{count} marcador(es) de crash/ANR no logcat.",
+                "Possível crash, ANR ou exceção fatal durante a auditoria.",
+                "Inspecionar o logcat e reproduzir o cenário associado.",
+                "média", rel_path,
+            )
+        )
+
+    for entry in summary["databaseSummary"]:
+        findings.extend(check_database_summary(entry))
+
+    return findings
+
+
+def check_database_summary(entry: dict) -> list[dict]:
+    content = entry.get("content", {})
+    if content.get("parseError"):
+        return [
+            finding(
+                "P1", "evidence", "-", entry["path"],
+                "Resumo de banco não pôde ser lido (JSON inválido).",
+                "Sem verificação determinística de integridade para o cenário.",
+                "Verificar a geração de database-summary no coletor de testes.",
+                "alta", entry["path"],
+            )
+        ]
+
+    findings: list[dict] = []
+    scenario = content.get("scenario", "-")
+    path = entry["path"]
+
+    violations = content.get("foreignKeyViolations") or []
+    if violations:
+        findings.append(
+            finding(
+                "P0", "integrity", scenario, "foreign_key_check",
+                f"{len(violations)} violação(ões) de chave estrangeira: {violations}.",
+                "Banco em estado inconsistente após o cenário.",
+                "Corrigir a escrita que deixa referências órfãs.",
+                "alta", path,
+            )
+        )
+
+    cache = content.get("saldoCache") or []
+    saldos = [item.get("saldoCentavos") for item in cache if item.get("saldoCentavos") is not None]
+    if any(saldo < 0 for saldo in saldos):
+        findings.append(
+            finding(
+                "P0", "balance", scenario, "conta.saldoCentavos",
+                "Saldo em cache negativo encontrado.",
+                "Invariante saldo >= 0 violada.",
+                "Revisar FinanceiroService/pagamentos que geram saldo negativo.",
+                "alta", path,
+            )
+        )
+
+    historico = content.get("saldoHistoricoCentavos")
+    if historico is not None and saldos:
+        divergente = historico != saldos[0] if len(saldos) == 1 else historico not in saldos
+        if divergente:
+            findings.append(
+                finding(
+                    "P0", "balance", scenario, "saldoCache vs ledger",
+                    f"Saldo em cache {saldos} diverge do ledger reconstruído ({historico}).",
+                    "Cache de Conta fora de sincronia com o histórico de vendas.",
+                    "Reconciliar Conta a partir do ledger e investigar a divergência.",
+                    "alta" if len(saldos) == 1 else "média", path,
+                )
+            )
+
+    return findings
+
+
 def write_markdown(root: pathlib.Path, summary: dict) -> None:
     lines = [
         "# Caderneta Autonomous Android Audit",
@@ -113,6 +269,16 @@ def write_markdown(root: pathlib.Path, summary: dict) -> None:
         )
     else:
         lines.append("- No JUnit XML parsed.")
+    lines.extend(["", "## Deterministic Findings", ""])
+    findings = summary["deterministicFindings"]
+    if findings:
+        for item in findings:
+            lines.append(
+                f"- `{item['severity']}` [{item['category']}] {item['description']}"
+                f" (tela: {item['screen']}, confiança: {item['confidence']})"
+            )
+    else:
+        lines.append("- Nenhum apontamento determinístico.")
     (root / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -162,25 +328,44 @@ th, td {{ border: 1px solid #ddd; padding: 6px; text-align: left; }}
     (root / "report.html").write_text(document, encoding="utf-8")
 
 
-def write_templates(root: pathlib.Path, summary: dict) -> None:
-    visual = ["# Visual Review", "", "## Screenshot Index", ""]
-    for path in summary["screenshots"]:
-        visual.extend(
-            [
-                f"### {path}",
-                f"![{path}]({path})",
-                "- Severity: ",
-                "- Screen: ",
-                "- Finding: ",
-                "- Impact: ",
-                "- Recommendation: ",
-                "",
-            ]
-        )
-    (root / "visual-review.md").write_text("\n".join(visual), encoding="utf-8")
+def write_visual_review(root: pathlib.Path, summary: dict) -> None:
+    """Visual review is NOT auto-analyzed here; declare it honestly instead of emitting blank fields."""
+    lines = [
+        "# Visual Review",
+        "",
+        "> Status: **Análise visual não executada** automaticamente.",
+        "> As checagens determinísticas estão em `report.md` (seção Deterministic Findings).",
+        "> Para uma análise visual real, revisar as capturas abaixo com um humano ou modelo e",
+        "> preencher os campos por apontamento (severidade/tela/componente/impacto/recomendação).",
+        "",
+        "## Screenshot Index",
+        "",
+    ]
+    if summary["screenshots"]:
+        for path in summary["screenshots"]:
+            lines.extend([f"### {path}", f"![{path}]({path})", "- Status: não analisado", ""])
+    else:
+        lines.append("- Nenhum screenshot coletado.")
+    (root / "visual-review.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    action = ["# Action Plan", "", "## P0", "", "- ", "", "## P1", "", "- ", "", "## P2", "", "- ", ""]
-    (root / "action-plan.md").write_text("\n".join(action), encoding="utf-8")
+
+def write_action_plan(root: pathlib.Path, summary: dict) -> None:
+    findings = summary["deterministicFindings"]
+    lines = ["# Action Plan", "", "Origem: checagens determinísticas da execução.", ""]
+    total = 0
+    for severity in ("P0", "P1", "P2"):
+        lines.extend([f"## {severity}", ""])
+        bucket = [item for item in findings if item["severity"] == severity]
+        total += len(bucket)
+        if bucket:
+            for item in bucket:
+                lines.append(f"- [{item['category']}] {item['description']} — {item['recommendation']}")
+        else:
+            lines.append("- Nenhum apontamento.")
+        lines.append("")
+    if total == 0:
+        lines.append("Nenhum apontamento determinístico nesta execução.")
+    (root / "action-plan.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -210,12 +395,15 @@ def main() -> int:
         "logcat": collect_files(root, "logcat", ("*.txt",)),
         "databaseSummary": read_json_files(root, "database-summary"),
         "metadata": read_json_files(root, "metadata"),
+        "visualAnalysisExecuted": False,
     }
+    summary["deterministicFindings"] = run_deterministic_checks(root, summary)
     (root / "execution-summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     (root / "app-build.json").write_text(json.dumps(summary["apk"], indent=2), encoding="utf-8")
     write_markdown(root, summary)
     write_html(root, summary)
-    write_templates(root, summary)
+    write_visual_review(root, summary)
+    write_action_plan(root, summary)
     return 0
 
 

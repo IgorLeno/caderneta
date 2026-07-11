@@ -25,3 +25,13 @@ data class BackupResumo(
     val lancamentos: Int,
     val geradoEmMillis: Long,
 )
+
+/**
+ * Dados de um backup lido/pronto para restaurar: o snapshot lógico do banco e, quando o
+ * backup é ZIP (v2), os bytes já verificados das fotos indexados por `fotoNome`.
+ * Backups JSON legados (v1) trazem [fotos] vazio.
+ */
+data class BackupPayload(
+    val snapshot: BackupSnapshot,
+    val fotos: Map<String, ByteArray> = emptyMap(),
+)
