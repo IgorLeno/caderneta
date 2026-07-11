@@ -18,16 +18,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Registra uma venda pela UI, recria a Activity (simulando recriação de processo/estado) e verifica
+ * Registra uma venda pela UI, recria a Activity e verifica
  * que configuração, cliente e saldo permanecem íntegros após a recriação.
- *
- * Observação: usa [androidx.test.core.app.ActivityScenario.recreate] (nível de recriação de Activity);
- * morte de processo real deve ser exercida no dispositivo físico/GMD.
  */
-class ProcessDeathE2ETest : BaseE2ETest() {
+class ActivityRecreationE2ETest : BaseE2ETest() {
     @Test
     fun vendaSobreviveARecriacaoDaActivity() {
-        val scenarioName = "process_death"
+        val scenarioName = "activity_recreation"
         DatabaseFixture.seedConfiguracoes(app.container)
         val seeded = DatabaseFixture.seedClienteBasico(app.container)
 
