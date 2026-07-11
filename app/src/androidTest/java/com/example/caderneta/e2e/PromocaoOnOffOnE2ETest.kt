@@ -56,7 +56,7 @@ class PromocaoOnOffOnE2ETest : BaseE2ETest() {
             onView(withId(R.id.rv_clientes)).perform(
                 actionOnItemAtPosition<RecyclerView.ViewHolder>(
                     0,
-                    assertChildVisibility(R.id.layout_acao_promocao, View.VISIBLE),
+                    assertChildVisibility(R.id.btnPromocao, View.VISIBLE),
                 ),
             )
             screenshot(scenarioName, "vendas_promocao_on")

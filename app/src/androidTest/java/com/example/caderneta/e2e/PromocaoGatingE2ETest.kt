@@ -27,7 +27,7 @@ class PromocaoGatingE2ETest : BaseE2ETest() {
             onView(withId(R.id.rv_clientes)).perform(
                 actionOnItemAtPosition<RecyclerView.ViewHolder>(
                     0,
-                    assertChildVisibility(R.id.layout_acao_promocao, View.GONE),
+                    assertChildVisibility(R.id.btnPromocao, View.GONE),
                 ),
             )
             screenshot(scenarioName, "vendas_promocao_off")

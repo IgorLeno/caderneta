@@ -118,10 +118,12 @@ class ClientesAdapter(
         private var boundCliente: Cliente? = null
         private var saldoJob: Job? = null
         private var isBindingPagamento = false
+        private var sincronizandoEstado = false
         private val pagamentoInputController = PagamentoInputController()
 
         init {
             setupPagamentoWatcher()
+            setupToggleGroupListeners()
         }
 
         fun bind(cliente: Cliente) {
@@ -129,8 +131,6 @@ class ClientesAdapter(
             boundCliente = cliente
             cancelSaldoJob()
             setupBasicInfo(cliente)
-            setupMainButtons(cliente)
-            setupVendaButtons(cliente)
             setupContadores(cliente)
             setupPagamentoLayout(cliente)
             setupConfirmationButtons(cliente)
@@ -225,60 +225,53 @@ class ClientesAdapter(
             }
         }
 
-        private fun setupMainButtons(cliente: Cliente) {
-            binding.apply {
-                btnVenda.setOnClickListener {
-                    val currentState = getClienteState(cliente.id)?.modoOperacao
-                    val newModoOperacao = if (currentState == ModoOperacao.VENDA) null else ModoOperacao.VENDA
-                    onModoOperacaoSelected(cliente, newModoOperacao)
-                    updateButtonStates(cliente)
-                }
-
-                btnPromocao.setOnClickListener {
-                    if (getConfiguracoes()?.promocoesAtivadas != true) {
-                        onModoOperacaoSelected(cliente, null)
-                        updateButtonStates(cliente)
-                        return@setOnClickListener
-                    }
-                    val currentState = getClienteState(cliente.id)?.modoOperacao
-                    val newModoOperacao = if (currentState == ModoOperacao.PROMOCAO) null else ModoOperacao.PROMOCAO
-                    onModoOperacaoSelected(cliente, newModoOperacao)
-                    updateButtonStates(cliente)
-                }
-
-                btnPagamento.setOnClickListener {
-                    val currentState = getClienteState(cliente.id)?.modoOperacao
-                    val newModoOperacao = if (currentState == ModoOperacao.PAGAMENTO) null else ModoOperacao.PAGAMENTO
-                    onModoOperacaoSelected(cliente, newModoOperacao)
-                    updateButtonStates(cliente)
-                }
+        private fun setupToggleGroupListeners() {
+            binding.toggleGroupModo.addOnButtonCheckedListener { _, checkedId, isChecked ->
+                onModoToggled(checkedId, isChecked)
+            }
+            binding.toggleGroupTipo.addOnButtonCheckedListener { _, checkedId, isChecked ->
+                onTipoToggled(checkedId, isChecked)
             }
         }
 
-        private fun setupVendaButtons(cliente: Cliente) {
-            binding.apply {
-                btnAVista.setOnClickListener {
-                    val newTipoTransacao =
-                        if (getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_VISTA) {
-                            null
-                        } else {
-                            TipoTransacao.A_VISTA
-                        }
-                    onTipoTransacaoSelected(cliente, newTipoTransacao)
-                    updateButtonStates(cliente)
-                }
+        private fun onModoToggled(
+            checkedId: Int,
+            isChecked: Boolean,
+        ) {
+            if (sincronizandoEstado) return
+            val cliente = boundCliente ?: return
+            onModoOperacaoSelected(cliente, modoOperacaoParaBotao(checkedId, isChecked))
+            updateButtonStates(cliente)
+        }
 
-                btnAPrazo.setOnClickListener {
-                    val newTipoTransacao =
-                        if (getClienteState(cliente.id)?.tipoTransacao == TipoTransacao.A_PRAZO) {
-                            null
-                        } else {
-                            TipoTransacao.A_PRAZO
-                        }
-                    onTipoTransacaoSelected(cliente, newTipoTransacao)
-                    updateButtonStates(cliente)
-                }
+        private fun modoOperacaoParaBotao(
+            checkedId: Int,
+            isChecked: Boolean,
+        ): ModoOperacao? {
+            if (!isChecked) return null
+            return when (checkedId) {
+                R.id.btnVenda -> ModoOperacao.VENDA
+                R.id.btnPromocao -> if (getConfiguracoes()?.promocoesAtivadas == true) ModoOperacao.PROMOCAO else null
+                R.id.btnPagamento -> ModoOperacao.PAGAMENTO
+                else -> null
             }
+        }
+
+        private fun onTipoToggled(
+            checkedId: Int,
+            isChecked: Boolean,
+        ) {
+            if (sincronizandoEstado) return
+            val cliente = boundCliente ?: return
+            val novoTipoTransacao =
+                when {
+                    !isChecked -> null
+                    checkedId == R.id.btnAVista -> TipoTransacao.A_VISTA
+                    checkedId == R.id.btnAPrazo -> TipoTransacao.A_PRAZO
+                    else -> null
+                }
+            onTipoTransacaoSelected(cliente, novoTipoTransacao)
+            updateButtonStates(cliente)
         }
 
         private fun setupPagamentoLayout(cliente: Cliente) {
@@ -375,26 +368,58 @@ class ClientesAdapter(
         }
 
         private fun updatePromocaoActionVisibility(promocoesAtivadas: Boolean) {
-            binding.layoutAcaoPromocao.visibility = if (promocoesAtivadas) View.VISIBLE else View.GONE
+            val visibility = if (promocoesAtivadas) View.VISIBLE else View.GONE
+            binding.btnPromocao.visibility = visibility
             binding.btnPromocao.isEnabled = promocoesAtivadas
+            binding.tvLabelPromocao.visibility = visibility
         }
 
         private fun updateButtonSelections(
             state: ClienteState,
             promocoesAtivadas: Boolean,
         ) {
-            binding.apply {
-                btnVenda.isSelected = state.modoOperacao == ModoOperacao.VENDA
-                btnPromocao.isSelected = promocoesAtivadas && state.modoOperacao == ModoOperacao.PROMOCAO
-                btnPagamento.isSelected = state.modoOperacao == ModoOperacao.PAGAMENTO
+            sincronizandoEstado = true
+            try {
+                sincronizarToggleModo(state, promocoesAtivadas)
+                sincronizarToggleTipo(state)
+            } finally {
+                sincronizandoEstado = false
+            }
+            updateButtonStyles()
+        }
 
-                val isVendaOrPromocao =
-                    state.modoOperacao == ModoOperacao.VENDA ||
-                        state.modoOperacao == ModoOperacao.PROMOCAO
-                btnAVista.isSelected = isVendaOrPromocao && state.tipoTransacao == TipoTransacao.A_VISTA
-                btnAPrazo.isSelected = isVendaOrPromocao && state.tipoTransacao == TipoTransacao.A_PRAZO
+        private fun sincronizarToggleModo(
+            state: ClienteState,
+            promocoesAtivadas: Boolean,
+        ) {
+            val modoChecado =
+                when {
+                    state.modoOperacao == ModoOperacao.VENDA -> R.id.btnVenda
+                    promocoesAtivadas && state.modoOperacao == ModoOperacao.PROMOCAO -> R.id.btnPromocao
+                    state.modoOperacao == ModoOperacao.PAGAMENTO -> R.id.btnPagamento
+                    else -> null
+                }
+            if (modoChecado != null) {
+                binding.toggleGroupModo.check(modoChecado)
+            } else {
+                binding.toggleGroupModo.clearChecked()
+            }
+        }
 
-                updateButtonStyles()
+        private fun sincronizarToggleTipo(state: ClienteState) {
+            val isVendaOrPromocao =
+                state.modoOperacao == ModoOperacao.VENDA ||
+                    state.modoOperacao == ModoOperacao.PROMOCAO
+            val tipoChecado =
+                when {
+                    isVendaOrPromocao && state.tipoTransacao == TipoTransacao.A_VISTA -> R.id.btnAVista
+                    isVendaOrPromocao && state.tipoTransacao == TipoTransacao.A_PRAZO -> R.id.btnAPrazo
+                    else -> null
+                }
+            if (tipoChecado != null) {
+                binding.toggleGroupTipo.check(tipoChecado)
+            } else {
+                binding.toggleGroupTipo.clearChecked()
             }
         }
 
@@ -538,7 +563,7 @@ class ClientesAdapter(
         private fun updateButtonStyle(button: MaterialButton) {
             val context = button.context
             val (backgroundColor, iconTint) =
-                if (button.isSelected) {
+                if (button.isChecked) {
                     Pair(R.color.button_background_selected, R.color.button_icon_selected)
                 } else {
                     Pair(R.color.button_background_unselected, R.color.button_icon_unselected)
@@ -575,7 +600,7 @@ class ClientesAdapter(
         private fun createStateListAnimator(): StateListAnimator =
             StateListAnimator().apply {
                 addState(
-                    intArrayOf(android.R.attr.state_selected),
+                    intArrayOf(android.R.attr.state_checked),
                     ObjectAnimator.ofFloat(null, "elevation", dpToPx(itemView.context, 8f)),
                 )
                 addState(
