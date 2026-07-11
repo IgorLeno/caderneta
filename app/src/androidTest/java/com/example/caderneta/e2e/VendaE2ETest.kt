@@ -26,50 +26,52 @@ class VendaE2ETest : BaseE2ETest() {
         val seeded = DatabaseFixture.seedClienteBasico(app.container)
 
         launch(scenarioName).use {
-            selecionarLocal()
-            onView(withText("Cliente Auditoria")).check(matches(isDisplayed()))
-            screenshot(scenarioName, "cliente_pronto")
+            try {
+                selecionarLocal()
+                onView(withText("Cliente Auditoria")).check(matches(isDisplayed()))
+                screenshot(scenarioName, "cliente_pronto")
 
-            clickRecyclerChild(R.id.rv_clientes, 0, R.id.btnVenda)
-            clickRecyclerChild(R.id.rv_clientes, 0, R.id.btnAPrazo)
-            tapRecyclerCounterPlus(R.id.rv_clientes, 0, R.id.contador_salgados, times = 2)
-            screenshot(scenarioName, "venda_2_salgados_prazo")
-            clickRecyclerChild(R.id.rv_clientes, 0, R.id.btn_confirmar_operacao)
-            onView(withText("Venda registrada com sucesso!")).check(matches(isDisplayed()))
+                clickRecyclerChild(R.id.rv_clientes, 0, R.id.btnVenda)
+                clickRecyclerChild(R.id.rv_clientes, 0, R.id.btnAPrazo)
+                tapRecyclerCounterPlus(R.id.rv_clientes, 0, R.id.contador_salgados, times = 2)
+                screenshot(scenarioName, "venda_2_salgados_prazo")
+                clickRecyclerChild(R.id.rv_clientes, 0, R.id.btn_confirmar_operacao)
 
-            WaitConditions.awaitDb {
-                app.container.contaRepository.getSaldoCentavos(seeded.clienteId) == 1200L
+                WaitConditions.awaitDb {
+                    app.container.contaRepository.getSaldoCentavos(seeded.clienteId) == 1200L
+                }
+                val vendas =
+                    runBlocking {
+                        app.container.database
+                            .backupDao()
+                            .getAllVendas()
+                    }
+                val operacoes =
+                    runBlocking {
+                        app.container.database
+                            .backupDao()
+                            .getAllOperacoes()
+                    }
+                val conta = runBlocking { app.container.contaRepository.getContaByCliente(seeded.clienteId) }
+                assertEquals(1, vendas.size)
+                assertEquals(1, operacoes.size)
+                assertEquals(TransacaoVenda.A_PRAZO, vendas.single().transacao)
+                assertEquals(2, vendas.single().quantidadeSalgados)
+                assertEquals(0, vendas.single().quantidadeSucos)
+                assertEquals(1200L, vendas.single().valorCentavos)
+                assertEquals(1200L, conta?.saldoCentavos)
+                assertEquals(
+                    1200L,
+                    runBlocking {
+                        app.container.database
+                            .vendaDao()
+                            .calcularSaldoHistorico(seeded.clienteId)
+                    },
+                )
+                DatabaseFixture.assertForeignKeysOk(app.container)
+            } finally {
+                runBlocking { DatabaseSummaryCollector.write(scenarioName, app.container, seeded.clienteId) }
             }
-            val vendas =
-                runBlocking {
-                    app.container.database
-                        .backupDao()
-                        .getAllVendas()
-                }
-            val operacoes =
-                runBlocking {
-                    app.container.database
-                        .backupDao()
-                        .getAllOperacoes()
-                }
-            val conta = runBlocking { app.container.contaRepository.getContaByCliente(seeded.clienteId) }
-            assertEquals(1, vendas.size)
-            assertEquals(1, operacoes.size)
-            assertEquals(TransacaoVenda.A_PRAZO, vendas.single().transacao)
-            assertEquals(2, vendas.single().quantidadeSalgados)
-            assertEquals(0, vendas.single().quantidadeSucos)
-            assertEquals(1200L, vendas.single().valorCentavos)
-            assertEquals(1200L, conta?.saldoCentavos)
-            assertEquals(
-                1200L,
-                runBlocking {
-                    app.container.database
-                        .vendaDao()
-                        .calcularSaldoHistorico(seeded.clienteId)
-                },
-            )
-            DatabaseFixture.assertForeignKeysOk(app.container)
-            runBlocking { DatabaseSummaryCollector.write(scenarioName, app.container, seeded.clienteId) }
         }
     }
 

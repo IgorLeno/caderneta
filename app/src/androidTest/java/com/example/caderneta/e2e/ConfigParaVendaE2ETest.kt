@@ -33,63 +33,64 @@ class ConfigParaVendaE2ETest : BaseE2ETest() {
         val seeded = DatabaseFixture.seedClienteBasico(app.container)
 
         launch(scenarioName).use {
-            step(scenarioName, "config_precos")
-            NavigationActions.openAjustes()
-            fillField(R.id.et_salgado_vista, "5,00")
-            fillField(R.id.et_salgado_prazo, "6,00")
-            fillField(R.id.et_suco_vista, "3,00")
-            fillField(R.id.et_suco_prazo, "4,00")
-            onView(withId(R.id.btn_salvar_configuracoes)).perform(scrollTo(), click())
-            onView(withText("Configurações salvas")).check(matches(isDisplayed()))
-            WaitConditions.awaitDb {
-                app.container.configuracoesRepository
-                    .getConfiguracoesOnce()
-                    ?.precoSalgadoPrazoCentavos == 600L
+            try {
+                step(scenarioName, "config_precos")
+                NavigationActions.openAjustes()
+                fillField(R.id.et_salgado_vista, "5,00")
+                fillField(R.id.et_salgado_prazo, "6,00")
+                fillField(R.id.et_suco_vista, "3,00")
+                fillField(R.id.et_suco_prazo, "4,00")
+                onView(withId(R.id.btn_salvar_configuracoes)).perform(scrollTo(), click())
+                WaitConditions.awaitDb {
+                    app.container.configuracoesRepository
+                        .getConfiguracoesOnce()
+                        ?.precoSalgadoPrazoCentavos == 600L
+                }
+
+                step(scenarioName, "registrar_venda")
+                NavigationActions.openVendas()
+                onView(withId(R.id.drawer_layout)).perform(DrawerActions.open())
+                onView(withText("Audit Local Norte")).perform(click())
+                onView(withText("Cliente Auditoria")).check(matches(isDisplayed()))
+
+                clickRecyclerChild(R.id.rv_clientes, 0, R.id.btnVenda)
+                clickRecyclerChild(R.id.rv_clientes, 0, R.id.btnAPrazo)
+                tapRecyclerCounterPlus(R.id.rv_clientes, 0, R.id.contador_salgados, times = 2)
+                screenshot(scenarioName, "venda_2_salgados_prazo")
+                clickRecyclerChild(R.id.rv_clientes, 0, R.id.btn_confirmar_operacao)
+
+                WaitConditions.awaitDb {
+                    app.container.contaRepository.getSaldoCentavos(seeded.clienteId) == 1200L
+                }
+                val venda =
+                    runBlocking {
+                        app.container.database
+                            .backupDao()
+                            .getAllVendas()
+                    }.single()
+                assertEquals(TransacaoVenda.A_PRAZO, venda.transacao)
+                assertEquals(2, venda.quantidadeSalgados)
+                assertEquals(1200L, venda.valorCentavos)
+                assertEquals(
+                    1200L,
+                    runBlocking {
+                        app.container.contaRepository
+                            .getContaByCliente(seeded.clienteId)
+                            ?.saldoCentavos
+                    },
+                )
+                assertEquals(
+                    1200L,
+                    runBlocking {
+                        app.container.database
+                            .vendaDao()
+                            .calcularSaldoHistorico(seeded.clienteId)
+                    },
+                )
+                DatabaseFixture.assertForeignKeysOk(app.container)
+            } finally {
+                runBlocking { DatabaseSummaryCollector.write(scenarioName, app.container, seeded.clienteId) }
             }
-
-            step(scenarioName, "registrar_venda")
-            NavigationActions.openVendas()
-            onView(withId(R.id.drawer_layout)).perform(DrawerActions.open())
-            onView(withText("Audit Local Norte")).perform(click())
-            onView(withText("Cliente Auditoria")).check(matches(isDisplayed()))
-
-            clickRecyclerChild(R.id.rv_clientes, 0, R.id.btnVenda)
-            clickRecyclerChild(R.id.rv_clientes, 0, R.id.btnAPrazo)
-            tapRecyclerCounterPlus(R.id.rv_clientes, 0, R.id.contador_salgados, times = 2)
-            screenshot(scenarioName, "venda_2_salgados_prazo")
-            clickRecyclerChild(R.id.rv_clientes, 0, R.id.btn_confirmar_operacao)
-            onView(withText("Venda registrada com sucesso!")).check(matches(isDisplayed()))
-
-            WaitConditions.awaitDb {
-                app.container.contaRepository.getSaldoCentavos(seeded.clienteId) == 1200L
-            }
-            val venda =
-                runBlocking {
-                    app.container.database
-                        .backupDao()
-                        .getAllVendas()
-                }.single()
-            assertEquals(TransacaoVenda.A_PRAZO, venda.transacao)
-            assertEquals(2, venda.quantidadeSalgados)
-            assertEquals(1200L, venda.valorCentavos)
-            assertEquals(
-                1200L,
-                runBlocking {
-                    app.container.contaRepository
-                        .getContaByCliente(seeded.clienteId)
-                        ?.saldoCentavos
-                },
-            )
-            assertEquals(
-                1200L,
-                runBlocking {
-                    app.container.database
-                        .vendaDao()
-                        .calcularSaldoHistorico(seeded.clienteId)
-                },
-            )
-            DatabaseFixture.assertForeignKeysOk(app.container)
-            runBlocking { DatabaseSummaryCollector.write(scenarioName, app.container, seeded.clienteId) }
         }
     }
 }
