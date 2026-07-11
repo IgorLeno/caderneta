@@ -10,10 +10,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
+fun interface PhotoProcessor {
+    suspend fun process(uri: Uri): ByteArray
+}
+
 class ClientePhotoProcessor(
     private val context: Context,
-) {
-    suspend fun process(uri: Uri): ByteArray =
+) : PhotoProcessor {
+    override suspend fun process(uri: Uri): ByteArray =
         withContext(Dispatchers.IO) {
             val resolver = context.contentResolver
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }

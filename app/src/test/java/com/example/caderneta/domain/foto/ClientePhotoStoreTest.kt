@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,10 +16,15 @@ class ClientePhotoStoreTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
-    fun photoNameForUsesStableClienteIdName() {
+    fun newPhotoNameForUsesVersionedClienteIdName() {
         val store = ClientePhotoStore(context)
 
-        assertEquals("cliente_42.jpg", store.photoNameFor(42))
+        val first = store.newPhotoNameFor(42)
+        val second = store.newPhotoNameFor(42)
+
+        assertTrue(first.matches(Regex("cliente_42_[A-Za-z0-9-]+\\.jpg")))
+        assertTrue(second.matches(Regex("cliente_42_[A-Za-z0-9-]+\\.jpg")))
+        assertNotEquals(first, second)
     }
 
     @Test
@@ -27,6 +33,7 @@ class ClientePhotoStoreTest {
         assertFalse(ClientePhotoStore.isValidPhotoName("cliente_1.png"))
         assertFalse(ClientePhotoStore.isValidPhotoName("cliente_0.jpg"))
         assertTrue(ClientePhotoStore.isValidPhotoName("cliente_1.jpg"))
+        assertTrue(ClientePhotoStore.isValidPhotoName("cliente_1_123e4567-e89b-12d3-a456-426614174000.jpg"))
     }
 
     @Test

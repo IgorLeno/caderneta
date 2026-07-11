@@ -53,7 +53,9 @@ class NovoClienteDialog(
     private var clienteExistente: Cliente? = null
     private var selectedPhotoUri: Uri? = null
     private var capturePhotoUri: Uri? = null
+    private var capturePhotoFile: File? = null
     private var removerFoto = false
+    private var submitted = false
 
     private val pickPhotoLauncher =
         registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -65,6 +67,8 @@ class NovoClienteDialog(
             val uri = capturePhotoUri
             if (success && uri != null) {
                 selecionarFoto(uri)
+            } else {
+                cleanupCaptureTemp()
             }
         }
 
@@ -197,8 +201,10 @@ class NovoClienteDialog(
     }
 
     private fun createCaptureUri(): Uri {
-        val dir = File(requireContext().cacheDir, "photo_capture").apply { mkdirs() }
+        cleanupOldCaptureFiles()
+        val dir = File(requireContext().cacheDir, PHOTO_CAPTURE_DIR).apply { mkdirs() }
         val file = File.createTempFile("cliente_", ".jpg", dir)
+        capturePhotoFile = file
         return FileProvider.getUriForFile(
             requireContext(),
             "${requireContext().packageName}.fileprovider",
@@ -507,6 +513,7 @@ class NovoClienteDialog(
                         selectedPhotoUri,
                         removerFoto,
                     )
+                    submitted = true
                     dismiss()
                 }
             }
@@ -561,6 +568,29 @@ class NovoClienteDialog(
 
     override fun onDestroyView() {
         super.onDestroyView()
+        if (!submitted) cleanupCaptureTemp()
         _binding = null
+    }
+
+    private fun cleanupCaptureTemp() {
+        capturePhotoFile?.delete()
+        capturePhotoFile = null
+        capturePhotoUri = null
+    }
+
+    private fun cleanupOldCaptureFiles() {
+        val cutoff = System.currentTimeMillis() - PHOTO_CAPTURE_MAX_AGE_MS
+        File(requireContext().cacheDir, PHOTO_CAPTURE_DIR)
+            .listFiles()
+            ?.forEach { file ->
+                if (file.isFile && file.lastModified() < cutoff) {
+                    file.delete()
+                }
+            }
+    }
+
+    companion object {
+        private const val PHOTO_CAPTURE_DIR = "photo_capture"
+        private const val PHOTO_CAPTURE_MAX_AGE_MS = 60 * 60 * 1000L
     }
 }

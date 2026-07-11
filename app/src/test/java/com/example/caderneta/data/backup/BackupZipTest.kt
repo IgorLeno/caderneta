@@ -63,7 +63,7 @@ class BackupZipTest {
             val localId = db.localDao().insertLocal(Local(nome = "Local"))
             val clienteId = db.clienteDao().insertCliente(Cliente(nome = "Cliente", telefone = null, localId = localId))
             db.configuracoesDao().insertConfiguracoes(config())
-            val fotoNome = store.photoNameFor(clienteId)
+            val fotoNome = store.newPhotoNameFor(clienteId)
             val fotoBytes = jpegBytes(byteArrayOf(1, 2, 3, 4, 5))
             store.writeAtomic(fotoNome, fotoBytes)
             db.clienteDao().updateCliente(
@@ -94,14 +94,15 @@ class BackupZipTest {
             val localId = db.localDao().insertLocal(Local(nome = "Local"))
             db.clienteDao().insertCliente(Cliente(nome = "Cliente", telefone = null, localId = localId))
             db.configuracoesDao().insertConfiguracoes(config())
-            store.writeAtomic(store.photoNameFor(99), jpegBytes(byteArrayOf(9)))
+            val fotoOrfa = store.newPhotoNameFor(99)
+            store.writeAtomic(fotoOrfa, jpegBytes(byteArrayOf(9)))
 
             val output = ByteArrayOutputStream()
             manager.exportar(output)
             val (payload) = manager.lerResumo(ByteArrayInputStream(output.toByteArray()))
             manager.restaurar(payload)
 
-            assertNull(store.existingPhotoFile(store.photoNameFor(99)))
+            assertNull(store.existingPhotoFile(fotoOrfa))
         }
 
     @Test

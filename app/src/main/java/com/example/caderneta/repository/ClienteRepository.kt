@@ -3,18 +3,19 @@ package com.example.caderneta.repository
 import android.database.sqlite.SQLiteConstraintException
 import com.example.caderneta.data.dao.ClienteDao
 import com.example.caderneta.data.entity.Cliente
+import com.example.caderneta.domain.foto.ClientePhotoClientStore
 import kotlinx.coroutines.flow.Flow
 
 class ClienteRepository(
     private val clienteDao: ClienteDao,
-) {
+) : ClientePhotoClientStore {
     fun getAllClientes(): Flow<List<Cliente>> = clienteDao.getAllClientes()
 
-    suspend fun getClienteById(id: Long): Cliente? = clienteDao.getClienteById(id)
+    override suspend fun getClienteById(id: Long): Cliente? = clienteDao.getClienteById(id)
 
     suspend fun insertCliente(cliente: Cliente): Long = clienteDao.insertCliente(cliente)
 
-    suspend fun updateCliente(cliente: Cliente) {
+    override suspend fun updateCliente(cliente: Cliente) {
         clienteDao.updateCliente(cliente)
     }
 

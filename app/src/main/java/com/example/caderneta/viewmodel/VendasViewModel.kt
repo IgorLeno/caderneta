@@ -537,6 +537,8 @@ class VendasViewModel(
                 val arquivado = clienteRepository.deleteCliente(cliente)
                 if (arquivado) {
                     publicarErro("${cliente.nome} possui histórico e foi arquivado em vez de excluído")
+                } else {
+                    clientePhotoRepository?.deleteFile(cliente.fotoNome)
                 }
             } catch (e: Exception) {
                 e.rethrowCancellation()

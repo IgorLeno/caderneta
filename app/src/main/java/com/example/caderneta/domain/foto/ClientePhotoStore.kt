@@ -2,15 +2,16 @@ package com.example.caderneta.domain.foto
 
 import android.content.Context
 import java.io.File
+import java.util.UUID
 
 class ClientePhotoStore(
     context: Context,
 ) {
     private val photosDir = File(context.filesDir, PHOTO_DIR).apply { mkdirs() }
 
-    fun photoNameFor(clienteId: Long): String {
+    fun newPhotoNameFor(clienteId: Long): String {
         require(clienteId > 0) { "Cliente inválido para foto" }
-        return "cliente_$clienteId.jpg"
+        return "cliente_${clienteId}_${UUID.randomUUID()}.jpg"
     }
 
     fun photoFile(fotoNome: String?): File? {
@@ -56,7 +57,7 @@ class ClientePhotoStore(
 
     companion object {
         const val PHOTO_DIR = "client_photos"
-        private val PHOTO_NAME_REGEX = Regex("cliente_[1-9][0-9]*\\.jpg")
+        private val PHOTO_NAME_REGEX = Regex("cliente_[1-9][0-9]*(_[A-Za-z0-9-]+)?\\.jpg")
 
         fun isValidPhotoName(fotoNome: String): Boolean = PHOTO_NAME_REGEX.matches(fotoNome)
     }
