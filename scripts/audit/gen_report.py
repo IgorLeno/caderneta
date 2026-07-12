@@ -82,10 +82,14 @@ def finding(
     recommendation: str,
     confidence: str,
     evidence: str = "",
+    origin: str = "product",
+    cause: str = "confirmed",
 ) -> dict:
     return {
         "severity": severity,
         "category": category,
+        "origin": origin,
+        "cause": cause,
         "screen": screen,
         "component": component,
         "description": description,
@@ -111,6 +115,119 @@ def scan_logcat(root: pathlib.Path, logcat_paths: list[str]) -> list[tuple[str, 
     return hits
 
 
+def scenario_key(value: str) -> str:
+    return "".join(char for char in value.lower() if char.isalnum())
+
+
+def database_summary_by_scenario(summary: dict) -> dict[str, dict]:
+    indexed: dict[str, dict] = {}
+    for entry in summary["databaseSummary"]:
+        content = entry.get("content", {})
+        scenario = str(content.get("scenario") or pathlib.Path(entry["path"]).stem.replace("_db", ""))
+        indexed[scenario_key(scenario)] = entry
+    return indexed
+
+
+def database_summary_is_clean(entry: dict | None) -> bool:
+    if not entry:
+        return False
+    content = entry.get("content", {})
+    if content.get("parseError"):
+        return False
+    if content.get("foreignKeyViolations"):
+        return False
+
+    cache = content.get("saldoCache") or []
+    saldos = [item.get("saldoCentavos") for item in cache if item.get("saldoCentavos") is not None]
+    if any(saldo < 0 for saldo in saldos):
+        return False
+
+    historico = content.get("saldoHistoricoCentavos")
+    if historico is not None and saldos:
+        if len(saldos) == 1 and historico != saldos[0]:
+            return False
+        if len(saldos) > 1 and historico not in saldos:
+            return False
+    return True
+
+
+def find_database_summary_for_case(case: dict, summary: dict) -> dict | None:
+    indexed = database_summary_by_scenario(summary)
+    haystack = scenario_key(f"{case['class']} {case['name']} {case['file']}")
+    for key, entry in indexed.items():
+        if key and key in haystack:
+            return entry
+    for failure_path in summary["failures"]:
+        if scenario_key(pathlib.Path(failure_path).stem.replace("_failure", "")) in haystack:
+            try:
+                failure_text = (pathlib.Path(summary["root"]) / failure_path).read_text(
+                    encoding="utf-8",
+                    errors="replace",
+                )
+            except OSError:
+                continue
+            for key, entry in indexed.items():
+                if key and key in scenario_key(failure_text):
+                    return entry
+    return None
+
+
+def classify_test_failure(case: dict, summary: dict) -> dict:
+    db_entry = find_database_summary_for_case(case, summary)
+    if database_summary_is_clean(db_entry):
+        return {
+            "severity": "P1",
+            "category": "test-flakiness",
+            "origin": "test",
+            "cause": "hypothesis",
+            "impact": "Suíte de auditoria instável apesar de evidência determinística de DB íntegro.",
+            "recommendation": "Isolar a sincronização do teste e manter DB/ledger como prova funcional.",
+            "confidence": "média",
+            "evidence": db_entry["path"],
+        }
+    return {
+        "severity": "P0",
+        "category": "product-functional",
+        "origin": "product",
+        "cause": "hypothesis",
+        "impact": "Fluxo verificado pode estar quebrado ou sem evidência determinística suficiente para descartar defeito funcional.",
+        "recommendation": "Inspecionar failure, screenshot, hierarquia, logcat e database-summary do cenário.",
+        "confidence": "média",
+        "evidence": case["file"],
+    }
+
+
+def check_evidence_integrity(summary: dict) -> list[dict]:
+    findings: list[dict] = []
+    invalid_screenshots = [path for path in summary["screenshots"] if "_INVALID" in pathlib.Path(path).stem]
+    for path in invalid_screenshots:
+        findings.append(
+            finding(
+                "P1", "evidence-invalid", "-", path,
+                "Screenshot marcada como inválida porque o foreground package não era o app auditado.",
+                "Evidência visual pode representar launcher/sistema em vez da tela sob teste.",
+                "Usar a captura pré-teardown do app e revisar metadata de foreground.",
+                "alta", path, origin="evidence", cause="confirmed",
+            )
+        )
+
+    for entry in summary["metadata"]:
+        content = entry.get("content", {})
+        expected = content.get("expectedPackage")
+        foreground = content.get("foregroundPackage")
+        if expected and foreground and expected != foreground:
+            findings.append(
+                finding(
+                    "P1", "evidence-invalid", "-", entry["path"],
+                    f"Metadata de falha registrou foregroundPackage={foreground}, esperado {expected}.",
+                    "A evidência do instante da falha pode não representar o estado do app.",
+                    "Revisar screenshot/hierarquia correlacionados e corrigir timing de captura se necessário.",
+                    "alta", entry["path"], origin="evidence", cause="confirmed",
+                )
+            )
+    return findings
+
+
 def run_deterministic_checks(root: pathlib.Path, summary: dict) -> list[dict]:
     findings: list[dict] = []
     junit = summary["junit"]
@@ -118,45 +235,48 @@ def run_deterministic_checks(root: pathlib.Path, summary: dict) -> list[dict]:
     if summary["testExitCode"] != 0:
         findings.append(
             finding(
-                "P0", "test-exec", "-", "instrumentation",
+                "P1", "test-infrastructure", "-", "instrumentation",
                 f"Instrumentation terminou com exit code {summary['testExitCode']}.",
                 "Suíte de auditoria não passou integralmente.",
                 "Investigar falhas nos artefatos de teste e no logcat.",
-                "alta",
+                "alta", origin="infra", cause="confirmed",
             )
         )
 
     for case in junit["cases"]:
         if case["status"] in ("failed", "error"):
+            classification = classify_test_failure(case, summary)
             findings.append(
                 finding(
-                    "P0", "test-failure", "-", f"{case['class']}#{case['name']}",
+                    classification["severity"], classification["category"], "-", f"{case['class']}#{case['name']}",
                     f"Teste {case['status']}: {case['class']}#{case['name']}.",
-                    "Comportamento verificado divergiu do esperado.",
-                    "Abrir o stacktrace correspondente em failures/ e corrigir a causa raiz.",
-                    "alta", case["file"],
+                    classification["impact"],
+                    classification["recommendation"],
+                    classification["confidence"], classification["evidence"],
+                    origin=classification["origin"], cause=classification["cause"],
                 )
             )
 
     if not summary["screenshots"]:
         findings.append(
             finding(
-                "P1", "evidence", "-", "screenshots",
+                "P1", "evidence-invalid", "-", "screenshots",
                 "Nenhum screenshot coletado na execução.",
                 "Auditoria visual fica sem evidência de estado das telas.",
                 "Confirmar que os testes chamam screenshot() e que TestStorage está ativo.",
-                "alta",
+                "alta", origin="evidence", cause="confirmed",
             )
         )
+    findings.extend(check_evidence_integrity(summary))
 
     for rel_path, count in scan_logcat(root, summary["logcat"]):
         findings.append(
             finding(
-                "P0", "stability", "-", rel_path,
+                "P0", "crash-anr", "-", rel_path,
                 f"{count} marcador(es) de crash/ANR no logcat.",
                 "Possível crash, ANR ou exceção fatal durante a auditoria.",
                 "Inspecionar o logcat e reproduzir o cenário associado.",
-                "média", rel_path,
+                "média", rel_path, origin="product", cause="hypothesis",
             )
         )
 
@@ -171,11 +291,11 @@ def check_database_summary(entry: dict) -> list[dict]:
     if content.get("parseError"):
         return [
             finding(
-                "P1", "evidence", "-", entry["path"],
+                "P1", "evidence-invalid", "-", entry["path"],
                 "Resumo de banco não pôde ser lido (JSON inválido).",
                 "Sem verificação determinística de integridade para o cenário.",
                 "Verificar a geração de database-summary no coletor de testes.",
-                "alta", entry["path"],
+                "alta", entry["path"], origin="evidence", cause="confirmed",
             )
         ]
 
@@ -187,11 +307,11 @@ def check_database_summary(entry: dict) -> list[dict]:
     if violations:
         findings.append(
             finding(
-                "P0", "integrity", scenario, "foreign_key_check",
+                "P0", "data-integrity", scenario, "foreign_key_check",
                 f"{len(violations)} violação(ões) de chave estrangeira: {violations}.",
                 "Banco em estado inconsistente após o cenário.",
                 "Corrigir a escrita que deixa referências órfãs.",
-                "alta", path,
+                "alta", path, origin="product", cause="confirmed",
             )
         )
 
@@ -200,11 +320,11 @@ def check_database_summary(entry: dict) -> list[dict]:
     if any(saldo < 0 for saldo in saldos):
         findings.append(
             finding(
-                "P0", "balance", scenario, "conta.saldoCentavos",
+                "P0", "financial-integrity", scenario, "conta.saldoCentavos",
                 "Saldo em cache negativo encontrado.",
                 "Invariante saldo >= 0 violada.",
                 "Revisar FinanceiroService/pagamentos que geram saldo negativo.",
-                "alta", path,
+                "alta", path, origin="product", cause="confirmed",
             )
         )
 
@@ -214,11 +334,12 @@ def check_database_summary(entry: dict) -> list[dict]:
         if divergente:
             findings.append(
                 finding(
-                    "P0", "balance", scenario, "saldoCache vs ledger",
+                    "P0", "financial-integrity", scenario, "saldoCache vs ledger",
                     f"Saldo em cache {saldos} diverge do ledger reconstruído ({historico}).",
                     "Cache de Conta fora de sincronia com o histórico de vendas.",
                     "Reconciliar Conta a partir do ledger e investigar a divergência.",
                     "alta" if len(saldos) == 1 else "média", path,
+                    origin="product", cause="confirmed",
                 )
             )
 
@@ -274,8 +395,9 @@ def write_markdown(root: pathlib.Path, summary: dict) -> None:
     if findings:
         for item in findings:
             lines.append(
-                f"- `{item['severity']}` [{item['category']}] {item['description']}"
-                f" (tela: {item['screen']}, confiança: {item['confidence']})"
+                f"- `{item['severity']}` [{item['category']}]"
+                f" origin=`{item['origin']}` cause=`{item['cause']}`: {item['description']}"
+                f" (tela: {item['screen']}, confiança: {item['confidence']}, evidência: `{item['evidence']}`)"
             )
     else:
         lines.append("- Nenhum apontamento determinístico.")
@@ -295,6 +417,17 @@ def write_html(root: pathlib.Path, summary: dict) -> None:
         f"<td>{html.escape(case['time'])}</td>"
         "</tr>"
         for case in summary["junit"]["cases"]
+    )
+    finding_rows = "\n".join(
+        "<tr>"
+        f"<td>{html.escape(item['severity'])}</td>"
+        f"<td>{html.escape(item['category'])}</td>"
+        f"<td>{html.escape(item['origin'])}</td>"
+        f"<td>{html.escape(item['cause'])}</td>"
+        f"<td>{html.escape(item['description'])}</td>"
+        f"<td>{html.escape(item['evidence'])}</td>"
+        "</tr>"
+        for item in summary["deterministicFindings"]
     )
     document = f"""<!doctype html>
 <html lang="en">
@@ -322,6 +455,8 @@ th, td {{ border: 1px solid #ddd; padding: 6px; text-align: left; }}
 <div class="grid">{screenshot_items}</div>
 <h2>JUnit Cases</h2>
 <table><tr><th>Status</th><th>Class</th><th>Name</th><th>Time</th></tr>{case_rows}</table>
+<h2>Deterministic Findings</h2>
+<table><tr><th>Severity</th><th>Category</th><th>Origin</th><th>Cause</th><th>Description</th><th>Evidence</th></tr>{finding_rows}</table>
 </body>
 </html>
 """
@@ -359,7 +494,10 @@ def write_action_plan(root: pathlib.Path, summary: dict) -> None:
         total += len(bucket)
         if bucket:
             for item in bucket:
-                lines.append(f"- [{item['category']}] {item['description']} — {item['recommendation']}")
+                lines.append(
+                    f"- [{item['category']}] origin=`{item['origin']}` cause=`{item['cause']}`: "
+                    f"{item['description']} — {item['recommendation']}"
+                )
         else:
             lines.append("- Nenhum apontamento.")
         lines.append("")
@@ -382,7 +520,9 @@ def main() -> int:
 
     root = pathlib.Path(args.root).resolve()
     summary = {
+        "root": str(root),
         "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "taxonomyVersion": 2,
         "mode": args.mode,
         "suite": args.suite,
         "gradleTask": args.gradle_task,
