@@ -101,7 +101,7 @@ class BalancoCaixaFragment : Fragment() {
     ) {
         setVazio(vendasCentavos == 0L && recebimentosCentavos == 0L && quantidadeOperacoes == 0)
         setTotalVendas("Vendas: ${vendasCentavos.centavosParaReais()}")
-        setTotalRecebimentos("Recebimentos (saldo líquido): ${recebimentosCentavos.centavosParaReais()}")
+        setTotalRecebimentos("Recebimentos: ${recebimentosCentavos.centavosParaReais()}")
         setQuantidadeOperacoes("Operações: $quantidadeOperacoes")
     }
 
