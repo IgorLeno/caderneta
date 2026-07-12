@@ -9,6 +9,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import com.example.caderneta.R
+import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TransacaoVenda
 import com.example.caderneta.fixtures.DatabaseFixture
 import com.example.caderneta.helpers.NavigationActions
@@ -17,6 +18,7 @@ import com.example.caderneta.helpers.clickRecyclerChild
 import com.example.caderneta.helpers.fillField
 import com.example.caderneta.helpers.tapRecyclerCounterPlus
 import com.example.caderneta.reporting.DatabaseSummaryCollector
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -71,6 +73,17 @@ class ConfigParaVendaE2ETest : BaseE2ETest() {
                 assertEquals(TransacaoVenda.A_PRAZO, venda.transacao)
                 assertEquals(2, venda.quantidadeSalgados)
                 assertEquals(1200L, venda.valorCentavos)
+                val operacao =
+                    runBlocking {
+                        app.container.database
+                            .operacaoDao()
+                            .getAllOperacoes()
+                            .first()
+                    }.single()
+                assertEquals(venda.operacaoId, operacao.id)
+                assertEquals(seeded.clienteId, operacao.clienteId)
+                assertEquals(ModoOperacao.VENDA, operacao.tipoOperacao)
+                assertEquals(1200L, operacao.valorCentavos)
                 assertEquals(
                     1200L,
                     runBlocking {
