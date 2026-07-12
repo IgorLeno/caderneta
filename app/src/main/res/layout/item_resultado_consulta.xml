@@ -3,11 +3,10 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.Caderneta.Card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="4dp">
+    android:layout_margin="8dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -116,6 +115,15 @@
                     android:layout_marginTop="2dp"
                     tools:text="R$ 50,00"
                     tools:textColor="@color/red" />
+
+                <ImageView
+                    android:id="@+id/iv_expandir"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginTop="4dp"
+                    android:contentDescription="@string/consultas_expandir_extrato"
+                    android:src="@drawable/ic_chevron_down"
+                    app:tint="@color/text_muted" />
             </LinearLayout>
 
         </LinearLayout>

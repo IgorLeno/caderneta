@@ -55,6 +55,26 @@
                 app:layout_constraintTop_toBottomOf="@id/tab_layout" />
 
             <TextView
+                android:id="@+id/tv_chart_vazio"
+                style="@style/TextAppearance.Caderneta.EmptyState"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/grafico_sem_dados"
+                android:visibility="gone"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tab_layout"
+                tools:visibility="visible" />
+
+            <androidx.constraintlayout.widget.Barrier
+                android:id="@+id/barrier_grafico"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:barrierDirection="bottom"
+                app:constraint_referenced_ids="chart_vendas,tv_chart_vazio" />
+
+            <TextView
                 android:id="@+id/tv_agrupamento"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -63,7 +83,7 @@
                 android:textSize="18sp"
                 android:textStyle="bold"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/chart_vendas" />
+                app:layout_constraintTop_toBottomOf="@id/barrier_grafico" />
 
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/chip_group_agrupamento"
@@ -77,12 +97,15 @@
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chip_pessoa"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:checked="true"
                     android:text="Pessoa" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chip_predio"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Prédio" />

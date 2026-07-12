@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.databinding.FragmentBalancoCaixaBinding
 import com.example.caderneta.ui.common.FeedbackPresenter
+import com.example.caderneta.ui.components.CardBalancoView
 import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.viewmodel.BalancoCaixaViewModel
 import com.example.caderneta.viewmodel.BalancoCaixaViewModelFactory
@@ -75,19 +76,33 @@ class BalancoCaixaFragment : Fragment() {
 
     private fun updateVendasCards(state: BalancoCaixaViewModel.VendasState) {
         with(binding) {
-            cardVendasDiarias.apply {
-                setTotalVendas("Total: ${state.totalVendasDiariasCentavos.centavosParaReais()}")
-                setTotalRecebimentos("Recebimentos: ${state.totalRecebimentosDiariosCentavos.centavosParaReais()}")
-            }
-            cardVendasSemanais.apply {
-                setTotalVendas("Total: ${state.totalVendasSemanaisCentavos.centavosParaReais()}")
-                setTotalRecebimentos("Recebimentos: ${state.totalRecebimentosSemanaisCentavos.centavosParaReais()}")
-            }
-            cardVendasMensais.apply {
-                setTotalVendas("Total: ${state.totalVendasMensaisCentavos.centavosParaReais()}")
-                setTotalRecebimentos("Recebimentos: ${state.totalRecebimentosMensaisCentavos.centavosParaReais()}")
-            }
+            cardVendasDiarias.atualizar(
+                vendasCentavos = state.totalVendasDiariasCentavos,
+                recebimentosCentavos = state.totalRecebimentosDiariosCentavos,
+                quantidadeOperacoes = state.quantidadeOperacoesDiarias,
+            )
+            cardVendasSemanais.atualizar(
+                vendasCentavos = state.totalVendasSemanaisCentavos,
+                recebimentosCentavos = state.totalRecebimentosSemanaisCentavos,
+                quantidadeOperacoes = state.quantidadeOperacoesSemanais,
+            )
+            cardVendasMensais.atualizar(
+                vendasCentavos = state.totalVendasMensaisCentavos,
+                recebimentosCentavos = state.totalRecebimentosMensaisCentavos,
+                quantidadeOperacoes = state.quantidadeOperacoesMensais,
+            )
         }
+    }
+
+    private fun CardBalancoView.atualizar(
+        vendasCentavos: Long,
+        recebimentosCentavos: Long,
+        quantidadeOperacoes: Int,
+    ) {
+        setVazio(vendasCentavos == 0L && recebimentosCentavos == 0L && quantidadeOperacoes == 0)
+        setTotalVendas("Vendas: ${vendasCentavos.centavosParaReais()}")
+        setTotalRecebimentos("Recebimentos (saldo líquido): ${recebimentosCentavos.centavosParaReais()}")
+        setQuantidadeOperacoes("Operações: $quantidadeOperacoes")
     }
 
     override fun onDestroyView() {

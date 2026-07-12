@@ -22,10 +22,11 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="16dp">
+            android:padding="@dimen/space_4">
 
             <com.example.caderneta.ui.components.CardBalancoView
                 android:id="@+id/card_vendas_diarias"
+                style="@style/Widget.Caderneta.Card"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -34,18 +35,20 @@
 
             <com.example.caderneta.ui.components.CardBalancoView
                 android:id="@+id/card_vendas_semanais"
+                style="@style/Widget.Caderneta.Card"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/space_4"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/card_vendas_diarias" />
 
             <com.example.caderneta.ui.components.CardBalancoView
                 android:id="@+id/card_vendas_mensais"
+                style="@style/Widget.Caderneta.Card"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/space_4"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/card_vendas_semanais" />

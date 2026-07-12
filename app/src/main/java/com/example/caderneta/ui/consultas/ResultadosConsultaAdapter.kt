@@ -133,6 +133,8 @@ class ResultadosConsultaAdapter(
                     atualizarSaldo(resultado.saldoCentavos)
                 }
 
+                ivExpandir.rotation =
+                    if (expandedClientes.contains(cliente.id)) ROTATION_EXPANDIDO else ROTATION_COLAPSADO
                 updateExtratoVisibility(cliente)
             }
 
@@ -294,6 +296,12 @@ class ResultadosConsultaAdapter(
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .start()
             }
+            binding.ivExpandir
+                .animate()
+                .rotation(ROTATION_EXPANDIDO)
+                .setDuration(300)
+                .setInterpolator(AccelerateDecelerateInterpolator())
+                .start()
         }
 
         private fun collapseExtrato() {
@@ -305,6 +313,12 @@ class ResultadosConsultaAdapter(
                 .withEndAction {
                     binding.layoutExtrato.visibility = View.GONE
                 }.start()
+            binding.ivExpandir
+                .animate()
+                .rotation(ROTATION_COLAPSADO)
+                .setDuration(300)
+                .setInterpolator(AccelerateDecelerateInterpolator())
+                .start()
         }
 
         private fun TextView.animateValue(
@@ -336,6 +350,7 @@ class ResultadosConsultaAdapter(
                 tvTelefone.visibility = View.GONE
                 tvLocalHierarquia.visibility = View.GONE
                 tvValorDevido.visibility = View.GONE
+                ivExpandir.visibility = View.GONE
                 layoutExtrato.visibility = View.GONE
             }
 
@@ -397,5 +412,7 @@ class ResultadosConsultaAdapter(
     companion object {
         private const val VIEW_TYPE_LOCAL = 0
         private const val VIEW_TYPE_CLIENTE = 1
+        private const val ROTATION_COLAPSADO = 0f
+        private const val ROTATION_EXPANDIDO = 180f
     }
 }

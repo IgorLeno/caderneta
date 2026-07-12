@@ -67,10 +67,13 @@ class BalancoCaixaViewModel(
                 VendasState(
                     totalVendasDiariasCentavos = calcularTotalVendas(diarias),
                     totalRecebimentosDiariosCentavos = calcularTotalRecebimentos(diarias),
+                    quantidadeOperacoesDiarias = diarias.size,
                     totalVendasSemanaisCentavos = calcularTotalVendas(semanais),
                     totalRecebimentosSemanaisCentavos = calcularTotalRecebimentos(semanais),
+                    quantidadeOperacoesSemanais = semanais.size,
                     totalVendasMensaisCentavos = calcularTotalVendas(mensais),
                     totalRecebimentosMensaisCentavos = calcularTotalRecebimentos(mensais),
+                    quantidadeOperacoesMensais = mensais.size,
                 )
             }.onEach { _isLoading.value = false }
                 .catch { e ->
@@ -92,10 +95,13 @@ class BalancoCaixaViewModel(
     data class VendasState(
         val totalVendasDiariasCentavos: Long = 0,
         val totalRecebimentosDiariosCentavos: Long = 0,
+        val quantidadeOperacoesDiarias: Int = 0,
         val totalVendasSemanaisCentavos: Long = 0,
         val totalRecebimentosSemanaisCentavos: Long = 0,
+        val quantidadeOperacoesSemanais: Int = 0,
         val totalVendasMensaisCentavos: Long = 0,
         val totalRecebimentosMensaisCentavos: Long = 0,
+        val quantidadeOperacoesMensais: Int = 0,
     )
 }
 

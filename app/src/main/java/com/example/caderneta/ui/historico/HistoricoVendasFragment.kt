@@ -162,8 +162,12 @@ class HistoricoVendasFragment : Fragment() {
         if (entries.isEmpty()) {
             binding.chartVendas.clear()
             binding.chartVendas.invalidate()
+            binding.chartVendas.isVisible = false
+            binding.tvChartVazio.isVisible = true
             return
         }
+        binding.chartVendas.isVisible = true
+        binding.tvChartVazio.isVisible = false
 
         val color = ContextCompat.getColor(requireContext(), R.color.primary_color)
 
@@ -178,6 +182,11 @@ class HistoricoVendasFragment : Fragment() {
                 barWidth = 0.9f
             }
 
+        val periodoDescricao =
+            when (viewModel.periodoSelecionado.value) {
+                HistoricoVendasViewModel.Periodo.SEMANAL -> "por semana"
+                HistoricoVendasViewModel.Periodo.MENSAL -> "por mês"
+            }
         binding.chartVendas.apply {
             data = barData
             xAxis.valueFormatter =
@@ -185,6 +194,8 @@ class HistoricoVendasFragment : Fragment() {
                     HistoricoVendasViewModel.Periodo.SEMANAL -> WeekValueFormatter()
                     HistoricoVendasViewModel.Periodo.MENSAL -> MonthValueFormatter()
                 }
+            contentDescription =
+                "Gráfico de barras: total de vendas $periodoDescricao, ${entries.size} períodos exibidos"
             invalidate()
         }
     }
