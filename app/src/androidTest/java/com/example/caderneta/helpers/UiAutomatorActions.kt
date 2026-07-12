@@ -18,6 +18,14 @@ fun clickByResourceName(resourceName: String) {
     device.waitForIdle()
 }
 
+fun waitForResourceName(resourceName: String) {
+    val instrumentation = InstrumentationRegistry.getInstrumentation()
+    val packageName = instrumentation.targetContext.packageName
+    val device = UiDevice.getInstance(instrumentation)
+    val target = device.wait(Until.findObject(By.res(packageName, resourceName)), UI_TIMEOUT_MS)
+    assertNotNull("Resource not found: $resourceName", target)
+}
+
 fun fillByResourceName(
     resourceName: String,
     value: String,

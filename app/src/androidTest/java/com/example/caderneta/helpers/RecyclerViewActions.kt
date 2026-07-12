@@ -8,6 +8,7 @@ import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.contrib.RecyclerViewActions.actionOnItemAtPosition
+import androidx.test.espresso.contrib.RecyclerViewActions.scrollToPosition
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -20,6 +21,13 @@ fun clickRecyclerItem(
     position: Int,
 ) {
     onView(withId(recyclerViewId)).perform(actionOnItemAtPosition<RecyclerView.ViewHolder>(position, click()))
+}
+
+fun scrollRecyclerToPosition(
+    @IdRes recyclerViewId: Int,
+    position: Int,
+) {
+    onView(withId(recyclerViewId)).perform(scrollToPosition<RecyclerView.ViewHolder>(position))
 }
 
 fun longClickRecyclerItem(

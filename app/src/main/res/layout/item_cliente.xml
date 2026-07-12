@@ -321,7 +321,7 @@
                         android:enabled="false"
                         android:inputType="numberDecimal"
                         android:textColor="@color/on_surface"
-                        android:textSize="18dp" />
+                        android:textSize="18sp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
@@ -399,7 +399,7 @@
                         android:enabled="false"
                         android:inputType="numberDecimal"
                         android:textColor="@color/on_surface"
-                        android:textSize="18dp" />
+                        android:textSize="18sp" />
 
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>

@@ -153,8 +153,12 @@ class ClientesAdapter(
         }
 
         private fun setupBasicInfo(cliente: Cliente) {
+            val fotoSizePx = binding.ivClienteFoto.fixedImageSizePx()
             binding.tvNomeCliente.text = cliente.nome
+            binding.ivClienteFoto.contentDescription =
+                itemView.context.getString(R.string.cliente_photo_content_description, cliente.nome)
             binding.ivClienteFoto.load(getClientePhotoFile(cliente.fotoNome)) {
+                size(fotoSizePx, fotoSizePx)
                 placeholder(R.drawable.ic_avatar)
                 error(R.drawable.ic_avatar)
                 transformations(CircleCropTransformation())
@@ -639,5 +643,11 @@ class ClientesAdapter(
             context: Context,
             dp: Float,
         ): Float = dp * context.resources.displayMetrics.density
+
+        private fun View.fixedImageSizePx(): Int =
+            layoutParams.width.takeIf { it > 0 }
+                ?: dpToPx(context, DEFAULT_CLIENTE_PHOTO_DP).toInt()
+
+        private const val DEFAULT_CLIENTE_PHOTO_DP = 40f
     }
 }

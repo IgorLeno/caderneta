@@ -88,6 +88,7 @@ class VendasFragment : Fragment() {
         observeViewModel()
     }
 
+    @Suppress("LongMethod")
     private fun setupRecyclerView() {
         clientesAdapter =
             ClientesAdapter(
@@ -146,6 +147,7 @@ class VendasFragment : Fragment() {
         binding.rvClientes.apply {
             layoutManager = LinearLayoutManager(context)
             adapter = clientesAdapter
+            setHasFixedSize(true)
         }
     }
 

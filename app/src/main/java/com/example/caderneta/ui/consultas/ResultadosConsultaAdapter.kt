@@ -122,7 +122,13 @@ class ResultadosConsultaAdapter(
                 tvTelefone.text = cliente.telefone?.takeIf { it.isNotBlank() } ?: "Não informado"
                 tvTelefone.visibility = View.VISIBLE
                 tvLocalHierarquia.visibility = View.VISIBLE
+                tvValorDevido.visibility = View.VISIBLE
+                ivExpandir.visibility = View.VISIBLE
+                ivClienteFoto.contentDescription =
+                    root.context.getString(R.string.cliente_photo_content_description, cliente.nome)
+                val fotoSizePx = ivClienteFoto.fixedImageSizePx()
                 ivClienteFoto.load(getClientePhotoFile(cliente.fotoNome)) {
+                    size(fotoSizePx, fotoSizePx)
                     placeholder(R.drawable.ic_avatar)
                     error(R.drawable.ic_avatar)
                     transformations(CircleCropTransformation())
@@ -138,10 +144,7 @@ class ResultadosConsultaAdapter(
                 updateExtratoVisibility(cliente)
             }
 
-            // Setup de click apenas se não estiver configurado
-            if (!binding.root.hasOnClickListeners()) {
-                setupClickListeners(cliente)
-            }
+            setupClickListeners(cliente)
 
             // Setup do long click listener
             binding.root.setOnLongClickListener {
@@ -215,15 +218,13 @@ class ResultadosConsultaAdapter(
         }
 
         private fun configureExtratoAdapter(cliente: ClienteEntity) {
-            if (extratoAdapter == null) {
-                extratoAdapter =
-                    ExtratoAdapter { venda ->
-                        onExtratoItemClick(venda, cliente)
-                    }
-                binding.rvExtrato.apply {
-                    layoutManager = LinearLayoutManager(context)
-                    adapter = extratoAdapter
+            extratoAdapter =
+                ExtratoAdapter { venda ->
+                    onExtratoItemClick(venda, cliente)
                 }
+            binding.rvExtrato.apply {
+                layoutManager = LinearLayoutManager(context)
+                adapter = extratoAdapter
             }
         }
 
@@ -351,6 +352,9 @@ class ResultadosConsultaAdapter(
                 tvLocalHierarquia.visibility = View.GONE
                 tvValorDevido.visibility = View.GONE
                 ivExpandir.visibility = View.GONE
+                ivClienteFoto.setImageResource(R.drawable.ic_location)
+                ivClienteFoto.contentDescription =
+                    root.context.getString(R.string.local_result_content_description, local.local.nome)
                 layoutExtrato.visibility = View.GONE
             }
 
@@ -414,5 +418,10 @@ class ResultadosConsultaAdapter(
         private const val VIEW_TYPE_CLIENTE = 1
         private const val ROTATION_COLAPSADO = 0f
         private const val ROTATION_EXPANDIDO = 180f
+        private const val DEFAULT_RESULTADO_PHOTO_DP = 44f
+
+        private fun View.fixedImageSizePx(): Int =
+            layoutParams.width.takeIf { it > 0 }
+                ?: (resources.displayMetrics.density * DEFAULT_RESULTADO_PHOTO_DP).toInt()
     }
 }

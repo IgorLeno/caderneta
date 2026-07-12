@@ -4,15 +4,16 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.contrib.DrawerActions
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import com.example.caderneta.R
 import com.example.caderneta.helpers.WaitConditions
+import com.example.caderneta.helpers.clickByAnyText
 import com.example.caderneta.helpers.clickByResourceName
 import com.example.caderneta.helpers.clickTextInputEndIcon
 import com.example.caderneta.helpers.fillVisibleField
 import com.example.caderneta.helpers.longClickRecyclerItem
+import com.example.caderneta.helpers.waitForResourceName
 import com.example.caderneta.reporting.DatabaseSummaryCollector
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -57,7 +58,10 @@ class ClientePhotoE2ETest : BaseE2ETest() {
 
                 step(scenarioName, "remover_foto")
                 removerFotoPelaUi()
-                WaitConditions.awaitDb { cliente().fotoNome == null }
+                WaitConditions.awaitDb {
+                    val cliente = findCliente()
+                    cliente != null && cliente.fotoNome == null
+                }
                 assertPhotoMissing(segundaFoto)
                 assertEquals(null, cliente().fotoNome)
             } finally {
@@ -84,19 +88,18 @@ class ClientePhotoE2ETest : BaseE2ETest() {
         fillVisibleField(R.id.et_nome, CLIENTE_NOME)
         fillVisibleField(R.id.et_telefone, "11999990000")
         onView(withId(R.id.btn_importar)).perform(click())
-        onView(withId(R.id.btn_adicionar_foto)).perform(click())
-        onView(withText("Escolher imagem")).perform(click())
-        WaitConditions.awaitView(withId(R.id.btn_remover_foto))
-        onView(withId(R.id.btn_remover_foto)).check(matches(isDisplayed()))
-        onView(withText("Adicionar")).perform(click())
+        clickByResourceName("btn_adicionar_foto")
+        clickByAnyText("Escolher imagem", "ESCOLHER IMAGEM")
+        waitForResourceName("btn_remover_foto")
+        clickByAnyText("Adicionar", "ADICIONAR")
     }
 
     private fun trocarFotoPelaUi() {
         longClickRecyclerItem(R.id.rv_clientes, 0)
         clickByResourceName("btn_editar")
-        onView(withId(R.id.btn_adicionar_foto)).perform(click())
-        onView(withText("Tirar foto")).perform(click())
-        WaitConditions.awaitView(withId(R.id.btn_remover_foto))
+        clickByResourceName("btn_adicionar_foto")
+        clickByAnyText("Tirar foto", "TIRAR FOTO")
+        waitForResourceName("btn_remover_foto")
         onView(withId(R.id.btn_importar)).perform(click())
         onView(withId(R.id.spinner_local)).check(matches(withText("Audit Local Foto")))
         onView(withText("Salvar")).perform(click())
@@ -105,33 +108,33 @@ class ClientePhotoE2ETest : BaseE2ETest() {
     private fun removerFotoPelaUi() {
         longClickRecyclerItem(R.id.rv_clientes, 0)
         clickByResourceName("btn_editar")
-        onView(withId(R.id.btn_remover_foto)).perform(click())
+        clickByResourceName("btn_remover_foto")
         onView(withId(R.id.btn_importar)).perform(click())
         onView(withId(R.id.spinner_local)).check(matches(withText("Audit Local Foto")))
         onView(withText("Salvar")).perform(click())
     }
 
     private fun awaitFotoNome(): String {
-        WaitConditions.awaitDb { cliente().fotoNome != null }
+        WaitConditions.awaitDb { findCliente()?.fotoNome != null }
         return requireNotNull(cliente().fotoNome)
     }
 
     private fun awaitFotoNomeDiferenteDe(previous: String): String {
         WaitConditions.awaitDb {
-            val atual = cliente().fotoNome
+            val atual = findCliente()?.fotoNome
             atual != null && atual != previous
         }
         return requireNotNull(cliente().fotoNome)
     }
 
-    private fun cliente() =
+    private fun cliente() = requireNotNull(findCliente())
+
+    private fun findCliente() =
         runBlocking {
-            requireNotNull(
-                app.container.database
-                    .backupDao()
-                    .getAllClientes()
-                    .singleOrNull { cliente -> cliente.nome == CLIENTE_NOME },
-            )
+            app.container.database
+                .backupDao()
+                .getAllClientes()
+                .singleOrNull { cliente -> cliente.nome == CLIENTE_NOME }
         }
 
     private fun assertPhotoExists(fotoNome: String) {
