@@ -11,6 +11,8 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentManager
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination
 import androidx.navigation.NavOptions
 import androidx.navigation.Navigation.findNavController
 import androidx.recyclerview.widget.DiffUtil
@@ -27,7 +29,7 @@ import com.example.caderneta.util.centavosParaReais
 import com.example.caderneta.util.rethrowCancellation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -98,12 +100,20 @@ class ResultadosConsultaAdapter(
         }
     }
 
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        if (holder is ClienteViewHolder) {
+            holder.onRecycled()
+        }
+        super.onViewRecycled(holder)
+    }
+
     inner class ClienteViewHolder(
         private val binding: ItemResultadoConsultaBinding,
     ) : RecyclerView.ViewHolder(binding.root) {
         private var extratoAdapter: ExtratoAdapter? = null
         private var currentSaldoCentavos: Long = 0
         private var currentClienteId: Long = -1L
+        private var hierarchyJob: Job? = null
 
         @SuppressLint("LongLogTag")
         @Suppress("LongMethod")
@@ -122,6 +132,7 @@ class ResultadosConsultaAdapter(
                 tvTelefone.text = cliente.telefone?.takeIf { it.isNotBlank() } ?: "Não informado"
                 tvTelefone.visibility = View.VISIBLE
                 tvLocalHierarquia.visibility = View.VISIBLE
+                tvLocalHierarquia.text = ""
                 tvValorDevido.visibility = View.VISIBLE
                 ivExpandir.visibility = View.VISIBLE
                 ivClienteFoto.contentDescription =
@@ -163,7 +174,24 @@ class ResultadosConsultaAdapter(
                                         ).lastOrNull()
                                     }
 
-                                findNavController(binding.root).navigate(
+                                val navController = findNavController(binding.root)
+                                val destinationListener =
+                                    object : NavController.OnDestinationChangedListener {
+                                        override fun onDestinationChanged(
+                                            controller: NavController,
+                                            destination: NavDestination,
+                                            arguments: Bundle?,
+                                        ) {
+                                            if (destination.id == R.id.vendasFragment) {
+                                                controller.removeOnDestinationChangedListener(this)
+                                                localMaisEspecifico?.let { local ->
+                                                    onLocalClick(local.id)
+                                                }
+                                            }
+                                        }
+                                    }
+                                navController.addOnDestinationChangedListener(destinationListener)
+                                navController.navigate(
                                     R.id.vendasFragment,
                                     null,
                                     NavOptions
@@ -171,11 +199,6 @@ class ResultadosConsultaAdapter(
                                         .setPopUpTo(R.id.consultasFragment, true)
                                         .build(),
                                 )
-
-                                delay(100) // Pequeno delay para garantir a navegação
-                                localMaisEspecifico?.let { local ->
-                                    onLocalClick(local.id)
-                                }
                             } catch (e: Exception) {
                                 e.rethrowCancellation()
                                 Log.e("ResultadosConsultaAdapter", "Erro ao navegar para vendas", e)
@@ -188,10 +211,13 @@ class ResultadosConsultaAdapter(
                 true
             }
 
-            // Carregar hierarquia local apenas se necessário
-            if (binding.tvLocalHierarquia.text.isNullOrEmpty()) {
-                construirHierarquiaLocal(cliente)
-            }
+            construirHierarquiaLocal(cliente)
+        }
+
+        fun onRecycled() {
+            hierarchyJob?.cancel()
+            hierarchyJob = null
+            binding.tvLocalHierarquia.text = ""
         }
 
         fun atualizarSaldo(novoSaldoCentavos: Long) {
@@ -258,33 +284,40 @@ class ResultadosConsultaAdapter(
 
         @SuppressLint("LongLogTag")
         private fun construirHierarquiaLocal(cliente: ClienteEntity) {
-            coroutineScope.launch {
-                try {
-                    val locais = mutableListOf<String>()
-                    withContext(Dispatchers.IO) {
-                        val principal = localRepository.getLocalById(cliente.localId)
-                        val sub1 = cliente.sublocal1Id?.let { localRepository.getLocalById(it) }
-                        val sub2 = cliente.sublocal2Id?.let { localRepository.getLocalById(it) }
-                        val sub3 = cliente.sublocal3Id?.let { localRepository.getLocalById(it) }
+            hierarchyJob?.cancel()
+            val clienteId = cliente.id
+            hierarchyJob =
+                coroutineScope.launch {
+                    try {
+                        val locais = mutableListOf<String>()
+                        withContext(Dispatchers.IO) {
+                            val principal = localRepository.getLocalById(cliente.localId)
+                            val sub1 = cliente.sublocal1Id?.let { localRepository.getLocalById(it) }
+                            val sub2 = cliente.sublocal2Id?.let { localRepository.getLocalById(it) }
+                            val sub3 = cliente.sublocal3Id?.let { localRepository.getLocalById(it) }
 
-                        listOfNotNull(principal, sub1, sub2, sub3)
-                            .sortedBy { it.level }
-                            .forEach { local ->
-                                locais.add(local.nome)
+                            listOfNotNull(principal, sub1, sub2, sub3)
+                                .sortedBy { it.level }
+                                .forEach { local ->
+                                    locais.add(local.nome)
+                                }
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            if (currentClienteId == clienteId) {
+                                binding.tvLocalHierarquia.text = locais.joinToString(" > ")
                             }
-                    }
-
-                    withContext(Dispatchers.Main) {
-                        binding.tvLocalHierarquia.text = locais.joinToString(" > ")
-                    }
-                } catch (e: Exception) {
-                    e.rethrowCancellation()
-                    Log.e("ResultadosConsultaAdapter", "Erro ao buscar hierarquia", e)
-                    withContext(Dispatchers.Main) {
-                        binding.tvLocalHierarquia.text = "Local não disponível"
+                        }
+                    } catch (e: Exception) {
+                        e.rethrowCancellation()
+                        Log.e("ResultadosConsultaAdapter", "Erro ao buscar hierarquia", e)
+                        withContext(Dispatchers.Main) {
+                            if (currentClienteId == clienteId) {
+                                binding.tvLocalHierarquia.text = "Local não disponível"
+                            }
+                        }
                     }
                 }
-            }
         }
 
         private fun expandExtrato() {

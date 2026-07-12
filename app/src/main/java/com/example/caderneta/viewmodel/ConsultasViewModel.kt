@@ -123,13 +123,17 @@ class ConsultasViewModel(
 
     fun selecionarLocal(localId: Long?) {
         viewModelScope.launch {
-            try {
-                _localSelecionado.value = localId?.let { localRepository.getLocalById(it) }
-                _searchQuery.value = ""
-            } catch (e: Exception) {
-                e.rethrowCancellation()
-                publicarErro("Erro ao selecionar local: ${e.message}")
-            }
+            selecionarLocalAguardando(localId)
+        }
+    }
+
+    suspend fun selecionarLocalAguardando(localId: Long?) {
+        try {
+            _localSelecionado.value = localId?.let { localRepository.getLocalById(it) }
+            _searchQuery.value = ""
+        } catch (e: Exception) {
+            e.rethrowCancellation()
+            publicarErro("Erro ao selecionar local: ${e.message}")
         }
     }
 

@@ -36,7 +36,6 @@ import com.example.caderneta.viewmodel.VendasViewModel
 import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -98,8 +97,7 @@ class ConsultasFragment : Fragment() {
         if (args.clienteId != -1L && args.localId != -1L) {
             lifecycleScope.launch {
                 try {
-                    viewModel.selecionarLocal(args.localId)
-                    delay(100)
+                    viewModel.selecionarLocalAguardando(args.localId)
                     args.filtroNomeCliente?.let { nome ->
                         binding.etBusca.setText(nome)
                         viewModel.buscarClientes(nome)
