@@ -10,10 +10,11 @@
 
     <ImageButton
         android:id="@+id/btn_expandir"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="@dimen/touch_target_min"
+        android:layout_height="@dimen/touch_target_min"
         android:src="@drawable/ic_chevron_right"
         android:background="?attr/selectableItemBackgroundBorderless"
+        android:padding="@dimen/space_3"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -29,41 +30,18 @@
         app:layout_constraintStart_toEndOf="@id/btn_expandir"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/btn_adicionar_sublocal"
+        app:layout_constraintEnd_toStartOf="@id/btn_menu_local"
         tools:text="Nome do Local"/>
 
     <ImageButton
-        android:id="@+id/btn_adicionar_sublocal"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_plus"
+        android:id="@+id/btn_menu_local"
+        android:layout_width="@dimen/touch_target_min"
+        android:layout_height="@dimen/touch_target_min"
+        android:src="@drawable/ic_more_vert"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:padding="6dp"
-        app:tint="@color/add_color"
-        app:layout_constraintEnd_toStartOf="@id/btn_editar_local"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"/>
-
-    <ImageButton
-        android:id="@+id/btn_editar_local"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_edit"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:padding="6dp"
-        app:tint="@color/edit_color"
-        app:layout_constraintEnd_toStartOf="@id/btn_excluir_local"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"/>
-
-    <ImageButton
-        android:id="@+id/btn_excluir_local"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_delete"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:padding="6dp"
-        app:tint="@color/delete_color"
+        android:padding="@dimen/space_3"
+        android:contentDescription="@string/local_more_options"
+        app:tint="@color/text_muted"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"/>

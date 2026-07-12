@@ -204,6 +204,7 @@ class VendasFragment : Fragment() {
                 onEditLocal = { local -> showEditLocalDialog(local) },
                 onDeleteLocal = { local -> showDeleteLocalConfirmation(local) },
                 onToggleExpand = { local -> vendasViewModel.toggleLocalExpansion(local) },
+                fragmentManager = childFragmentManager,
             )
         binding.navView.findViewById<RecyclerView>(R.id.rv_locais).apply {
             layoutManager = LinearLayoutManager(context)

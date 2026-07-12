@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentManager
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -17,6 +18,7 @@ class LocalAdapter(
     private val onEditLocal: (Local) -> Unit,
     private val onDeleteLocal: (Local) -> Unit,
     private val onToggleExpand: (Local) -> Unit,
+    private val fragmentManager: FragmentManager,
 ) : ListAdapter<LocalWithChildren, LocalAdapter.LocalViewHolder>(LocalDiffCallback()) {
     private var allLocals: List<LocalWithChildren> = emptyList()
 
@@ -29,9 +31,10 @@ class LocalAdapter(
             binding.root.setPadding(16 + local.level * 32, 8, 16, 8)
 
             binding.root.setOnClickListener { onLocalClick(local) }
-            binding.btnAdicionarSublocal.setOnClickListener { onAddSubLocal(local) }
-            binding.btnEditarLocal.setOnClickListener { onEditLocal(local) }
-            binding.btnExcluirLocal.setOnClickListener { onDeleteLocal(local) }
+            binding.btnMenuLocal.setOnClickListener {
+                OpcoesLocalDialog(local, onAddSubLocal, onEditLocal, onDeleteLocal)
+                    .show(fragmentManager, OpcoesLocalDialog.DIALOG_TAG)
+            }
 
             // Configura o botão de expandir/retrair
             binding.btnExpandir.apply {
