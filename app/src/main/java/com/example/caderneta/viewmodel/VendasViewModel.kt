@@ -38,6 +38,21 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 
+sealed class ResultadoSalvarCliente {
+    data class Sucesso(
+        val clienteId: Long,
+    ) : ResultadoSalvarCliente()
+
+    data class SucessoParcialSemFoto(
+        val clienteId: Long,
+        val motivoFoto: String,
+    ) : ResultadoSalvarCliente()
+
+    data class Erro(
+        val mensagem: String,
+    ) : ResultadoSalvarCliente()
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class VendasViewModel(
     private val clienteRepository: ClienteRepository,
@@ -484,7 +499,15 @@ class VendasViewModel(
                             sublocal3Id = sublocal3Id,
                         ),
                     )
-                fotoUri?.let { uri -> clientePhotoRepository?.salvarFotoCliente(clienteId, uri) }
+                val resultado = salvarFotoSeNecessario(clienteId, fotoUri)
+                when (resultado) {
+                    is ResultadoSalvarCliente.Sucesso ->
+                        _eventos.send(UiEvento.Sucesso("Cliente adicionado com sucesso!"))
+                    is ResultadoSalvarCliente.SucessoParcialSemFoto ->
+                        _eventos.send(UiEvento.Sucesso("Cliente salvo, mas não foi possível adicionar a foto."))
+                    is ResultadoSalvarCliente.Erro ->
+                        publicarErro(resultado.mensagem)
+                }
             } catch (e: Exception) {
                 e.rethrowCancellation()
                 publicarErro("Erro ao adicionar cliente: ${e.message}")
@@ -517,9 +540,18 @@ class VendasViewModel(
                         sublocal3Id = novoSublocal3Id,
                     ),
                 )
-                when {
-                    removerFoto -> clientePhotoRepository?.removerFoto(cliente.id)
-                    fotoUri != null -> clientePhotoRepository?.salvarFotoCliente(cliente.id, fotoUri)
+                val resultado =
+                    when {
+                        removerFoto -> removerFotoSeNecessario(cliente.id)
+                        else -> salvarFotoSeNecessario(cliente.id, fotoUri)
+                    }
+                when (resultado) {
+                    is ResultadoSalvarCliente.Sucesso ->
+                        _eventos.send(UiEvento.Sucesso("Cliente atualizado com sucesso!"))
+                    is ResultadoSalvarCliente.SucessoParcialSemFoto ->
+                        _eventos.send(UiEvento.Sucesso("Cliente salvo, mas não foi possível atualizar a foto."))
+                    is ResultadoSalvarCliente.Erro ->
+                        publicarErro(resultado.mensagem)
                 }
             } catch (e: Exception) {
                 e.rethrowCancellation()
@@ -529,6 +561,36 @@ class VendasViewModel(
     }
 
     fun arquivoFotoCliente(fotoNome: String?): File? = clientePhotoRepository?.arquivo(fotoNome)
+
+    private suspend fun salvarFotoSeNecessario(
+        clienteId: Long,
+        fotoUri: Uri?,
+    ): ResultadoSalvarCliente {
+        if (fotoUri == null) return ResultadoSalvarCliente.Sucesso(clienteId)
+        val repository =
+            clientePhotoRepository
+                ?: return ResultadoSalvarCliente.SucessoParcialSemFoto(clienteId, "Repositório de foto indisponível")
+        return try {
+            repository.salvarFotoCliente(clienteId, fotoUri)
+            ResultadoSalvarCliente.Sucesso(clienteId)
+        } catch (e: Exception) {
+            e.rethrowCancellation()
+            ResultadoSalvarCliente.SucessoParcialSemFoto(clienteId, e.message ?: "Falha ao salvar foto")
+        }
+    }
+
+    private suspend fun removerFotoSeNecessario(clienteId: Long): ResultadoSalvarCliente {
+        val repository =
+            clientePhotoRepository
+                ?: return ResultadoSalvarCliente.SucessoParcialSemFoto(clienteId, "Repositório de foto indisponível")
+        return try {
+            repository.removerFoto(clienteId)
+            ResultadoSalvarCliente.Sucesso(clienteId)
+        } catch (e: Exception) {
+            e.rethrowCancellation()
+            ResultadoSalvarCliente.SucessoParcialSemFoto(clienteId, e.message ?: "Falha ao remover foto")
+        }
+    }
 
     /**
      * Cliente com histórico financeiro não pode ser apagado (FK RESTRICT):

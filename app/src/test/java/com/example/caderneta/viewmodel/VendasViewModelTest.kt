@@ -1,6 +1,7 @@
 package com.example.caderneta.viewmodel
 
 import android.content.Context
+import android.net.Uri
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -12,6 +13,9 @@ import com.example.caderneta.data.entity.ModoOperacao
 import com.example.caderneta.data.entity.TipoTransacao
 import com.example.caderneta.data.entity.TransacaoVenda
 import com.example.caderneta.domain.FinanceiroService
+import com.example.caderneta.domain.foto.ClientePhotoRepository
+import com.example.caderneta.domain.foto.ClientePhotoStore
+import com.example.caderneta.domain.foto.PhotoProcessor
 import com.example.caderneta.repository.ClienteRepository
 import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
@@ -51,6 +55,7 @@ class VendasViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var executor: ExecutorService
+    private lateinit var context: Context
     private lateinit var db: AppDatabase
     private lateinit var viewModel: VendasViewModel
     private var localId: Long = 0
@@ -60,7 +65,7 @@ class VendasViewModelTest {
     fun setUp() =
         runTest {
             executor = Executors.newSingleThreadExecutor()
-            val context = ApplicationProvider.getApplicationContext<Context>()
+            context = ApplicationProvider.getApplicationContext()
             db =
                 Room
                     .inMemoryDatabaseBuilder(context, AppDatabase::class.java)
@@ -242,6 +247,42 @@ class VendasViewModelTest {
             )
         }
 
+    @Test
+    fun adicionarClienteComFalhaNaFotoMantemClienteEPublicaSucessoParcial() =
+        runTest {
+            viewModel =
+                newViewModel(
+                    clientePhotoRepository =
+                        ClientePhotoRepository(
+                            clienteRepository = ClienteRepository(db.clienteDao()),
+                            store = ClientePhotoStore(context),
+                            processor = PhotoProcessor { error("falha foto") },
+                        ),
+                )
+
+            viewModel.addCliente(
+                nome = "Cliente com foto parcial",
+                telefone = "11999999999",
+                localId = localId,
+                sublocal1Id = null,
+                sublocal2Id = null,
+                sublocal3Id = null,
+                fotoUri = Uri.EMPTY,
+            )
+            advanceUntilIdle()
+
+            val cliente =
+                db
+                    .clienteDao()
+                    .getAllClientes()
+                    .first()
+                    .single { it.nome == "Cliente com foto parcial" }
+            assertNull(cliente.fotoNome)
+            val evento = withTimeout(1_000) { viewModel.eventos.first() }
+            assertTrue(evento is UiEvento.Sucesso)
+            assertEquals("Cliente salvo, mas não foi possível adicionar a foto.", (evento as UiEvento.Sucesso).mensagem)
+        }
+
     private suspend fun salvarConfigESelecionarLocal(configuracoes: Configuracoes = config()) {
         db.configuracoesDao().insertConfiguracoes(configuracoes)
         viewModel = newViewModel()
@@ -266,7 +307,7 @@ class VendasViewModelTest {
         assertEquals(false, viewModel.configuracoes.value?.promocoesAtivadas)
     }
 
-    private fun newViewModel(): VendasViewModel =
+    private fun newViewModel(clientePhotoRepository: ClientePhotoRepository? = null): VendasViewModel =
         VendasViewModel(
             clienteRepository = ClienteRepository(db.clienteDao()),
             localRepository = LocalRepository(db.localDao(), db.clienteDao(), db),
@@ -274,6 +315,7 @@ class VendasViewModelTest {
             configuracoesRepository = ConfiguracoesRepository(db.configuracoesDao()),
             contaRepository = ContaRepository(db.contaDao()),
             financeiroService = FinanceiroService(db),
+            clientePhotoRepository = clientePhotoRepository,
         )
 
     private fun config(promocoesAtivadas: Boolean = false) =
