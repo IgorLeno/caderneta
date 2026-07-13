@@ -23,6 +23,7 @@ import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
@@ -259,6 +260,7 @@ class VendasViewModelTest {
                             processor = PhotoProcessor { error("falha foto") },
                         ),
                 )
+            val eventoDeferred = async { viewModel.eventos.first() }
 
             viewModel.addCliente(
                 nome = "Cliente com foto parcial",
@@ -278,7 +280,7 @@ class VendasViewModelTest {
                     .first()
                     .single { it.nome == "Cliente com foto parcial" }
             assertNull(cliente.fotoNome)
-            val evento = withTimeout(1_000) { viewModel.eventos.first() }
+            val evento = withTimeout(1_000) { eventoDeferred.await() }
             assertTrue(evento is UiEvento.Sucesso)
             assertEquals("Cliente salvo, mas não foi possível adicionar a foto.", (evento as UiEvento.Sucesso).mensagem)
         }
