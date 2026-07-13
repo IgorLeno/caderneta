@@ -140,6 +140,7 @@ android {
                     device = "Pixel 7"
                     apiLevel = 35
                     systemImageSource = "aosp"
+                    testedAbi = "x86_64"
                 }
             }
         }
