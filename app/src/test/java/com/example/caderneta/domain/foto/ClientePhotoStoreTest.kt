@@ -47,4 +47,23 @@ class ClientePhotoStoreTest {
         assertEquals("client_photos", file.parentFile?.name)
         store.delete("cliente_999999.jpg")
     }
+
+    @Test
+    fun findUnreferencedReportsOnlyValidUnreferencedPhotoNames() {
+        val store = ClientePhotoStore(context)
+        store.deleteUnreferenced(emptySet())
+        val referenced = "cliente_101.jpg"
+        val orphan = "cliente_102.jpg"
+        store.writeAtomic(referenced, byteArrayOf(1))
+        store.writeAtomic(orphan, byteArrayOf(2))
+        val invalidFile = store.photoFile("cliente_103.jpg")?.parentFile?.resolve("notes.txt")
+        invalidFile?.writeText("ignore")
+
+        val unreferenced = store.findUnreferenced(setOf(referenced))
+
+        assertEquals(listOf(orphan), unreferenced)
+        store.delete(referenced)
+        store.delete(orphan)
+        invalidFile?.delete()
+    }
 }

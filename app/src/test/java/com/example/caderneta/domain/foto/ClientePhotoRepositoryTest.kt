@@ -13,6 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 class ClientePhotoRepositoryTest {
@@ -76,6 +77,51 @@ class ClientePhotoRepositoryTest {
             store.delete(newName)
         }
 
+    @Test
+    fun saveDeletesInternalCaptureTempAfterProcessing() =
+        runTest {
+            val store = ClientePhotoStore(context)
+            store.deleteUnreferenced(emptySet())
+            val captureFile = newCaptureFile("cliente_capture.jpg")
+            val captureUri = internalCaptureUri(captureFile)
+            val clientStore = FakeClientStore(cliente(fotoNome = null))
+            val repository =
+                ClientePhotoRepository(
+                    clienteRepository = clientStore,
+                    store = store,
+                    processor = PhotoProcessor { byteArrayOf(4, 5, 6) },
+                )
+
+            val newName = repository.salvarFotoCliente(1, captureUri)
+
+            assertFalse(captureFile.exists())
+            assertArrayEquals(byteArrayOf(4, 5, 6), store.existingPhotoFile(newName)?.readBytes())
+            store.delete(newName)
+        }
+
+    @Test
+    fun saveKeepsExternalUriFilesAfterProcessing() =
+        runTest {
+            val store = ClientePhotoStore(context)
+            store.deleteUnreferenced(emptySet())
+            val externalFile = File(context.cacheDir, "external_pick.jpg").apply { writeBytes(byteArrayOf(1)) }
+            val externalUri =
+                Uri.parse("content://${context.packageName}.fileprovider/audit_photo_fixture/${externalFile.name}")
+            val clientStore = FakeClientStore(cliente(fotoNome = null))
+            val repository =
+                ClientePhotoRepository(
+                    clienteRepository = clientStore,
+                    store = store,
+                    processor = PhotoProcessor { byteArrayOf(7, 8, 9) },
+                )
+
+            val newName = repository.salvarFotoCliente(1, externalUri)
+
+            assertTrue(externalFile.exists())
+            store.delete(newName)
+            externalFile.delete()
+        }
+
     private fun clientPhotoNames(store: ClientePhotoStore): List<String> {
         val dir = requireNotNull(store.photoFile("cliente_1.jpg")?.parentFile)
         return dir
@@ -84,6 +130,14 @@ class ClientePhotoRepositoryTest {
             ?.filter { ClientePhotoStore.isValidPhotoName(it) }
             .orEmpty()
     }
+
+    private fun newCaptureFile(name: String): File {
+        val dir = File(context.cacheDir, ClientePhotoStore.PHOTO_CAPTURE_DIR).apply { mkdirs() }
+        return File(dir, name).apply { writeBytes(byteArrayOf(1, 2, 3)) }
+    }
+
+    private fun internalCaptureUri(file: File): Uri =
+        Uri.parse("content://${context.packageName}.fileprovider/${ClientePhotoStore.PHOTO_CAPTURE_DIR}/${file.name}")
 
     private fun cliente(
         fotoNome: String?,

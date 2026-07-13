@@ -32,6 +32,8 @@ class ClientePhotoRepository(
         ) {
             store.delete(fotoNome)
             throw exception
+        } finally {
+            store.deleteInternalCaptureTemp(uri)
         }
         return fotoNome
     }

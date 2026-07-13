@@ -23,6 +23,7 @@ import coil.transform.CircleCropTransformation
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogNovoClienteBinding
+import com.example.caderneta.domain.foto.ClientePhotoStore
 import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.viewmodel.VendasViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -216,7 +217,7 @@ class NovoClienteDialog(
 
     private fun createCaptureUri(): Uri {
         cleanupOldCaptureFiles()
-        val dir = File(requireContext().cacheDir, PHOTO_CAPTURE_DIR).apply { mkdirs() }
+        val dir = File(requireContext().cacheDir, ClientePhotoStore.PHOTO_CAPTURE_DIR).apply { mkdirs() }
         val file = File.createTempFile("cliente_", ".jpg", dir)
         capturePhotoFile = file
         return FileProvider.getUriForFile(
@@ -594,7 +595,7 @@ class NovoClienteDialog(
 
     private fun cleanupOldCaptureFiles() {
         val cutoff = System.currentTimeMillis() - PHOTO_CAPTURE_MAX_AGE_MS
-        File(requireContext().cacheDir, PHOTO_CAPTURE_DIR)
+        File(requireContext().cacheDir, ClientePhotoStore.PHOTO_CAPTURE_DIR)
             .listFiles()
             ?.forEach { file ->
                 if (file.isFile && file.lastModified() < cutoff) {
@@ -604,7 +605,6 @@ class NovoClienteDialog(
     }
 
     companion object {
-        private const val PHOTO_CAPTURE_DIR = "photo_capture"
         private const val PHOTO_CAPTURE_MAX_AGE_MS = 60 * 60 * 1000L
     }
 }
