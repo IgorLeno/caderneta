@@ -21,6 +21,7 @@ import com.example.caderneta.repository.ConfiguracoesRepository
 import com.example.caderneta.repository.ContaRepository
 import com.example.caderneta.repository.LocalRepository
 import com.example.caderneta.repository.VendaRepository
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -260,7 +261,7 @@ class VendasViewModelTest {
                             processor = PhotoProcessor { error("falha foto") },
                         ),
                 )
-            val eventoDeferred = async { viewModel.eventos.first() }
+            val eventoDeferred = async(start = CoroutineStart.UNDISPATCHED) { viewModel.eventos.first() }
 
             viewModel.addCliente(
                 nome = "Cliente com foto parcial",
