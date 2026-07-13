@@ -14,9 +14,6 @@ import com.example.caderneta.databinding.ItemLocalBinding
 
 class LocalAdapter(
     private val onLocalClick: (Local) -> Unit,
-    private val onAddSubLocal: (Local) -> Unit,
-    private val onEditLocal: (Local) -> Unit,
-    private val onDeleteLocal: (Local) -> Unit,
     private val onToggleExpand: (Local) -> Unit,
     private val fragmentManager: FragmentManager,
 ) : ListAdapter<LocalWithChildren, LocalAdapter.LocalViewHolder>(LocalDiffCallback()) {
@@ -32,7 +29,8 @@ class LocalAdapter(
 
             binding.root.setOnClickListener { onLocalClick(local) }
             binding.btnMenuLocal.setOnClickListener {
-                OpcoesLocalDialog(local, onAddSubLocal, onEditLocal, onDeleteLocal)
+                OpcoesLocalDialog
+                    .newInstance(local.id, local.nome)
                     .show(fragmentManager, OpcoesLocalDialog.DIALOG_TAG)
             }
 

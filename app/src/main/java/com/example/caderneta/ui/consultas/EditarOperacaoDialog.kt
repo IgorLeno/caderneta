@@ -41,14 +41,14 @@ import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
-class EditarOperacaoDialog(
-    private val venda: Venda,
-    private val cliente: Cliente,
-) : DialogFragment() {
+class EditarOperacaoDialog : DialogFragment() {
     private var _binding: ItemClienteBinding? = null
     private val binding get() = _binding!!
+    private lateinit var venda: Venda
+    private lateinit var cliente: Cliente
 
     private var alertDialog: AlertDialog? = null
 
@@ -74,12 +74,25 @@ class EditarOperacaoDialog(
         ownerProducer = { requireParentFragment() },
     )
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val app = requireActivity().application as CadernetaApplication
+        runBlocking(Dispatchers.IO) {
+            val vendaAtual = app.vendaRepository.getVendaById(requireArguments().getLong(ARG_VENDA_ID))
+            val clienteAtual = app.clienteRepository.getClienteById(requireArguments().getLong(ARG_CLIENTE_ID))
+            if (vendaAtual != null && clienteAtual != null) {
+                venda = vendaAtual
+                cliente = clienteAtual
+            }
+        }
+    }
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = ItemClienteBinding.inflate(LayoutInflater.from(context))
 
         return AlertDialog
             .Builder(requireContext())
-            .setTitle(getTitleForOperation())
+            .setTitle(if (::venda.isInitialized) getTitleForOperation() else "Editar Operação")
             .setView(binding.root)
             .setPositiveButton("Salvar") { _, _ -> } // Criamos um listener vazio inicialmente
             .setNegativeButton("Cancelar", null)
@@ -173,6 +186,11 @@ class EditarOperacaoDialog(
         savedInstanceState: Bundle?,
     ) {
         super.onViewCreated(view, savedInstanceState)
+        if (!::venda.isInitialized || !::cliente.isInitialized) {
+            FeedbackPresenter.erro(conteudoActivity(), "Operação não encontrada")
+            dismiss()
+            return
+        }
         configureInitialLayout()
         setupUI()
         observeViewModels()
@@ -726,5 +744,19 @@ class EditarOperacaoDialog(
 
     companion object {
         const val TAG = "EditarOperacaoDialog"
+        private const val ARG_VENDA_ID = "vendaId"
+        private const val ARG_CLIENTE_ID = "clienteId"
+
+        fun newInstance(
+            vendaId: Long,
+            clienteId: Long,
+        ): EditarOperacaoDialog =
+            EditarOperacaoDialog().apply {
+                arguments =
+                    Bundle().apply {
+                        putLong(ARG_VENDA_ID, vendaId)
+                        putLong(ARG_CLIENTE_ID, clienteId)
+                    }
+            }
     }
 }

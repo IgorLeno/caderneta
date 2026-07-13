@@ -46,8 +46,6 @@ class ClientesAdapter(
     private val onCancelarOperacao: (Long) -> Unit,
     private val onUpdateValorTotal: (Long, Long) -> Unit,
     private val observeSaldoAtualizado: ((suspend (Long) -> Unit) -> Unit),
-    private val onEditarCliente: (Cliente) -> Unit,
-    private val onExcluirCliente: (Cliente) -> Unit,
     private val getClientePhotoFile: (String?) -> File?,
 ) : ListAdapter<Cliente, ClientesAdapter.ClienteViewHolder>(ClienteDiffCallback()) {
     enum class TipoQuantidade {
@@ -591,11 +589,9 @@ class ClientesAdapter(
 
         private fun setupMenuOpcoes(cliente: Cliente) {
             binding.root.setOnLongClickListener {
-                OpcoesClienteDialog(
-                    cliente = cliente,
-                    onEditarClick = { onEditarCliente(it) },
-                    onExcluirClick = { onExcluirCliente(it) },
-                ).show(fragmentManager, OpcoesClienteDialog.DIALOG_TAG)
+                OpcoesClienteDialog
+                    .newInstance(cliente.id, cliente.nome)
+                    .show(fragmentManager, OpcoesClienteDialog.DIALOG_TAG)
                 true
             }
         }

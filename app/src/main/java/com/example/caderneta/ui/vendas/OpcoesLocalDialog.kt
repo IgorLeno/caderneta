@@ -5,21 +5,37 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
-import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogOpcoesLocalBinding
 
-class OpcoesLocalDialog(
-    private val local: Local,
-    private val onAddSubLocal: (Local) -> Unit,
-    private val onEditLocal: (Local) -> Unit,
-    private val onDeleteLocal: (Local) -> Unit,
-) : DialogFragment() {
+class OpcoesLocalDialog : DialogFragment() {
     companion object {
         const val DIALOG_TAG = "OpcoesLocalDialog"
+        const val REQUEST_KEY = "opcoes_local_result"
+        const val RESULT_ACTION = "action"
+        const val RESULT_LOCAL_ID = "localId"
+        const val ACTION_ADD_SUBLOCAL = "add_sublocal"
+        const val ACTION_EDIT = "edit"
+        const val ACTION_DELETE = "delete"
+        private const val ARG_LOCAL_ID = "localId"
+        private const val ARG_LOCAL_NAME = "localName"
+
+        fun newInstance(
+            localId: Long,
+            localName: String,
+        ): OpcoesLocalDialog =
+            OpcoesLocalDialog().apply {
+                arguments =
+                    Bundle().apply {
+                        putLong(ARG_LOCAL_ID, localId)
+                        putString(ARG_LOCAL_NAME, localName)
+                    }
+            }
     }
 
     private var _binding: DialogOpcoesLocalBinding? = null
     private val binding get() = _binding!!
+    private val localId: Long get() = requireArguments().getLong(ARG_LOCAL_ID)
+    private val localName: String get() = requireArguments().getString(ARG_LOCAL_NAME).orEmpty()
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogOpcoesLocalBinding.inflate(LayoutInflater.from(context))
@@ -28,7 +44,7 @@ class OpcoesLocalDialog(
             .Builder(
                 requireContext(),
                 com.google.android.material.R.style.ThemeOverlay_MaterialComponents_Dialog_Alert,
-            ).setTitle(local.nome)
+            ).setTitle(localName)
             .setView(binding.root)
             .setNegativeButton("Fechar") { _, _ -> dismiss() }
             .create()
@@ -40,23 +56,29 @@ class OpcoesLocalDialog(
     private fun setupButtons() {
         binding.apply {
             btnAdicionarSublocal.setOnClickListener {
-                closeMenuThen { onAddSubLocal(local) }
+                closeMenuThen(ACTION_ADD_SUBLOCAL)
             }
 
             btnRenomearLocal.setOnClickListener {
-                closeMenuThen { onEditLocal(local) }
+                closeMenuThen(ACTION_EDIT)
             }
 
             btnExcluirLocal.setOnClickListener {
-                closeMenuThen { onDeleteLocal(local) }
+                closeMenuThen(ACTION_DELETE)
             }
         }
     }
 
-    private fun closeMenuThen(action: () -> Unit) {
+    private fun closeMenuThen(action: String) {
+        parentFragmentManager.setFragmentResult(
+            REQUEST_KEY,
+            Bundle().apply {
+                putString(RESULT_ACTION, action)
+                putLong(RESULT_LOCAL_ID, localId)
+            },
+        )
         dismiss()
         parentFragmentManager.executePendingTransactions()
-        action()
     }
 
     override fun onDestroyView() {

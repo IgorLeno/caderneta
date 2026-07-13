@@ -17,27 +17,43 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import coil.load
 import coil.transform.CircleCropTransformation
+import com.example.caderneta.CadernetaApplication
 import com.example.caderneta.data.entity.Cliente
 import com.example.caderneta.data.entity.Local
 import com.example.caderneta.databinding.DialogNovoClienteBinding
 import com.example.caderneta.domain.foto.ClientePhotoStore
 import com.example.caderneta.util.rethrowCancellation
 import com.example.caderneta.viewmodel.VendasViewModel
+import com.example.caderneta.viewmodel.VendasViewModelFactory
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
 import java.io.File
 
-class NovoClienteDialog(
-    private val viewModel: VendasViewModel,
-) : DialogFragment() {
+class NovoClienteDialog : DialogFragment() {
     private var _binding: DialogNovoClienteBinding? = null
     private val binding get() = _binding!!
 
-    var onClienteAdicionado: ((String, String, Long, Long?, Long?, Long?, Uri?, Boolean) -> Unit)? = null
+    private val viewModel: VendasViewModel by lazy {
+        val app = requireActivity().application as CadernetaApplication
+        ViewModelProvider(
+            requireParentFragment(),
+            VendasViewModelFactory(
+                app.clienteRepository,
+                app.localRepository,
+                app.vendaRepository,
+                app.configuracoesRepository,
+                app.contaRepository,
+                app.financeiroService,
+                app.clientePhotoRepository,
+                app.clientePhotoSource,
+            ),
+        )[VendasViewModel::class.java]
+    }
 
     private lateinit var localAdapter: ArrayAdapter<Local>
     private lateinit var sublocal1Adapter: ArrayAdapter<Local>
@@ -57,6 +73,8 @@ class NovoClienteDialog(
     private var capturePhotoFile: File? = null
     private var removerFoto = false
     private var submitted = false
+    private val clienteId: Long get() = requireArguments().getLong(ARG_CLIENTE_ID, ID_NOVO_CLIENTE)
+    private val isEditMode: Boolean get() = clienteId != ID_NOVO_CLIENTE
 
     private val pickPhotoLauncher =
         registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -73,18 +91,14 @@ class NovoClienteDialog(
             }
         }
 
-    fun setClienteExistente(cliente: Cliente) {
-        clienteExistente = cliente
-    }
-
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogNovoClienteBinding.inflate(LayoutInflater.from(context)) // Correção aqui
 
         return AlertDialog
             .Builder(requireContext())
-            .setTitle(if (clienteExistente != null) "Editar Cliente" else "Novo Cliente")
+            .setTitle(if (isEditMode) "Editar Cliente" else "Novo Cliente")
             .setView(binding.root)
-            .setPositiveButton(if (clienteExistente != null) "Salvar" else "Adicionar", null)
+            .setPositiveButton(if (isEditMode) "Salvar" else "Adicionar", null)
             .setNegativeButton("Cancelar", null)
             .create()
     }
@@ -105,38 +119,11 @@ class NovoClienteDialog(
         setupDialogButtons()
         setupImportButton()
         setupPhotoActions()
-
-        // Preencher campos se for edição
-        clienteExistente?.let { cliente ->
-            // Preencher apenas nome e telefone
-            binding.etNome.setText(cliente.nome)
-            binding.etTelefone.setText(cliente.telefone)
-
-            // Limpar campos de local
-            binding.spinnerLocal.text = null
-            binding.spinnerSublocal1.text = null
-            binding.spinnerSublocal2.text = null
-            binding.spinnerSublocal3.text = null
-
-            // Esconder sublocais
-            binding.tilSublocal1.visibility = View.GONE
-            binding.tilSublocal2.visibility = View.GONE
-            binding.tilSublocal3.visibility = View.GONE
-
-            viewModel.arquivoFotoCliente(cliente.fotoNome)?.let { foto ->
-                binding.ivClienteFoto.load(foto) {
-                    placeholder(com.example.caderneta.R.drawable.ic_avatar)
-                    error(com.example.caderneta.R.drawable.ic_avatar)
-                    transformations(CircleCropTransformation())
-                }
-                binding.btnRemoverFoto.visibility = View.VISIBLE
-                binding.btnAdicionarFoto.text = "Trocar foto"
-            }
-        }
+        loadClienteExistenteIfNeeded()
 
         // Alterar título se for edição
         (dialog as? AlertDialog)?.setTitle(
-            if (clienteExistente != null) "Editar Cliente" else "Novo Cliente",
+            if (isEditMode) "Editar Cliente" else "Novo Cliente",
         )
     }
 
@@ -237,6 +224,52 @@ class NovoClienteDialog(
         }
         binding.btnRemoverFoto.visibility = View.VISIBLE
         binding.btnAdicionarFoto.text = "Trocar foto"
+    }
+
+    private fun loadClienteExistenteIfNeeded() {
+        if (!isEditMode) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val cliente =
+                    (requireActivity().application as CadernetaApplication)
+                        .clienteRepository
+                        .getClienteById(clienteId)
+                if (cliente == null) {
+                    Toast.makeText(context, "Cliente não encontrado", Toast.LENGTH_LONG).show()
+                    dismiss()
+                    return@launch
+                }
+                clienteExistente = cliente
+                preencherClienteExistente(cliente)
+            } catch (e: Exception) {
+                e.rethrowCancellation()
+                Log.e("NovoClienteDialog", "Erro ao carregar cliente", e)
+                Toast.makeText(context, "Erro ao carregar cliente: ${e.message}", Toast.LENGTH_LONG).show()
+                dismiss()
+            }
+        }
+    }
+
+    private fun preencherClienteExistente(cliente: Cliente) {
+        binding.etNome.setText(cliente.nome)
+        binding.etTelefone.setText(cliente.telefone)
+        binding.spinnerLocal.text = null
+        binding.spinnerSublocal1.text = null
+        binding.spinnerSublocal2.text = null
+        binding.spinnerSublocal3.text = null
+        binding.tilSublocal1.visibility = View.GONE
+        binding.tilSublocal2.visibility = View.GONE
+        binding.tilSublocal3.visibility = View.GONE
+
+        viewModel.arquivoFotoCliente(cliente.fotoNome)?.let { foto ->
+            binding.ivClienteFoto.load(foto) {
+                placeholder(com.example.caderneta.R.drawable.ic_avatar)
+                error(com.example.caderneta.R.drawable.ic_avatar)
+                transformations(CircleCropTransformation())
+            }
+            binding.btnRemoverFoto.visibility = View.VISIBLE
+            binding.btnAdicionarFoto.text = "Trocar foto"
+        }
     }
 
     private fun setupInputValidation() {
@@ -518,15 +551,19 @@ class NovoClienteDialog(
                         importedHierarchy?.getOrNull(3)?.id
                             ?: selectedSublocal3Id
 
-                    onClienteAdicionado?.invoke(
-                        nome,
-                        telefone,
-                        localId,
-                        sublocal1Id,
-                        sublocal2Id,
-                        sublocal3Id,
-                        selectedPhotoUri,
-                        removerFoto,
+                    parentFragmentManager.setFragmentResult(
+                        REQUEST_KEY,
+                        Bundle().apply {
+                            putLong(RESULT_CLIENTE_ID, clienteId)
+                            putString(RESULT_NOME, nome)
+                            putString(RESULT_TELEFONE, telefone)
+                            putLong(RESULT_LOCAL_ID, localId)
+                            putLongOrNull(RESULT_SUBLOCAL1_ID, sublocal1Id)
+                            putLongOrNull(RESULT_SUBLOCAL2_ID, sublocal2Id)
+                            putLongOrNull(RESULT_SUBLOCAL3_ID, sublocal3Id)
+                            putParcelable(RESULT_FOTO_URI, selectedPhotoUri)
+                            putBoolean(RESULT_REMOVER_FOTO, removerFoto)
+                        },
                     )
                     submitted = true
                     dismiss()
@@ -605,6 +642,36 @@ class NovoClienteDialog(
     }
 
     companion object {
+        const val TAG = "NovoClienteDialog"
+        const val REQUEST_KEY = "novo_cliente_result"
+        const val RESULT_CLIENTE_ID = "clienteId"
+        const val RESULT_NOME = "nome"
+        const val RESULT_TELEFONE = "telefone"
+        const val RESULT_LOCAL_ID = "localId"
+        const val RESULT_SUBLOCAL1_ID = "sublocal1Id"
+        const val RESULT_SUBLOCAL2_ID = "sublocal2Id"
+        const val RESULT_SUBLOCAL3_ID = "sublocal3Id"
+        const val RESULT_FOTO_URI = "fotoUri"
+        const val RESULT_REMOVER_FOTO = "removerFoto"
+        const val ID_NOVO_CLIENTE = -1L
+        private const val ARG_CLIENTE_ID = "clienteId"
         private const val PHOTO_CAPTURE_MAX_AGE_MS = 60 * 60 * 1000L
+
+        fun newInstance(clienteId: Long = ID_NOVO_CLIENTE): NovoClienteDialog =
+            NovoClienteDialog().apply {
+                arguments =
+                    Bundle().apply {
+                        putLong(ARG_CLIENTE_ID, clienteId)
+                    }
+            }
+    }
+}
+
+private fun Bundle.putLongOrNull(
+    key: String,
+    value: Long?,
+) {
+    if (value != null) {
+        putLong(key, value)
     }
 }

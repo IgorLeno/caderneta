@@ -1,5 +1,6 @@
 package com.example.caderneta.ui.consultas
 
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -18,6 +19,9 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -88,6 +92,7 @@ class ConsultasFragment : Fragment() {
 
         setupUI()
         setupBackNavigation()
+        setupDialogResultListeners()
         observeViewModel()
         handleNavigationArgs()
     }
@@ -179,12 +184,6 @@ class ConsultasFragment : Fragment() {
                 onExtratoItemClick = { venda, cliente ->
                     showOpcoesExtratoDialog(venda, cliente)
                 },
-                onEditarCliente = { cliente ->
-                    showEditClienteDialog(cliente)
-                },
-                onExcluirCliente = { cliente ->
-                    vendasViewModel.excluirCliente(cliente)
-                },
                 onClienteCollapse = { clienteId ->
                     viewModel.fecharVendasPorCliente(clienteId)
                 },
@@ -202,64 +201,149 @@ class ConsultasFragment : Fragment() {
         }
     }
 
-    private fun showEditClienteDialog(cliente: Cliente) {
-        vendasViewModel.reloadLocais()
-        val dialog =
-            NovoClienteDialog(vendasViewModel).apply {
-                setClienteExistente(cliente)
-                onClienteAdicionado = {
-                    nome,
-                    telefone,
-                    localId,
-                    sublocal1Id,
-                    sublocal2Id,
-                    sublocal3Id,
-                    fotoUri,
-                    removerFoto,
-                    ->
-                    vendasViewModel.editarCliente(
-                        cliente = cliente,
-                        novoNome = nome,
-                        novoTelefone = telefone,
-                        novoLocalId = localId,
-                        novoSublocal1Id = sublocal1Id,
-                        novoSublocal2Id = sublocal2Id,
-                        novoSublocal3Id = sublocal3Id,
-                        fotoUri = fotoUri,
-                        removerFoto = removerFoto,
-                    )
+    private fun setupDialogResultListeners() {
+        childFragmentManager.setFragmentResultListener(
+            OpcoesConsultaClienteDialog.REQUEST_KEY,
+            viewLifecycleOwner,
+        ) { _, bundle ->
+            val clienteId = bundle.getLong(OpcoesConsultaClienteDialog.RESULT_CLIENTE_ID)
+            viewLifecycleOwner.lifecycleScope.launch {
+                val cliente =
+                    (requireActivity().application as CadernetaApplication)
+                        .clienteRepository
+                        .getClienteById(clienteId)
+                        ?: return@launch
+                when (bundle.getString(OpcoesConsultaClienteDialog.RESULT_ACTION)) {
+                    OpcoesConsultaClienteDialog.ACTION_SELL -> navigateToVendasForCliente(cliente)
+                    OpcoesConsultaClienteDialog.ACTION_EDIT -> showEditClienteDialog(cliente)
+                    OpcoesConsultaClienteDialog.ACTION_DELETE -> vendasViewModel.excluirCliente(cliente)
                 }
             }
-        dialog.show(childFragmentManager, "EditClienteDialog")
+        }
+        childFragmentManager.setFragmentResultListener(
+            NovoClienteDialog.REQUEST_KEY,
+            viewLifecycleOwner,
+        ) { _, bundle -> handleClienteDialogResult(bundle) }
+        childFragmentManager.setFragmentResultListener(
+            OpcoesExtratoDialog.REQUEST_KEY,
+            viewLifecycleOwner,
+        ) { _, bundle -> handleOpcoesExtratoResult(bundle) }
+    }
+
+    private suspend fun navigateToVendasForCliente(cliente: Cliente) {
+        try {
+            val localRepository = (requireActivity().application as CadernetaApplication).localRepository
+            val localMaisEspecifico =
+                listOfNotNull(
+                    localRepository.getLocalById(cliente.localId),
+                    cliente.sublocal1Id?.let { localRepository.getLocalById(it) },
+                    cliente.sublocal2Id?.let { localRepository.getLocalById(it) },
+                    cliente.sublocal3Id?.let { localRepository.getLocalById(it) },
+                ).lastOrNull()
+
+            val navController = findNavController()
+            val destinationListener =
+                object : NavController.OnDestinationChangedListener {
+                    override fun onDestinationChanged(
+                        controller: NavController,
+                        destination: NavDestination,
+                        arguments: Bundle?,
+                    ) {
+                        if (destination.id == R.id.vendasFragment) {
+                            controller.removeOnDestinationChangedListener(this)
+                            localMaisEspecifico?.let { local -> viewModel.selecionarLocal(local.id) }
+                        }
+                    }
+                }
+            navController.addOnDestinationChangedListener(destinationListener)
+            navController.navigate(
+                R.id.vendasFragment,
+                null,
+                NavOptions
+                    .Builder()
+                    .setPopUpTo(R.id.consultasFragment, true)
+                    .build(),
+            )
+        } catch (e: Exception) {
+            e.rethrowCancellation()
+            Log.e("ConsultasFragment", "Erro ao navegar para vendas", e)
+        }
+    }
+
+    private fun showEditClienteDialog(cliente: Cliente) {
+        vendasViewModel.reloadLocais()
+        NovoClienteDialog.newInstance(cliente.id).show(childFragmentManager, NovoClienteDialog.TAG)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun handleClienteDialogResult(bundle: Bundle) {
+        val clienteId = bundle.getLong(NovoClienteDialog.RESULT_CLIENTE_ID)
+        if (clienteId == NovoClienteDialog.ID_NOVO_CLIENTE) return
+        val nome = bundle.getString(NovoClienteDialog.RESULT_NOME).orEmpty()
+        val telefone = bundle.getString(NovoClienteDialog.RESULT_TELEFONE).orEmpty()
+        val localId = bundle.getLong(NovoClienteDialog.RESULT_LOCAL_ID)
+        val sublocal1Id = bundle.getOptionalLong(NovoClienteDialog.RESULT_SUBLOCAL1_ID)
+        val sublocal2Id = bundle.getOptionalLong(NovoClienteDialog.RESULT_SUBLOCAL2_ID)
+        val sublocal3Id = bundle.getOptionalLong(NovoClienteDialog.RESULT_SUBLOCAL3_ID)
+        val fotoUri = bundle.getParcelable<Uri>(NovoClienteDialog.RESULT_FOTO_URI)
+        val removerFoto = bundle.getBoolean(NovoClienteDialog.RESULT_REMOVER_FOTO)
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            val cliente =
+                (requireActivity().application as CadernetaApplication)
+                    .clienteRepository
+                    .getClienteById(clienteId)
+                    ?: return@launch
+            vendasViewModel.editarCliente(
+                cliente = cliente,
+                novoNome = nome,
+                novoTelefone = telefone,
+                novoLocalId = localId,
+                novoSublocal1Id = sublocal1Id,
+                novoSublocal2Id = sublocal2Id,
+                novoSublocal3Id = sublocal3Id,
+                fotoUri = fotoUri,
+                removerFoto = removerFoto,
+            )
+        }
     }
 
     private fun showOpcoesExtratoDialog(
         venda: Venda,
         cliente: Cliente,
     ) {
-        OpcoesExtratoDialog(
-            venda = venda,
-            cliente = cliente,
-            onEditarData = { vendaAtual, novaData ->
-                viewModel.atualizarDataVenda(vendaAtual, novaData)
-            },
-            onEditarOperacao = { vendaAtual ->
-                showEditarOperacaoDialog(vendaAtual, cliente)
-            },
-            onExcluir = { vendaAtual ->
-                viewModel.excluirVenda(vendaAtual)
-            },
-        ).show(childFragmentManager, OpcoesExtratoDialog.TAG)
+        OpcoesExtratoDialog.newInstance(venda.id, cliente.id).show(childFragmentManager, OpcoesExtratoDialog.TAG)
+    }
+
+    private fun handleOpcoesExtratoResult(bundle: Bundle) {
+        val vendaId = bundle.getLong(OpcoesExtratoDialog.RESULT_VENDA_ID)
+        val clienteId = bundle.getLong(OpcoesExtratoDialog.RESULT_CLIENTE_ID)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val app = requireActivity().application as CadernetaApplication
+            val venda = app.vendaRepository.getVendaById(vendaId) ?: return@launch
+            val cliente = app.clienteRepository.getClienteById(clienteId) ?: return@launch
+            when (bundle.getString(OpcoesExtratoDialog.RESULT_ACTION)) {
+                OpcoesExtratoDialog.ACTION_EDIT_DATE -> {
+                    val novaData = java.util.Date(bundle.getLong(OpcoesExtratoDialog.RESULT_DATE_MILLIS))
+                    if (viewModel.atualizarDataVenda(venda, novaData)) {
+                        FeedbackPresenter.sucesso(binding.root, "Data atualizada com sucesso")
+                    }
+                }
+                OpcoesExtratoDialog.ACTION_EDIT_OPERATION -> showEditarOperacaoDialog(venda, cliente)
+                OpcoesExtratoDialog.ACTION_DELETE -> {
+                    if (viewModel.excluirVenda(venda)) {
+                        FeedbackPresenter.sucesso(binding.root, "Operação excluída com sucesso")
+                    }
+                }
+            }
+        }
     }
 
     private fun showEditarOperacaoDialog(
         venda: Venda,
         cliente: Cliente,
     ) {
-        EditarOperacaoDialog(
-            venda = venda,
-            cliente = cliente,
-        ).show(childFragmentManager, EditarOperacaoDialog.TAG)
+        EditarOperacaoDialog.newInstance(venda.id, cliente.id).show(childFragmentManager, EditarOperacaoDialog.TAG)
     }
 
     private fun setupNavDrawer() {
@@ -475,3 +559,10 @@ class ConsultasFragment : Fragment() {
         private const val TAG = "ConsultasFragment"
     }
 }
+
+private fun Bundle.getOptionalLong(key: String): Long? =
+    if (containsKey(key)) {
+        getLong(key)
+    } else {
+        null
+    }

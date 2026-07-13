@@ -11,10 +11,6 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentManager
-import androidx.navigation.NavController
-import androidx.navigation.NavDestination
-import androidx.navigation.NavOptions
-import androidx.navigation.Navigation.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
@@ -43,8 +39,6 @@ class ResultadosConsultaAdapter(
     private val localRepository: LocalRepository,
     private val coroutineScope: CoroutineScope,
     private val fragmentManager: FragmentManager,
-    private val onEditarCliente: (ClienteEntity) -> Unit,
-    private val onExcluirCliente: (ClienteEntity) -> Unit,
     private val onClienteCollapse: (Long) -> Unit,
     private val getClientePhotoFile: (String?) -> File?,
 ) : ListAdapter<ResultadoConsulta, RecyclerView.ViewHolder>(ResultadoConsultaDiffCallback()) {
@@ -159,55 +153,9 @@ class ResultadosConsultaAdapter(
 
             // Setup do long click listener
             binding.root.setOnLongClickListener {
-                OpcoesConsultaClienteDialog(
-                    cliente = cliente,
-                    onVenderClick = { clienteSelecionado ->
-                        coroutineScope.launch {
-                            try {
-                                val localMaisEspecifico =
-                                    withContext(Dispatchers.IO) {
-                                        listOfNotNull(
-                                            localRepository.getLocalById(clienteSelecionado.localId),
-                                            clienteSelecionado.sublocal1Id?.let { localRepository.getLocalById(it) },
-                                            clienteSelecionado.sublocal2Id?.let { localRepository.getLocalById(it) },
-                                            clienteSelecionado.sublocal3Id?.let { localRepository.getLocalById(it) },
-                                        ).lastOrNull()
-                                    }
-
-                                val navController = findNavController(binding.root)
-                                val destinationListener =
-                                    object : NavController.OnDestinationChangedListener {
-                                        override fun onDestinationChanged(
-                                            controller: NavController,
-                                            destination: NavDestination,
-                                            arguments: Bundle?,
-                                        ) {
-                                            if (destination.id == R.id.vendasFragment) {
-                                                controller.removeOnDestinationChangedListener(this)
-                                                localMaisEspecifico?.let { local ->
-                                                    onLocalClick(local.id)
-                                                }
-                                            }
-                                        }
-                                    }
-                                navController.addOnDestinationChangedListener(destinationListener)
-                                navController.navigate(
-                                    R.id.vendasFragment,
-                                    null,
-                                    NavOptions
-                                        .Builder()
-                                        .setPopUpTo(R.id.consultasFragment, true)
-                                        .build(),
-                                )
-                            } catch (e: Exception) {
-                                e.rethrowCancellation()
-                                Log.e("ResultadosConsultaAdapter", "Erro ao navegar para vendas", e)
-                            }
-                        }
-                    },
-                    onEditarClick = { onEditarCliente(it) },
-                    onExcluirClick = { onExcluirCliente(it) },
-                ).show(fragmentManager, OpcoesConsultaClienteDialog.TAG)
+                OpcoesConsultaClienteDialog
+                    .newInstance(cliente.id, cliente.nome)
+                    .show(fragmentManager, OpcoesConsultaClienteDialog.TAG)
                 true
             }
 
