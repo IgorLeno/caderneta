@@ -6,4 +6,7 @@
     <cache-path
         name="audit_photo_fixture"
         path="audit_photo_fixture/" />
+    <cache-path
+        name="audit_backup"
+        path="audit_backup/" />
 </paths>
