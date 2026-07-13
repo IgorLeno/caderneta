@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.view.View
 import androidx.core.content.ContextCompat
 import com.example.caderneta.R
+import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
 
 /**
@@ -34,10 +35,23 @@ object FeedbackPresenter {
         duracaoMs: Int,
         corFundo: Int,
     ) {
+        if (!view.isAttachedToWindow) return
         snackbarAtual?.dismiss()
         val snackbar = Snackbar.make(view, mensagem, duracaoMs)
         snackbar.setBackgroundTint(ContextCompat.getColor(view.context, corFundo))
         bottomNavigationDe(view)?.let { snackbar.anchorView = it }
+        snackbar.addCallback(
+            object : BaseTransientBottomBar.BaseCallback<Snackbar>() {
+                override fun onDismissed(
+                    transientBottomBar: Snackbar?,
+                    event: Int,
+                ) {
+                    if (snackbarAtual === transientBottomBar) {
+                        snackbarAtual = null
+                    }
+                }
+            },
+        )
         snackbarAtual = snackbar
         snackbar.show()
     }
