@@ -24,7 +24,7 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 
-class PhotoListPerformanceE2ETest : BaseE2ETest() {
+class PhotoListScrollSmokeTest : BaseE2ETest() {
     @Test
     fun listaComCemClientesComFotoRolaEmVendasEConsultas() {
         val scenarioName = "photo_list_100"

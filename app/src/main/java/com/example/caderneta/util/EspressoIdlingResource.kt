@@ -1,19 +1,30 @@
 package com.example.caderneta.util
 
-import androidx.test.espresso.idling.CountingIdlingResource
-
 object EspressoIdlingResource {
-    private const val RESOURCE = "caderneta-async-work"
+    interface Backend {
+        fun increment()
 
-    val countingIdlingResource = CountingIdlingResource(RESOURCE)
+        fun decrement()
+    }
+
+    private object NoOpBackend : Backend {
+        override fun increment() = Unit
+
+        override fun decrement() = Unit
+    }
+
+    @Volatile
+    private var backend: Backend = NoOpBackend
+
+    fun installBackend(backend: Backend?) {
+        this.backend = backend ?: NoOpBackend
+    }
 
     fun increment() {
-        countingIdlingResource.increment()
+        backend.increment()
     }
 
     fun decrement() {
-        if (!countingIdlingResource.isIdleNow) {
-            countingIdlingResource.decrement()
-        }
+        backend.decrement()
     }
 }

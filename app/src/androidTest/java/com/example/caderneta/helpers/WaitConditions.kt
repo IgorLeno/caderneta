@@ -6,6 +6,7 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.IdlingRegistry
 import androidx.test.espresso.NoMatchingViewException
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.idling.CountingIdlingResource
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.caderneta.util.EspressoIdlingResource
@@ -15,12 +16,28 @@ import kotlinx.coroutines.withTimeout
 import org.hamcrest.Matcher
 
 object WaitConditions {
+    private val countingIdlingResource = CountingIdlingResource("caderneta-async-work")
+    private val backend =
+        object : EspressoIdlingResource.Backend {
+            override fun increment() {
+                countingIdlingResource.increment()
+            }
+
+            override fun decrement() {
+                if (!countingIdlingResource.isIdleNow) {
+                    countingIdlingResource.decrement()
+                }
+            }
+        }
+
     fun registerIdlingResource() {
-        IdlingRegistry.getInstance().register(EspressoIdlingResource.countingIdlingResource)
+        EspressoIdlingResource.installBackend(backend)
+        IdlingRegistry.getInstance().register(countingIdlingResource)
     }
 
     fun unregisterIdlingResource() {
-        IdlingRegistry.getInstance().unregister(EspressoIdlingResource.countingIdlingResource)
+        IdlingRegistry.getInstance().unregister(countingIdlingResource)
+        EspressoIdlingResource.installBackend(null)
     }
 
     fun awaitDb(

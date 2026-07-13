@@ -178,8 +178,6 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.exifinterface)
 
-    implementation(libs.androidx.espresso.idling.resource)
-
     implementation(libs.material)
     implementation(libs.mpandroidchart)
     implementation(libs.coil)
@@ -199,6 +197,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.espresso.contrib)
+    androidTestImplementation(libs.androidx.espresso.idling.resource)
     androidTestImplementation(libs.androidx.espresso.intents)
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.test.runner)
