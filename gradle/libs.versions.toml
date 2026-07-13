@@ -42,7 +42,7 @@ testRules = "1.7.0"
 testOrchestrator = "1.6.1"
 testServices = "1.6.0"
 testStorage = "1.6.0"
-robolectric = "4.15.1"
+robolectric = "4.16.1"
 androidxTestCore = "1.7.0"
 orgJson = "20250517"
 
