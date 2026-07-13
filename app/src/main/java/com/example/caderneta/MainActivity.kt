@@ -32,10 +32,7 @@ class MainActivity : AppCompatActivity() {
 
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
-        if (BuildConfig.IS_AUDIT) {
-            toolbar.subtitle = "AUDITORIA - dados ficticios"
-            toolbar.setSubtitleTextColor(ContextCompat.getColor(this, R.color.red))
-        }
+        binding.auditBadge.visibility = if (BuildConfig.IS_AUDIT) View.VISIBLE else View.GONE
 
         val navHostFragment =
             supportFragmentManager
@@ -60,8 +57,6 @@ class MainActivity : AppCompatActivity() {
 
         // Monitorar mudanças de destino e manter visibilidade do menu
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            supportActionBar?.subtitle =
-                if (BuildConfig.IS_AUDIT) "AUDITORIA - dados ficticios" else null
             binding.bottomNavigation.visibility =
                 when (destination.id) {
                     R.id.vendasFragment,

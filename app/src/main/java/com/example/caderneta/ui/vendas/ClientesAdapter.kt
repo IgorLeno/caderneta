@@ -10,6 +10,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -576,6 +577,16 @@ class ClientesAdapter(
                 setIconTintResource(iconTint)
                 elevation = 0f
                 stateListAnimator = createStateListAnimator()
+                ViewCompat.setStateDescription(
+                    this,
+                    context.getString(
+                        if (isChecked) {
+                            R.string.a11y_selecionado
+                        } else {
+                            R.string.a11y_nao_selecionado
+                        },
+                    ),
+                )
             }
         }
 

@@ -83,11 +83,12 @@ class HistoricoVendasFragment : Fragment() {
     }
 
     private fun setupChipGroup() {
-        binding.chipGroupAgrupamento.setOnCheckedStateChangeListener { group, checkedIds ->
+        binding.chipGroupAgrupamento.setOnCheckedStateChangeListener { _, checkedIds ->
             when (checkedIds.firstOrNull()) {
                 R.id.chip_pessoa -> viewModel.setAgrupamentoSelecionado(HistoricoVendasViewModel.Agrupamento.PESSOA)
                 R.id.chip_predio -> viewModel.setAgrupamentoSelecionado(HistoricoVendasViewModel.Agrupamento.PREDIO)
             }
+            atualizarDetalhesVendas()
         }
     }
 
@@ -136,27 +137,49 @@ class HistoricoVendasFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.historicoVendas.collectLatest {
-                atualizarGrafico()
-                atualizarDetalhesVendas()
+            viewModel.historicoVendas.collectLatest { vendas ->
+                atualizarHistorico(vendas.isEmpty())
             }
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
+    private fun atualizarHistorico(semVendas: Boolean) {
+        if (semVendas) {
+            binding.chartVendas.clear()
+            binding.chartVendas.invalidate()
+            binding.chartVendas.isVisible = false
+            binding.tvChartVazio.apply {
+                text = getString(R.string.historico_sem_vendas)
+                isVisible = true
+            }
+            binding.tvAgrupamento.isVisible = false
+            binding.chipGroupAgrupamento.isVisible = false
+            binding.rvDetalhesVendas.isVisible = false
+            binding.tvEmptyDetalhes.isVisible = false
+            detalhesVendasAdapter.submitList(emptyList())
+            return
+        }
+
+        binding.tvAgrupamento.isVisible = true
+        binding.chipGroupAgrupamento.isVisible = true
+        binding.rvDetalhesVendas.isVisible = true
+        binding.tvChartVazio.text = getString(R.string.grafico_sem_dados)
+        atualizarGrafico()
+        atualizarDetalhesVendas()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun atualizarGrafico() {
-        val entries =
+        val totais =
             when (viewModel.periodoSelecionado.value) {
-                HistoricoVendasViewModel.Periodo.SEMANAL -> {
-                    viewModel.calcularTotalVendasPorSemana().map { (semana, total) ->
-                        BarEntry(semana.toFloat(), total.toFloat() / 100f)
-                    }
-                }
-                HistoricoVendasViewModel.Periodo.MENSAL -> {
-                    viewModel.calcularTotalVendasPorMes().map { (mes, total) ->
-                        BarEntry(mes.toFloat(), total.toFloat() / 100f)
-                    }
-                }
+                HistoricoVendasViewModel.Periodo.SEMANAL -> viewModel.calcularTotalVendasPorSemana()
+                HistoricoVendasViewModel.Periodo.MENSAL -> viewModel.calcularTotalVendasPorMes()
+            }
+        val labels = totais.map { (label, _) -> label }
+        val entries =
+            totais.mapIndexed { index, (_, total) ->
+                BarEntry(index.toFloat(), total.toFloat() / 100f)
             }
 
         if (entries.isEmpty()) {
@@ -189,11 +212,9 @@ class HistoricoVendasFragment : Fragment() {
             }
         binding.chartVendas.apply {
             data = barData
-            xAxis.valueFormatter =
-                when (viewModel.periodoSelecionado.value) {
-                    HistoricoVendasViewModel.Periodo.SEMANAL -> WeekValueFormatter()
-                    HistoricoVendasViewModel.Periodo.MENSAL -> MonthValueFormatter()
-                }
+            xAxis.valueFormatter = LabelValueFormatter(labels)
+            xAxis.axisMinimum = -0.5f
+            xAxis.axisMaximum = entries.lastIndex + 0.5f
             contentDescription =
                 "Gráfico de barras: total de vendas $periodoDescricao, ${entries.size} períodos exibidos"
             invalidate()
@@ -225,6 +246,7 @@ class HistoricoVendasFragment : Fragment() {
             }
 
         binding.tvEmptyDetalhes.isVisible = detalhesList.isEmpty()
+        binding.rvDetalhesVendas.isVisible = detalhesList.isNotEmpty()
         detalhesVendasAdapter.submitList(detalhesList)
     }
 
@@ -234,18 +256,14 @@ class HistoricoVendasFragment : Fragment() {
     }
 
     inner class CurrencyValueFormatter : ValueFormatter() {
-        private val format = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
+        private val format = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("pt-BR"))
 
         override fun getFormattedValue(value: Float): String = format.format(value)
     }
 
-    inner class WeekValueFormatter : ValueFormatter() {
-        override fun getFormattedValue(value: Float): String = "Semana ${value.toInt()}"
-    }
-
-    inner class MonthValueFormatter : ValueFormatter() {
-        private val months = arrayOf("Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez")
-
-        override fun getFormattedValue(value: Float): String = months[value.toInt() - 1]
+    inner class LabelValueFormatter(
+        private val labels: List<String>,
+    ) : ValueFormatter() {
+        override fun getFormattedValue(value: Float): String = labels.getOrNull(value.toInt()).orEmpty()
     }
 }

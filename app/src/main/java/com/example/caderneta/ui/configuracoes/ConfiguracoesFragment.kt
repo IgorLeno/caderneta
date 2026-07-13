@@ -261,14 +261,25 @@ class ConfiguracoesFragment : Fragment() {
         )
 
     private fun buildInfo(): String =
-        "Caderneta ${BuildConfig.VERSION_NAME}\n" +
-            "Código ${BuildConfig.VERSION_CODE}\n" +
-            "Build ${BuildConfig.BUILD_TYPE}\n" +
-            "Audit ${BuildConfig.IS_AUDIT}\n" +
-            "Dirty ${BuildConfig.GIT_DIRTY}\n" +
-            "Commit ${BuildConfig.GIT_SHA}\n" +
-            "Build ${BuildConfig.BUILD_TIME}\n" +
-            "Banco ${BuildConfig.DB_VERSION}"
+        "Caderneta ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
+            "Variante: ${BuildConfig.BUILD_TYPE} (${auditStatus()})\n" +
+            "Commit: ${BuildConfig.GIT_SHA} (${dirtyStatus()})\n" +
+            "Gerado: ${BuildConfig.BUILD_TIME}\n" +
+            "Banco: v${BuildConfig.DB_VERSION}"
+
+    private fun auditStatus(): String =
+        if (BuildConfig.IS_AUDIT) {
+            "auditoria ativa"
+        } else {
+            "produção"
+        }
+
+    private fun dirtyStatus(): String =
+        if (BuildConfig.GIT_DIRTY) {
+            "alterações locais"
+        } else {
+            "limpo"
+        }
 
     override fun onDestroyView() {
         super.onDestroyView()

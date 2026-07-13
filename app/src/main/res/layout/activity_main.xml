@@ -13,7 +13,27 @@
         android:minHeight="?attr/actionBarSize"
         android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
         app:layout_constraintTop_toTopOf="parent"
-        app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light" />
+        app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light">
+
+        <TextView
+            android:id="@+id/audit_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="@dimen/space_4"
+            android:background="@drawable/bg_audit_badge"
+            android:contentDescription="@string/a11y_audit_badge"
+            android:paddingStart="@dimen/space_2"
+            android:paddingTop="@dimen/space_1"
+            android:paddingEnd="@dimen/space_2"
+            android:paddingBottom="@dimen/space_1"
+            android:text="@string/audit_badge_text"
+            android:textAllCaps="true"
+            android:textColor="@color/red"
+            android:textSize="@dimen/text_caption"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </androidx.appcompat.widget.Toolbar>
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/nav_host_fragment"

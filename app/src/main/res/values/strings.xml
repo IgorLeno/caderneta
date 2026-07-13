@@ -11,4 +11,13 @@
     <string name="historico_sem_vendas">Sem vendas no período selecionado.</string>
     <string name="grafico_sem_dados">Sem dados para exibir.</string>
     <string name="consultas_expandir_extrato">Expandir extrato do cliente</string>
+    <string name="a11y_modo_venda">Modo venda</string>
+    <string name="a11y_modo_promocao">Modo promoção</string>
+    <string name="a11y_modo_pagamento">Modo pagamento</string>
+    <string name="a11y_tipo_a_vista">Tipo de venda à vista</string>
+    <string name="a11y_tipo_a_prazo">Tipo de venda a prazo</string>
+    <string name="a11y_selecionado">Selecionado</string>
+    <string name="a11y_nao_selecionado">Não selecionado</string>
+    <string name="a11y_audit_badge">Modo auditoria: dados fictícios</string>
+    <string name="audit_badge_text">AUDIT</string>
 </resources>
