@@ -16,10 +16,11 @@ export JAVA_HOME
 PHYSICAL_SERIAL=""
 ALLOW_DIRTY="0"
 SKIP_BUILD="0"
+REPORT_DIR=""
 
 usage() {
   cat <<USAGE
-Usage: $0 --physical SERIAL [--allow-dirty] [--skip-build]
+Usage: $0 --physical SERIAL [--allow-dirty] [--skip-build] [--report-dir DIR]
 
 Prova morte de processo real: semeia dados via instrumentacao, mata o
 processo do app audit com 'adb shell am force-stop', relanca a Activity
@@ -30,6 +31,7 @@ gerenciado pelo Gradle no meio da instrumentacao seria mais arriscado e
 nao e necessario aqui).
 
 --skip-build reaproveita os APKs ja montados em app/build/outputs/apk.
+--report-dir grava artefatos no diretorio informado em vez de criar um novo.
 USAGE
 }
 
@@ -47,6 +49,11 @@ while [ "$#" -gt 0 ]; do
     --skip-build)
       SKIP_BUILD="1"
       shift
+      ;;
+    --report-dir)
+      [ "$#" -ge 2 ] || { echo "Erro: --report-dir requer diretorio" >&2; exit 2; }
+      REPORT_DIR="$2"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -123,7 +130,9 @@ if [ "$STATE" != "device" ]; then
 fi
 
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-REPORT_DIR="build/reports/process-death/$TIMESTAMP"
+if [ -z "$REPORT_DIR" ]; then
+  REPORT_DIR="build/reports/process-death/$TIMESTAMP"
+fi
 mkdir -p "$REPORT_DIR"
 
 echo "Report dir: $REPORT_DIR"
@@ -194,6 +203,7 @@ fi
 
 cat > "$REPORT_DIR/summary.json" <<JSON
 {
+  "status": "passed",
   "scenario": "process_death_real",
   "device": "$PHYSICAL_SERIAL",
   "appId": "$APP_ID",

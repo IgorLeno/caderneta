@@ -7,6 +7,7 @@ import com.example.caderneta.fixtures.TestStateReset
 import com.example.caderneta.helpers.WaitConditions
 import com.example.caderneta.reporting.AuditTestWatcher
 import com.example.caderneta.reporting.DeviceMetadataCollector
+import com.example.caderneta.reporting.ScenarioId
 import com.example.caderneta.reporting.ScreenshotCollector
 import org.junit.After
 import org.junit.Before
@@ -31,14 +32,17 @@ abstract class BaseE2ETest {
     }
 
     protected fun launch(scenario: String): AuditActivityScenario {
+        val scenarioId = audit.scenarioId
         val activityScenario = ActivityScenario.launch(MainActivity::class.java)
-        DeviceMetadataCollector.write(scenario)
+        DeviceMetadataCollector.write(scenarioId)
         return AuditActivityScenario(
-            scenario = scenario,
+            scenario = scenarioId,
             activityScenario = activityScenario,
             audit = audit,
         )
     }
+
+    protected fun launch(): AuditActivityScenario = launch(audit.scenarioId)
 
     protected fun step(
         scenario: String,
@@ -50,7 +54,13 @@ abstract class BaseE2ETest {
     protected fun screenshot(
         scenario: String,
         name: String,
-    ): String = ScreenshotCollector.takeScreenshot(scenario, name)
+    ): String = ScreenshotCollector.takeScreenshot(audit.scenarioId, ScenarioId.stepName(scenario, name))
+
+    protected fun step(name: String) {
+        audit.step(audit.scenarioId, name)
+    }
+
+    protected fun screenshot(name: String): String = ScreenshotCollector.takeScreenshot(audit.scenarioId, name)
 }
 
 class AuditActivityScenario(

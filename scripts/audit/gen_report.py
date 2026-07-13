@@ -69,6 +69,18 @@ def read_json_files(root: pathlib.Path, directory: str) -> list[dict]:
     return result
 
 
+def read_optional_json(root: pathlib.Path, path: str) -> dict | None:
+    file_path = root / path
+    if not file_path.exists():
+        return None
+    try:
+        content = json.loads(file_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"status": "invalid", "path": path}
+    content.setdefault("path", path)
+    return content
+
+
 LOGCAT_CRASH_MARKERS = ("FATAL EXCEPTION", "E AndroidRuntime", "ANR in ", "signal 11 (SIGSEGV)")
 
 
@@ -115,16 +127,21 @@ def scan_logcat(root: pathlib.Path, logcat_paths: list[str]) -> list[tuple[str, 
     return hits
 
 
-def scenario_key(value: str) -> str:
-    return "".join(char for char in value.lower() if char.isalnum())
+def scenario_id_for_case(case: dict) -> str:
+    class_name = str(case.get("class", "")).split(".")[-1]
+    return f"{class_name}.{case.get('name', '')}"
 
 
 def database_summary_by_scenario(summary: dict) -> dict[str, dict]:
     indexed: dict[str, dict] = {}
     for entry in summary["databaseSummary"]:
         content = entry.get("content", {})
-        scenario = str(content.get("scenario") or pathlib.Path(entry["path"]).stem.replace("_db", ""))
-        indexed[scenario_key(scenario)] = entry
+        scenario = str(
+            content.get("scenarioId")
+            or content.get("scenario")
+            or pathlib.Path(entry["path"]).stem.replace("_db", "")
+        )
+        indexed[scenario] = entry
     return indexed
 
 
@@ -153,22 +170,13 @@ def database_summary_is_clean(entry: dict | None) -> bool:
 
 def find_database_summary_for_case(case: dict, summary: dict) -> dict | None:
     indexed = database_summary_by_scenario(summary)
-    haystack = scenario_key(f"{case['class']} {case['name']} {case['file']}")
-    for key, entry in indexed.items():
-        if key and key in haystack:
-            return entry
+    scenario_id = scenario_id_for_case(case)
+    if scenario_id in indexed:
+        return indexed[scenario_id]
     for failure_path in summary["failures"]:
-        if scenario_key(pathlib.Path(failure_path).stem.replace("_failure", "")) in haystack:
-            try:
-                failure_text = (pathlib.Path(summary["root"]) / failure_path).read_text(
-                    encoding="utf-8",
-                    errors="replace",
-                )
-            except OSError:
-                continue
-            for key, entry in indexed.items():
-                if key and key in scenario_key(failure_text):
-                    return entry
+        failure_scenario = pathlib.Path(failure_path).stem.replace("_failure", "")
+        if failure_scenario in indexed and failure_scenario == scenario_id:
+            return indexed[failure_scenario]
     return None
 
 
@@ -240,6 +248,30 @@ def run_deterministic_checks(root: pathlib.Path, summary: dict) -> list[dict]:
                 "Suíte de auditoria não passou integralmente.",
                 "Investigar falhas nos artefatos de teste e no logcat.",
                 "alta", origin="infra", cause="confirmed",
+            )
+        )
+
+    process_death = summary.get("processDeath") or {}
+    if process_death.get("status") == "failed":
+        findings.append(
+            finding(
+                "P1", "test-infrastructure", "-", "process-death",
+                "Process-death físico foi solicitado, mas falhou.",
+                "A suíte unificada não provou restauração após morte real de processo.",
+                "Inspecionar process-death/summary.json e saídas seed/verify.",
+                "alta", process_death.get("path", "process-death/summary.json"),
+                origin="infra", cause="confirmed",
+            )
+        )
+    elif process_death.get("status") == "invalid":
+        findings.append(
+            finding(
+                "P1", "evidence-invalid", "-", "process-death",
+                "Resumo de process-death existe, mas não pôde ser lido.",
+                "Relatório não consegue diferenciar resultado real de execução física.",
+                "Corrigir geração de process-death/summary.json.",
+                "alta", process_death.get("path", "process-death/summary.json"),
+                origin="evidence", cause="confirmed",
             )
         )
 
@@ -368,6 +400,11 @@ def write_markdown(root: pathlib.Path, summary: dict) -> None:
         f"Failures: {summary['junit']['failures']}",
         f"Errors: {summary['junit']['errors']}",
         f"Skipped: {summary['junit']['skipped']}",
+        "",
+        "## Process Death",
+        "",
+        f"Status: `{summary['processDeath']['status']}`",
+        f"Reason: {summary['processDeath'].get('reason', '-')}",
         "",
         "## Screenshots",
         "",
@@ -535,6 +572,8 @@ def main() -> int:
         "logcat": collect_files(root, "logcat", ("*.txt",)),
         "databaseSummary": read_json_files(root, "database-summary"),
         "metadata": read_json_files(root, "metadata"),
+        "processDeath": read_optional_json(root, "process-death/summary.json")
+        or {"status": "skipped", "reason": "not requested"},
         "visualAnalysisExecuted": False,
     }
     summary["deterministicFindings"] = run_deterministic_checks(root, summary)

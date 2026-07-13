@@ -15,13 +15,17 @@ WIPE="0"
 MODE="gmd"
 ALLOW_DIRTY="0"
 DRY_RUN="0"
+INCLUDE_PROCESS_DEATH="0"
+ORIGINAL_FONT_SCALE=""
+FONT_SCALE_RESTORE_INSTALLED="0"
 
 usage() {
   cat <<USAGE
-Usage: $0 [--suite smoke|full] [--keep-device] [--physical SERIAL] [--wipe] [--allow-dirty] [--dry-run]
+Usage: $0 [--suite smoke|full] [--keep-device] [--physical SERIAL] [--wipe] [--include-process-death] [--allow-dirty] [--dry-run]
 
 Default mode runs Gradle Managed Device pixelApi35 on the audit buildType.
 Physical mode requires --physical SERIAL and only operates on com.example.caderneta.audit.
+--include-process-death is physical-only and runs scripts/audit/process_death_check.sh after the normal suite.
 The script refuses a dirty worktree unless --allow-dirty is present.
 USAGE
 }
@@ -45,6 +49,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --wipe)
       WIPE="1"
+      shift
+      ;;
+    --include-process-death)
+      INCLUDE_PROCESS_DEATH="1"
       shift
       ;;
     --allow-dirty)
@@ -71,6 +79,11 @@ case "$SUITE" in
   smoke|full) ;;
   *) echo "Erro: suite invalida: $SUITE" >&2; exit 2 ;;
 esac
+
+if [ "$INCLUDE_PROCESS_DEATH" = "1" ] && [ "$MODE" != "physical" ]; then
+  echo "Erro: --include-process-death requer --physical SERIAL" >&2
+  exit 2
+fi
 
 case "$APP_ID" in
   "$REAL_APP_ID")
@@ -137,6 +150,12 @@ flatten_test_artifacts() {
   done
 }
 
+restore_font_scale() {
+  if [ "$FONT_SCALE_RESTORE_INSTALLED" = "1" ] && [ -n "$ORIGINAL_FONT_SCALE" ] && [ -n "$PHYSICAL_SERIAL" ]; then
+    "$ADB" -s "$PHYSICAL_SERIAL" shell settings put system font_scale "$ORIGINAL_FONT_SCALE" >/dev/null 2>&1 || true
+  fi
+}
+
 require_cmd git
 
 cd "$ROOT_DIR"
@@ -185,6 +204,10 @@ DRY_RUN_JSON="false"
 if [ "$DRY_RUN" = "1" ]; then
   DRY_RUN_JSON="true"
 fi
+INCLUDE_PROCESS_DEATH_JSON="false"
+if [ "$INCLUDE_PROCESS_DEATH" = "1" ]; then
+  INCLUDE_PROCESS_DEATH_JSON="true"
+fi
 
 GIT_STATUS_FILE="$REPORT_DIR/git-status.txt"
 git status --short --branch > "$GIT_STATUS_FILE"
@@ -203,6 +226,7 @@ cat > "$REPORT_DIR/run-context.json" <<JSON
   "appId": "$APP_ID",
   "realAppId": "$REAL_APP_ID",
   "buildType": "audit",
+  "includeProcessDeath": $INCLUDE_PROCESS_DEATH_JSON,
   "reproducible": $REPRODUCIBLE,
   "allowDirty": $ALLOW_DIRTY_JSON,
   "dryRun": $DRY_RUN_JSON
@@ -229,6 +253,14 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "Dry-run: auditoria usaria :app:assembleAudit e pacote $APP_ID"
   exit 0
 fi
+
+mkdir -p "$REPORT_DIR/process-death"
+cat > "$REPORT_DIR/process-death/summary.json" <<JSON
+{
+  "status": "skipped",
+  "reason": "not requested"
+}
+JSON
 
 ./gradlew :app:assembleAudit --stacktrace --no-daemon
 
@@ -268,6 +300,21 @@ if [ "$MODE" = "physical" ]; then
     echo "Erro: device $PHYSICAL_SERIAL em estado '$STATE', esperado 'device'" >&2
     exit 1
   fi
+  ORIGINAL_FONT_SCALE="$("$ADB" -s "$PHYSICAL_SERIAL" shell settings get system font_scale | tr -d '\r' | tr -d '\n')"
+  if [ -z "$ORIGINAL_FONT_SCALE" ] || [ "$ORIGINAL_FONT_SCALE" = "null" ]; then
+    ORIGINAL_FONT_SCALE="1.0"
+  fi
+  FONT_SCALE_RESTORE_INSTALLED="1"
+  trap restore_font_scale EXIT
+  trap 'restore_font_scale; exit 130' INT
+  trap 'restore_font_scale; exit 143' TERM
+  cat > "$REPORT_DIR/font-scale.json" <<JSON
+{
+  "device": "$PHYSICAL_SERIAL",
+  "originalFontScale": "$ORIGINAL_FONT_SCALE",
+  "restore": "trap"
+}
+JSON
   "$ADB" -s "$PHYSICAL_SERIAL" install -r "$APK"
   if [ "$WIPE" = "1" ]; then
     "$ADB" -s "$PHYSICAL_SERIAL" shell pm clear "$APP_ID"
@@ -295,6 +342,47 @@ else
   ./gradlew $GRADLE_TASK $TEST_ARGS --stacktrace --no-daemon
   TEST_EXIT_CODE="$?"
   set -e
+fi
+
+if [ "$INCLUDE_PROCESS_DEATH" = "1" ]; then
+  PROCESS_DEATH_DIR="$REPORT_DIR/process-death"
+  mkdir -p "$PROCESS_DEATH_DIR"
+  PROCESS_DEATH_ALLOW_DIRTY=""
+  if [ "$ALLOW_DIRTY" = "1" ]; then
+    PROCESS_DEATH_ALLOW_DIRTY="--allow-dirty"
+  fi
+  set +e
+  scripts/audit/process_death_check.sh \
+    --physical "$PHYSICAL_SERIAL" \
+    --skip-build \
+    --report-dir "$PROCESS_DEATH_DIR" \
+    $PROCESS_DEATH_ALLOW_DIRTY > "$PROCESS_DEATH_DIR/process-death-check.txt" 2>&1
+  PROCESS_DEATH_EXIT_CODE="$?"
+  set -e
+  cat "$PROCESS_DEATH_DIR/process-death-check.txt"
+  if [ "$PROCESS_DEATH_EXIT_CODE" != "0" ]; then
+    cat > "$PROCESS_DEATH_DIR/summary.json" <<JSON
+{
+  "status": "failed",
+  "reason": "process_death_check exit code $PROCESS_DEATH_EXIT_CODE",
+  "exitCode": $PROCESS_DEATH_EXIT_CODE,
+  "device": "$PHYSICAL_SERIAL",
+  "appId": "$APP_ID"
+}
+JSON
+    if [ "$TEST_EXIT_CODE" = "0" ]; then
+      TEST_EXIT_CODE="$PROCESS_DEATH_EXIT_CODE"
+    fi
+  fi
+else
+  if [ "$MODE" = "physical" ]; then
+    cat > "$REPORT_DIR/process-death/summary.json" <<JSON
+{
+  "status": "skipped",
+  "reason": "--include-process-death not provided"
+}
+JSON
+  fi
 fi
 
 copy_if_exists "app/build/outputs/androidTest-results" "$REPORT_DIR/test-results"

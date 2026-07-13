@@ -11,22 +11,34 @@ import java.io.StringWriter
 class AuditTestWatcher : TestWatcher() {
     private var lastStep: String = "not-started"
     private val capturedFailures = mutableSetOf<String>()
+    val scenarioId: String get() = ScenarioId.current()
+
+    override fun starting(description: Description) {
+        ScenarioId.start(description)
+        capturedFailures.clear()
+        lastStep = "not-started"
+    }
 
     fun step(
         scenario: String,
         step: String,
     ) {
-        lastStep = step
-        LogcatCollector.mark(scenario, step)
+        val scenarioId = ScenarioId.currentOr(scenario)
+        lastStep = ScenarioId.stepName(scenario, step)
+        LogcatCollector.mark(scenarioId, lastStep)
     }
 
     override fun failed(
         e: Throwable,
         description: Description,
     ) {
-        val scenario = description.methodName ?: description.displayName
+        val scenario = ScenarioId.currentOr(description.methodName ?: description.displayName)
         if (capturedFailures.isNotEmpty()) return
         captureFailure(scenario, e, preClose = false)
+    }
+
+    override fun finished(description: Description) {
+        ScenarioId.clear()
     }
 
     fun captureFailure(
@@ -34,11 +46,12 @@ class AuditTestWatcher : TestWatcher() {
         throwable: Throwable,
         preClose: Boolean,
     ) {
-        if (!capturedFailures.add(scenario)) return
-        runCatching { ScreenshotCollector.takeScreenshot(scenario, "failure_$lastStep") }
-        runCatching { dumpHierarchy(scenario) }
-        runCatching { DeviceMetadataCollector.writeFailure(scenario, lastStep, preClose) }
-        runCatching { writeFailure(scenario, throwable, preClose) }
+        val scenarioId = ScenarioId.currentOr(scenario)
+        if (!capturedFailures.add(scenarioId)) return
+        runCatching { ScreenshotCollector.takeScreenshot(scenarioId, "failure_$lastStep") }
+        runCatching { dumpHierarchy(scenarioId) }
+        runCatching { DeviceMetadataCollector.writeFailure(scenarioId, lastStep, preClose) }
+        runCatching { writeFailure(scenarioId, throwable, preClose) }
     }
 
     private fun dumpHierarchy(scenario: String) {

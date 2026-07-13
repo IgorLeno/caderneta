@@ -11,6 +11,7 @@ object DatabaseSummaryCollector {
         container: AppContainer,
         clienteId: Long? = null,
     ) {
+        val scenarioId = ScenarioId.currentOr(scenario)
         val backupDao = container.database.backupDao()
         val contas = backupDao.getAllContas()
         val vendas = backupDao.getAllVendas()
@@ -18,7 +19,9 @@ object DatabaseSummaryCollector {
         val violations = backupDao.foreignKeyCheck(SimpleSQLiteQuery("PRAGMA foreign_key_check"))
         val json =
             JSONObject()
-                .put("scenario", scenario)
+                .put("scenario", scenarioId)
+                .put("scenarioId", scenarioId)
+                .put("legacyScenario", scenario)
                 .put("locais", backupDao.getAllLocais().size)
                 .put("clientes", backupDao.getAllClientes().size)
                 .put("configuracoes", container.database.configuracoesDao().countConfiguracoes())
@@ -45,6 +48,6 @@ object DatabaseSummaryCollector {
                         },
                     ),
                 )
-        TestOutput.writeText("database-summary/${scenario}_db.json", json.toString(2))
+        TestOutput.writeText("database-summary/${scenarioId}_db.json", json.toString(2))
     }
 }
