@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="@dimen/space_4">
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_adicionar_sublocal"
@@ -13,8 +13,8 @@
         android:layout_height="wrap_content"
         android:text="Adicionar sublocal"
         android:textAlignment="textStart"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+        android:paddingStart="@dimen/space_4"
+        android:paddingEnd="@dimen/space_4"
         app:icon="@drawable/ic_plus"
         app:iconGravity="start"
         app:iconTint="@color/add_color" />
@@ -24,11 +24,11 @@
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/space_2"
         android:text="Renomear"
         android:textAlignment="textStart"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+        android:paddingStart="@dimen/space_4"
+        android:paddingEnd="@dimen/space_4"
         app:icon="@drawable/ic_edit"
         app:iconGravity="start"
         app:iconTint="@color/edit_color" />
@@ -38,11 +38,11 @@
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/space_2"
         android:text="Excluir"
         android:textAlignment="textStart"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+        android:paddingStart="@dimen/space_4"
+        android:paddingEnd="@dimen/space_4"
         android:textColor="@color/delete_color"
         app:icon="@drawable/ic_delete"
         app:iconGravity="start"

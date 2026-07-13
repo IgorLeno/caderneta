@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="@dimen/space_4">
 
     <EditText
         android:id="@+id/et_nome_produto"
@@ -16,7 +16,7 @@
         android:id="@+id/et_preco_produto"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/space_2"
         android:hint="Preço"
         android:inputType="numberDecimal" />
 
@@ -24,6 +24,6 @@
         android:id="@+id/spinner_tipo_produto"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="@dimen/space_2" />
 
 </LinearLayout>
