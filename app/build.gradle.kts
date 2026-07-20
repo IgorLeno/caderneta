@@ -22,8 +22,8 @@ ktlint {
 
 configurations.configureEach {
     resolutionStrategy.force("androidx.test.services:storage:1.6.0")
-    resolutionStrategy.force("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1")
-    resolutionStrategy.force("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    resolutionStrategy.force("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
+    resolutionStrategy.force("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 }
 
 ksp {

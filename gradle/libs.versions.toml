@@ -1,7 +1,7 @@
 [versions]
 # Toolchain
 agp = "9.2.1"
-kotlin = "2.2.10"
+kotlin = "2.4.10"
 ksp = "2.3.2"
 
 # AndroidX
@@ -22,7 +22,7 @@ mpandroidchart = "v3.1.0"
 coil = "2.7.0"
 
 # Kotlin/Coroutines
-coroutines = "1.10.2"
+coroutines = "1.11.0"
 
 # Build
 desugar = "2.1.5"
